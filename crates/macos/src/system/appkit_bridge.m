@@ -123,6 +123,67 @@ static NSString *agent_desktop_application_name(NSRunningApplication *app) {
     return name;
 }
 
+AgentDesktopBytesResult agent_desktop_copy_application_names_json(int32_t pid) {
+    AgentDesktopBytesResult result = {
+        .status = 5, .failureField = NULL, .failureIndex = -1,
+        .failurePID = 0, .bytes = NULL, .length = 0
+    };
+    @try {
+        @autoreleasepool {
+            NSRunningApplication *app =
+                [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+            NSURL *url = app.bundleURL;
+            NSBundle *bundle = url == nil ? nil : [NSBundle bundleWithURL:url];
+            NSArray *candidates = @[
+                app.localizedName ?: @"",
+                [bundle objectForInfoDictionaryKey:@"CFBundleName"] ?: @"",
+                [bundle objectForInfoDictionaryKey:@"CFBundleDisplayName"] ?: @"",
+                bundle.infoDictionary[@"CFBundleName"] ?: @"",
+                bundle.infoDictionary[@"CFBundleDisplayName"] ?: @"",
+            ];
+            NSMutableArray<NSString *> *names = [NSMutableArray array];
+            for (id candidate in candidates) {
+                if (![candidate isKindOfClass:[NSString class]]) {
+                    continue;
+                }
+                NSString *name = agent_desktop_non_blank(candidate);
+                if (name == nil || [names containsObject:name]) {
+                    continue;
+                }
+                if ([name lengthOfBytesUsingEncoding:NSUTF8StringEncoding] > 16384) {
+                    result.status = 2;
+                    return result;
+                }
+                [names addObject:name];
+            }
+            NSError *error = nil;
+            NSData *data = [NSJSONSerialization dataWithJSONObject:names options:0 error:&error];
+            if (data == nil || error != nil || data.length > 1048576) {
+                result.status = 3;
+                return result;
+            }
+            result.bytes = malloc(data.length);
+            if (result.bytes == NULL) {
+                result.status = 4;
+                return result;
+            }
+            memcpy(result.bytes, data.bytes, data.length);
+            result.length = data.length;
+            result.status = 0;
+            return result;
+        }
+    } @catch (NSException *exception) {
+        (void)exception;
+        if (result.bytes != NULL) {
+            free(result.bytes);
+            result.bytes = NULL;
+            result.length = 0;
+        }
+        result.status = 5;
+        return result;
+    }
+}
+
 AgentDesktopBytesResult agent_desktop_copy_workspace_snapshot_json(void) {
     AgentDesktopBytesResult result = {
         .status = 5, .failureField = NULL, .failureIndex = -1,
