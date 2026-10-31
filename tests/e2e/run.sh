@@ -145,6 +145,13 @@ check_fixture_contention || { finish; exit 1; }
 # shellcheck source=tests/e2e/scenarios/os_surfaces.sh
 source "$here/scenarios/os_surfaces.sh"
 
+note "Packaged cursor renderer startup"
+if python3 "$here/cursor_packaged.py" "$raw_bin"; then
+    okmsg "packaged CLI starts the cursor renderer and releases its socket on session end"
+else
+    badmsg "packaged CLI cursor renderer startup probe failed"
+fi
+
 note "Multi-agent cursor probe"
 if [ "$fixture_owned" -eq 0 ] || "$bin" close-app "$app" --force >/dev/null 2>&1; then
     fixture_owned=0
