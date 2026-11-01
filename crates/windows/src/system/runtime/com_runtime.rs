@@ -94,7 +94,45 @@ pub fn is_mta_established_for_new_threads() -> bool {
         .unwrap_or(false)
 }
 
+pub(crate) fn ensure_thread_desktop_attached() {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        #[link(name = "user32")]
+        unsafe extern "system" {
+            fn OpenInputDesktop(dwflags: u32, finherit: i32, dwdesiredaccess: u32) -> isize;
+            fn OpenDesktopW(lpszdesktop: *const u16, dwflags: u32, finherit: i32, dwdesiredaccess: u32) -> isize;
+            fn SetThreadDesktop(hdesktop: isize) -> i32;
+            fn CloseDesktop(hdesktop: isize) -> i32;
+        }
+        const DESKTOP_ENUMERATE: u32 = 0x0040;
+        const DESKTOP_READOBJECTS: u32 = 0x0001;
+        const DESKTOP_WRITEOBJECTS: u32 = 0x0002;
+        let access = DESKTOP_ENUMERATE | DESKTOP_READOBJECTS | DESKTOP_WRITEOBJECTS;
+
+        let h_input = OpenInputDesktop(0, 0, access);
+        if h_input != 0 {
+            SetThreadDesktop(h_input);
+            CloseDesktop(h_input);
+            return;
+        }
+        let default_name: [u16; 8] = [
+            100, 101, 102, 97, 117, 108, 116, 0
+        ];
+        let h_def = OpenDesktopW(
+            default_name.as_ptr(),
+            0,
+            0,
+            access,
+        );
+        if h_def != 0 {
+            SetThreadDesktop(h_def);
+            CloseDesktop(h_def);
+        }
+    }
+}
+
 fn initialize_owned_process_apartment() -> Result<ComApartment, AdapterError> {
+    ensure_thread_desktop_attached();
     #[cfg(test)]
     native_call_probe::OWNED_INITIALIZATIONS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let apartment =
