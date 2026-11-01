@@ -11,6 +11,7 @@ description: Reference for batch, with the input format, limits, validation, sto
 ```bash
 agent-desktop batch JSON [--stop-on-error] [--timeout-ms MS]
 agent-desktop batch '[{"command":"version"},{"command":"wait","args":{"ms":100}}]' --stop-on-error
+printf '%s' "$json" | agent-desktop batch - --stop-on-error
 ```
 
 <table>
@@ -18,7 +19,7 @@ agent-desktop batch '[{"command":"version"},{"command":"wait","args":{"ms":100}}
     <tr><th>Flag or argument</th><th>Default</th><th>Meaning</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>JSON</code></td><td>required</td><td>A JSON array of entries.</td></tr>
+    <tr><td><code>JSON</code></td><td>required</td><td>A JSON array of entries, or <code>-</code> to read the array from stdin until end of input. Use stdin for values that should not appear in the process list, such as text for <code>set-value</code> or <code>type</code>.</td></tr>
     <tr><td><code>--stop-on-error</code></td><td>off</td><td>Halt after the first entry that fails. Without it, later entries still run.</td></tr>
     <tr><td><code>--timeout-ms MS</code></td><td><code>60000</code></td><td>Wall-clock budget for the whole batch, at most 86400000. Each entry's own deadlines are capped by what remains.</td></tr>
   </tbody>

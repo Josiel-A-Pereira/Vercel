@@ -18,6 +18,7 @@ use crate::{
 
 mod bounded_json;
 mod execution;
+mod input;
 mod preparation;
 mod result_entry;
 
