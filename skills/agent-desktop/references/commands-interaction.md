@@ -56,6 +56,7 @@ Exit codes: `0` success, `1` structured error, `2` argument error. The `error` o
 | `INVALID_ARGS` | Bad arguments, or a protected system process was targeted for close | Check syntax |
 | `PLATFORM_NOT_SUPPORTED` | The adapter lacks this method or surface | Use another approach |
 | `NOTIFICATION_NOT_FOUND` | Notification index or fingerprint no longer matches | List again |
+| `TREE_TOO_LARGE` | One snapshot's ref map is over its 1 MB cap | Lower `--max-depth`, or `--skeleton` then `--root`. `details` has `serialized_bytes`, `limit_bytes` and `max_depth` |
 | `INTERNAL` | Unexpected OS failure | Read `message`. Retry once only if `disposition.retry` is `safe` |
 
 `TIMEOUT` `details.kind` values: `actionability_timeout` (the target never became actionable), `wait_timeout` (a `wait` condition; carries `predicate`, `timeout_ms`, `last_observed` or `last_error`), `chain_deadline` (an activation chain ran out of time; carries `value_before`, `value_at_timeout`, `target`, `mutated`). With `chain_deadline`, `mutated: true` or an unknown expanded state means re-read before you retry. `mutated: false` means a direct retry is safe.

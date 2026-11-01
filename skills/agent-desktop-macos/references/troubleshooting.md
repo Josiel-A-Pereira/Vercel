@@ -36,6 +36,17 @@ For Automation, open Privacy & Security > Automation and allow the launching app
 
 **Fix.** Use `find` when you know the target. Otherwise use `snapshot --skeleton -i --compact`, then `snapshot --root @<snapshot_id>:eN` to drill down. Add `--window-id` to limit the window.
 
+## TREE_TOO_LARGE
+
+**Symptom.** `snapshot`, a `--root` drill-down, or `find` returns `TREE_TOO_LARGE`. Older builds returned `INTERNAL` with the message `RefMap exceeds 1MB size limit on write`.
+
+**Cause.** The ref map for one snapshot is capped at 1 MB (1,048,576 bytes). A dense Chromium or Electron page at the default `--max-depth` of 10 can allocate more refs than fit. The observation finished; only the save was refused, so nothing reached the app and `disposition.retry` is `safe`.
+
+**Fix.** Read `details.serialized_bytes`, `details.limit_bytes` and `details.max_depth`, then narrow and retry:
+1. `snapshot --app "App" --max-depth 6`. Lower it further if the save still overflows.
+2. `snapshot --skeleton -i --compact`, then `snapshot --root @<snapshot_id>:eN` on the container you need. A drill-down that overflows too needs a deeper ref or a lower `--max-depth`.
+3. `find` with a tighter query or `--limit` when you know the target.
+
 ## ACTION_FAILED
 
 **Symptom.** A ref action returns `ACTION_FAILED`.

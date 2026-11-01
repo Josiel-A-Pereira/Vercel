@@ -314,11 +314,29 @@ pub fn run_with_context(
         crate::Deadline::after(timeout_ms)?,
     )?;
     let store = RefStore::for_session(context.session_id())?;
-    let snapshot_id = store.save_new_snapshot(&result.refmap)?;
+    let snapshot_id = store
+        .save_new_snapshot(&result.refmap)
+        .map_err(|error| note_observed_depth(error, opts.max_depth))?;
     trace_artifacts::copy_refmap_if_full(context, &store, &snapshot_id, &result.refmap)?;
     result.bind_snapshot_id(snapshot_id);
     emit_snapshot_saved(context, &result)?;
     Ok(result)
+}
+
+/// Adds the depth an observation ran at to a `TREE_TOO_LARGE` error raised
+/// while its refmap was being saved, so the caller can choose a lower
+/// `--max-depth` from the envelope instead of guessing. Any other error
+/// passes through unchanged.
+pub(crate) fn note_observed_depth(error: AppError, max_depth: u8) -> AppError {
+    match error {
+        AppError::Adapter(mut adapter) if adapter.code == crate::ErrorCode::TreeTooLarge => {
+            if let Some(serde_json::Value::Object(details)) = adapter.details.as_mut() {
+                details.insert("max_depth".to_owned(), json!(max_depth));
+            }
+            AppError::Adapter(adapter)
+        }
+        other => other,
+    }
 }
 
 pub(crate) fn emit_snapshot_saved(

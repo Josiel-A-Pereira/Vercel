@@ -326,3 +326,25 @@ fn test_skeleton_fixture_matches_golden() {
 
 #[path = "skeleton_anchor_tests.rs"]
 mod skeleton_anchor_tests;
+
+#[test]
+fn note_observed_depth_adds_the_depth_only_to_a_tree_too_large_error() {
+    let too_large: AppError = crate::refs::tree_too_large(2_000_000).into();
+    let AppError::Adapter(noted) = note_observed_depth(too_large, 8) else {
+        panic!("expected an adapter error");
+    };
+    assert_eq!(noted.code, crate::ErrorCode::TreeTooLarge);
+    let details = noted.details.as_ref().expect("size details");
+    assert_eq!(details["max_depth"], 8);
+    assert_eq!(details["serialized_bytes"], 2_000_000);
+    assert!(
+        noted.is_explicitly_retryable(),
+        "adding the depth must not drop the retryable stamp"
+    );
+
+    let other: AppError = crate::AdapterError::internal("unrelated").into();
+    let AppError::Adapter(untouched) = note_observed_depth(other, 8) else {
+        panic!("expected an adapter error");
+    };
+    assert!(untouched.details.is_none());
+}

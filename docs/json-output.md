@@ -141,6 +141,7 @@ to `role` or `value`.
 | `ACTION_FAILED` | Action rejected, or its observed result contradicted the request |
 | `ACTION_NOT_SUPPORTED` | The target does not expose the requested action |
 | `APP_UNRESPONSIVE` | The matching application stopped responding |
+| `TREE_TOO_LARGE` | The ref map of one snapshot serialized above its 1 MB cap. The observation finished and nothing was sent, so the disposition is `not_delivered`; `details` carries `serialized_bytes`, `limit_bytes` and, for `snapshot` and a `--root` drill-down, the `max_depth` used |
 | `PLATFORM_NOT_SUPPORTED` | Adapter method not implemented on this platform |
 | `TIMEOUT` | Wait condition expired, or a live identity read stayed incomplete until the deadline |
 | `INVALID_ARGS` | Invalid argument values |

@@ -64,6 +64,7 @@ A failed command prints an envelope with `ok: false` and exits `1` (or `2` for a
     <tr><td><code>SNAPSHOT_NOT_FOUND</code></td><td>The snapshot id is missing, pruned, or belongs to another <a href="/desktop/sessions">session</a> namespace.</td><td>Take a snapshot in the same session scope you act in, then use its refs.</td></tr>
     <tr><td><code>POLICY_DENIED</code></td><td>Headless mode blocked a physical or headed path.</td><td>Do not switch modes to recover. See <a href="/desktop/guides/headed-mode">Headed mode</a>.</td></tr>
     <tr><td><code>APP_UNRESPONSIVE</code></td><td>The application stopped responding.</td><td>Wait, take a fresh snapshot, then retry only if <code>disposition.retry</code> is <code>safe</code>.</td></tr>
+    <tr><td><code>TREE_TOO_LARGE</code></td><td>The ref map of one snapshot serialized above its 1 MB cap. The observation finished; only the save was refused.</td><td>Read <code>details.serialized_bytes</code>, <code>details.limit_bytes</code> and <code>details.max_depth</code>, then retry with a lower <code>--max-depth</code>, or <code>--skeleton</code> and then <code>--root</code>. <code>disposition.retry</code> is <code>safe</code>. It never carries <code>recovery</code>.</td></tr>
     <tr><td><code>INTERNAL</code></td><td>An unexpected error.</td><td>Read <code>message</code>. Retry once only if <code>disposition.retry</code> is <code>safe</code>.</td></tr>
   </tbody>
 </table>
@@ -104,7 +105,7 @@ A failed command prints an envelope with `ok: false` and exits `1` (or `2` for a
   </tbody>
 </table>
 
-`STALE_REF` uses `inspect_state_then_retry_original` only when `details.process_state` is `exited`, and `refresh_snapshot_then_retry_original` otherwise. Every other code, such as `ACTION_FAILED`, `INVALID_ARGS`, or `AMBIGUOUS_TARGET`, never carries `recovery`. Follow the "What to do" column instead.
+`STALE_REF` uses `inspect_state_then_retry_original` only when `details.process_state` is `exited`, and `refresh_snapshot_then_retry_original` otherwise. Every other code, such as `ACTION_FAILED`, `INVALID_ARGS`, `AMBIGUOUS_TARGET`, or `TREE_TOO_LARGE`, never carries `recovery`. Follow the "What to do" column instead.
 
 `retry_after_ms` is set only for `TIMEOUT` and `APP_UNRESPONSIVE` (250 ms in this release). `details.retryable` is the adapter's own judgment: `false` means waiting cannot change the outcome, so try a different approach, and it suppresses `recovery` even for a code that would otherwise carry one.
 

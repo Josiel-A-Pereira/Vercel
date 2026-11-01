@@ -13,6 +13,31 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub type RefPath = SmallVec<[usize; 8]>;
 
 pub(crate) const MAX_REFMAP_BYTES: u64 = 1_048_576;
+
+/// `TREE_TOO_LARGE` for a refmap that serialized to `serialized_bytes`, above
+/// `MAX_REFMAP_BYTES`. The observation finished and nothing reached the
+/// application, so the disposition is `not_delivered` and a narrower retry is
+/// safe. `details` carries the measured size and the cap so the caller can
+/// judge how far to narrow.
+pub(crate) fn tree_too_large(serialized_bytes: u64) -> crate::AdapterError {
+    crate::AdapterError::new(
+        crate::ErrorCode::TreeTooLarge,
+        format!(
+            "RefMap serialized to {serialized_bytes} bytes, above the {MAX_REFMAP_BYTES} byte limit for one snapshot"
+        ),
+    )
+    .with_suggestion(
+        "Narrow the observation and retry: snapshot with a lower --max-depth, or snapshot --skeleton \
+         and then --root @<snapshot_id>:eN to drill into one subtree; for find, tighten the query or lower --limit",
+    )
+    .with_details(serde_json::json!({
+        "kind": "refmap_too_large",
+        "serialized_bytes": serialized_bytes,
+        "limit_bytes": MAX_REFMAP_BYTES,
+        "retryable": true,
+    }))
+    .with_disposition(crate::DeliverySemantics::not_delivered())
+}
 static SNAPSHOT_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 thread_local! {
@@ -150,12 +175,9 @@ impl RefMap {
     pub(crate) fn serialize_with_size_check(&self) -> Result<String, AppError> {
         self.validate()?;
         let json = serde_json::to_string(self)?;
-        if json.len() as u64 > MAX_REFMAP_BYTES {
-            return Err(crate::AdapterError::internal("RefMap exceeds 1MB size limit on write")
-                .with_suggestion(
-                    "Narrow the observation: snapshot with --skeleton, --max-depth, or --root @ref, or use find with a tighter query or --limit",
-                )
-                .into());
+        let serialized_bytes = json.len() as u64;
+        if serialized_bytes > MAX_REFMAP_BYTES {
+            return Err(tree_too_large(serialized_bytes).into());
         }
         Ok(json)
     }
