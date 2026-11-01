@@ -41,6 +41,35 @@ pub(crate) fn children(
     Ok(children)
 }
 
+pub(crate) fn content_origin(
+    scroll_area: &AXElement,
+    deadline: Deadline,
+) -> Result<Option<agent_desktop_core::Point>, AdapterError> {
+    prepare(scroll_area, deadline)?;
+    let result = crate::tree::properties::attributes::copy_ax_array_prefix_result(
+        scroll_area,
+        "AXContents",
+        1,
+        deadline,
+    );
+    deadline.ensure_remaining()?;
+    let contents = result
+        .map(|contents| contents.unwrap_or_default())
+        .map_err(|error| read_error("AXContents", error))?;
+    let Some(content) = contents.first() else {
+        return Ok(None);
+    };
+    let instant = crate::tree::locator_deadline::from_operation(deadline)?;
+    Ok(
+        crate::tree::element_bounds::read_bounds_with_deadline(content, instant)?.map(|bounds| {
+            agent_desktop_core::Point {
+                x: bounds.x,
+                y: bounds.y,
+            }
+        }),
+    )
+}
+
 pub(crate) fn string(
     element: &AXElement,
     attribute: &str,

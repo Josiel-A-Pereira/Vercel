@@ -92,3 +92,24 @@ fn repeated_scroll_propagates_uncertain_mutation_without_another_attempt() {
         true
     );
 }
+
+#[test]
+fn value_shift_is_verified_only_by_content_movement() {
+    let at = |y: f64| Some(agent_desktop_core::Point { x: 213.0, y });
+    assert_eq!(super::content_moved(at(196.0), at(-530.0)), Some(true));
+    assert_eq!(super::content_moved(at(196.0), at(196.0)), Some(false));
+    assert_eq!(super::content_moved(at(196.0), at(196.4)), Some(false));
+    assert_eq!(super::content_moved(None, at(196.0)), None);
+    assert_eq!(super::content_moved(at(196.0), None), None);
+}
+
+#[test]
+fn unmoved_content_fails_as_delivered_but_unverified() {
+    let error = super::content_unmoved();
+    assert_eq!(error.code, ErrorCode::ActionFailed);
+    assert_eq!(error.details.unwrap()["kind"], "scroll_content_unmoved");
+    assert_eq!(
+        error.disposition,
+        agent_desktop_core::DeliverySemantics::delivered_unverified()
+    );
+}
