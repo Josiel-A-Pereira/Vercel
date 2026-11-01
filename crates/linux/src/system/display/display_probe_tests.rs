@@ -1,7 +1,7 @@
 #[cfg(target_os = "linux")]
 use std::os::unix::net::UnixListener;
 
-use super::{SocketProbe, local_number, reach_from};
+use super::{SocketProbe, local_number, reach_from, read_table};
 use crate::system::display::display_reach::Reach;
 use crate::system::display::display_server::Probe;
 
@@ -82,4 +82,25 @@ fn the_kernel_table_sees_a_real_listener_and_then_its_stale_file() {
     assert_eq!(SocketProbe.wayland(&live), Reach::Refused);
     assert_eq!(SocketProbe.wayland(&dir.join("absent")), Reach::Missing);
     std::fs::remove_dir_all(&dir).expect("cleanup");
+}
+
+#[test]
+fn a_non_utf8_socket_name_does_not_hide_a_listening_x11_socket() {
+    let dir = std::env::temp_dir().join(format!("ad-probe-table-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("scratch dir");
+    let unix_table = dir.join("unix");
+    let mut bytes = HEADER.as_bytes().to_vec();
+    bytes.extend_from_slice(
+        b"0000000000000000: 00000002 00000000 00010000 0001 01 11 @app-\xff\xfe\n",
+    );
+    bytes.extend_from_slice(
+        b"0000000000000000: 00000002 00000000 00010000 0001 01 4242 /tmp/.X11-unix/X0\n",
+    );
+    std::fs::write(&unix_table, bytes).expect("write table");
+    let table = read_table(&unix_table);
+    std::fs::remove_dir_all(&dir).expect("cleanup");
+    assert_eq!(
+        reach_from(&table, "/tmp/.X11-unix/X0", true),
+        Reach::Connected
+    );
 }
