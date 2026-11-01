@@ -20,6 +20,7 @@ pub(crate) mod node_attrs;
 pub(crate) mod node_control_states;
 pub(crate) mod node_identifiers;
 pub(crate) mod node_semantic_states;
+pub(crate) mod offspace_windows;
 pub(crate) mod readonly;
 pub(crate) mod text_attributes;
 pub(crate) mod text_insertion;
