@@ -33,6 +33,16 @@ impl OperationReport {
         )
     }
 
+    pub fn background_click(event: &MouseEvent) -> Self {
+        Self::new(
+            ActionResult::delivered_unverified("mouse-click")
+                .with_steps(vec![window_step("element_press")]),
+            OperationTarget::Pointer {
+                point: event.point.clone(),
+            },
+        )
+    }
+
     pub fn drag_dispatched(params: &DragParams) -> Self {
         Self::new(
             ActionResult::delivered_unverified("drag")

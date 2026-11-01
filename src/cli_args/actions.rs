@@ -236,6 +236,13 @@ pub(crate) struct MouseClickArgs {
     )]
     #[serde(default)]
     pub modifiers: Vec<String>,
+    #[arg(
+        long,
+        value_name = "APP",
+        help = "Press the element of this app at --xy through accessibility: the pointer stays put, the app stays behind, and --headed is not needed; macOS only"
+    )]
+    #[serde(default)]
+    pub app: Option<String>,
 }
 
 #[derive(Parser, Debug, Deserialize)]
