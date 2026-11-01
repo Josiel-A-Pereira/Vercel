@@ -138,13 +138,13 @@ fn live_generation_rejects_stale_tokens() {
 #[test]
 fn duplicate_windows_share_one_consistent_process_instance() {
     let records = vec![record(10, 1, "One"), record(10, 2, "Two")];
-    let instances = unique_process_instances(&records).unwrap();
+    let instances = generation::unique_process_instances(&records).unwrap();
 
     assert_eq!(instances, [(10, "macos-proc-v1:100:0")]);
 
     let mut conflicting = records;
     conflicting[1].process_instance = Some("macos-proc-v1:101:0".into());
-    let error = unique_process_instances(&conflicting).unwrap_err();
+    let error = generation::unique_process_instances(&conflicting).unwrap_err();
     assert_eq!(error.details.unwrap()["phase"], "process_instance_conflict");
 }
 
