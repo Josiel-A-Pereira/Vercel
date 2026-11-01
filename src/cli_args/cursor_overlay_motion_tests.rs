@@ -88,3 +88,18 @@ fn out_of_budget_motion_is_invalid_args() {
         .unwrap_err();
     assert_eq!(error.code(), "INVALID_ARGS");
 }
+
+#[test]
+fn rest_ms_flag_sets_the_rest_time() {
+    let config = parse(&["--rest-ms", "0"])
+        .unwrap()
+        .enable
+        .to_core()
+        .unwrap();
+    assert_eq!(config.motion().rest_ms(), 0);
+    let config = parse(&[]).unwrap().enable.to_core().unwrap();
+    assert_eq!(
+        config.motion().rest_ms(),
+        agent_desktop_core::CURSOR_IDLE_REST_MS
+    );
+}

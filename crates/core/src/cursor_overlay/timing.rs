@@ -27,3 +27,10 @@ pub const CURSOR_REST_FADE_MS: u64 = 156;
 /// arrives does not simply blink into place. The same caveat applies: the
 /// bridge holds its own copy for now.
 pub const CURSOR_LABEL_REVEAL_MS: u64 = 180;
+
+/// Whether a cursor that has been quiet for `quiet` should rest under a rest
+/// time of `rest_ms`. A rest time of zero keeps the cursor until its session
+/// ends or the overlay is disabled.
+pub fn rest_is_due(rest_ms: u64, quiet: std::time::Duration) -> bool {
+    rest_ms != 0 && quiet.as_millis() >= u128::from(rest_ms)
+}
