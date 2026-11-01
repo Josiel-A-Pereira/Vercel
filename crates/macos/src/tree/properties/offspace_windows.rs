@@ -39,7 +39,8 @@ mod imp {
     const TOKEN_ID_RANGE: u64 = 3000;
     const PROBE_TIMEOUT: Duration = Duration::from_millis(50);
     /// Upper bound on one probe, so an application that answers slowly or
-    /// not at all costs at most this much, never the caller's whole deadline.
+    /// not at all costs at most this much. A probe also takes at most half of
+    /// the remaining deadline, so the native read it extends still completes.
     const PROBE_BUDGET: Duration = Duration::from_millis(750);
     const CACHE_TTL: Duration = Duration::from_secs(3);
     const WINDOW_SUBROLES: &[&str] = &[
@@ -209,7 +210,9 @@ mod imp {
         if let Some(windows) = cached(pid) {
             return windows;
         }
-        let until = deadline.min(Instant::now() + PROBE_BUDGET);
+        let now = Instant::now();
+        let share = deadline.saturating_duration_since(now) / 2;
+        let until = now + share.min(PROBE_BUDGET);
         let (windows, complete) = probe(pid, until);
         if complete {
             retain_all(&windows);
