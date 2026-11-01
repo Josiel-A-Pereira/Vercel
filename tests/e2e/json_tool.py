@@ -151,9 +151,12 @@ def command_run(output_path, command):
         command,
         inherit_interaction_lease=os.environ.get(INHERIT_INTERACTION_LEASE_ENV) == "1",
     )
-    payload = result.stdout if result.stdout.strip() else result.stderr
+    stdout_selected = bool(result.stdout.strip())
+    payload = result.stdout if stdout_selected else result.stderr
     with open(output_path, "w", encoding="utf-8") as output:
         output.write(payload)
+    if stdout_selected and result.stderr:
+        sys.stderr.write(result.stderr)
     print(f"{result.returncode}\t{result.wall_ms:.1f}")
 
 

@@ -6,7 +6,7 @@ import time
 import unittest
 from unittest import mock
 
-from json_tool import command_delivered_mechanism, command_get, run_bounded
+from json_tool import command_delivered_mechanism, command_get, command_run, run_bounded
 
 
 class RunBoundedTests(unittest.TestCase):
@@ -176,6 +176,34 @@ class RunBoundedTests(unittest.TestCase):
         self.assertEqual(result.returncode, 125)
         self.assertTrue(result.output_limited)
         self.assertLessEqual(len(result.stdout.encode()), 4096)
+
+
+class CommandRunTests(unittest.TestCase):
+    def run_command(self, script):
+        with tempfile.TemporaryDirectory() as directory:
+            output_path = os.path.join(directory, "result.out")
+            with mock.patch("builtins.print"), mock.patch("json_tool.sys.stderr") as stderr:
+                command_run(output_path, [sys.executable, "-c", script])
+            with open(output_path, encoding="utf-8") as output:
+                payload = output.read()
+        forwarded = "".join(call.args[0] for call in stderr.write.call_args_list)
+        return payload, forwarded
+
+    def test_stdout_goes_to_the_output_file_and_stderr_to_the_caller(self):
+        payload, forwarded = self.run_command(
+            "import sys; print('{\"ok\":true}'); print('warning: diagnostic', file=sys.stderr)"
+        )
+
+        self.assertEqual(payload, '{"ok":true}\n')
+        self.assertEqual(forwarded, "warning: diagnostic\n")
+
+    def test_stderr_goes_to_the_output_file_when_stdout_is_empty(self):
+        payload, forwarded = self.run_command(
+            "import sys; print('only diagnostic', file=sys.stderr)"
+        )
+
+        self.assertEqual(payload, "only diagnostic\n")
+        self.assertEqual(forwarded, "")
 
 
 class CommandGetTests(unittest.TestCase):
