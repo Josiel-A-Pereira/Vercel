@@ -73,7 +73,7 @@ pub(crate) fn verify_window_identity_until(
     id: &str,
     evidence: WindowIdentityEvidence<'_>,
     deadline: std::time::Instant,
-) -> Result<(), AdapterError> {
+) -> Result<WindowRecord, AdapterError> {
     let window_number = parse_window_number(id).ok_or_else(|| invalid_window_id(id))?;
     let record =
         crate::system::window::cg_window_exact::exact_window_record_until(window_number, deadline)?
@@ -88,7 +88,7 @@ pub(crate) fn verify_window_identity_until(
     {
         return Err(window_identity_mismatch(id));
     }
-    Ok(())
+    Ok(record)
 }
 
 fn window_record_matches_source(

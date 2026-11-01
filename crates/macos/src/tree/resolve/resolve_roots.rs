@@ -75,13 +75,7 @@ fn source_surface_scoped_roots(
         {
             let scoped = match source_window_scoped_roots(application, entry, context) {
                 Ok(scoped) => scoped,
-                Err(error)
-                    if error
-                        .details
-                        .as_ref()
-                        .and_then(|details| details["kind"].as_str())
-                        == Some("resolution_window_bridge_miss") =>
-                {
+                Err(error) if super::resolve_errors::is_unmatched_source_window(&error) => {
                     let root = saved_surface_fallback(entry, |number| {
                         crate::tree::window_surface::surface_for_pid_with_window_number(
                             pid,
@@ -141,6 +135,7 @@ fn source_window_scoped_roots(
     context: &mut ResolveReadContext,
 ) -> Result<CandidateRoots, AdapterError> {
     let deadline = context.deadline;
+    let mut source_window_on_screen = true;
     if let Some(id) = entry.source.source_window_id.as_deref() {
         if source_window_number(entry).is_none() {
             return Err(
@@ -154,21 +149,23 @@ fn source_window_scoped_roots(
                 ),
             );
         }
-        crate::system::window::window_resolve::verify_window_identity_until(
-            id,
-            crate::system::window::window_resolve::WindowIdentityEvidence {
-                pid: crate::system::process::process_identity::to_pid_t(entry.process.pid)?,
-                app: entry.source.source_app.as_deref(),
-                process_instance: entry.process.process_instance.as_deref(),
-                title: entry.source.source_window_title.as_deref(),
-                bounds_hash: entry.source.source_window_bounds_hash,
-            },
-            deadline,
-        )?;
+        source_window_on_screen =
+            crate::system::window::window_resolve::verify_window_identity_until(
+                id,
+                crate::system::window::window_resolve::WindowIdentityEvidence {
+                    pid: crate::system::process::process_identity::to_pid_t(entry.process.pid)?,
+                    app: entry.source.source_app.as_deref(),
+                    process_instance: entry.process.process_instance.as_deref(),
+                    title: entry.source.source_window_title.as_deref(),
+                    bounds_hash: entry.source.source_window_bounds_hash,
+                },
+                deadline,
+            )?
+            .visible;
     }
     let windows = read_root_array(application, "AXWindows", context)?.unwrap_or_default();
     let window = if entry.source.source_window_id.is_some() {
-        window_by_number(&windows, entry, context)?
+        window_by_number(&windows, entry, source_window_on_screen, context)?
     } else {
         window_by_title(
             &windows,
@@ -195,6 +192,7 @@ pub(in crate::tree) fn source_scope_verified(
 fn window_by_number(
     windows: &[AXElement],
     entry: &RefEntry,
+    source_window_on_screen: bool,
     context: &mut ResolveReadContext,
 ) -> Result<Option<AXElement>, AdapterError> {
     let deadline = context.deadline;
@@ -225,9 +223,9 @@ fn window_by_number(
         return Err(error);
     }
     require_unique_window_number_match(match_count, source_window_number)?;
-    found
-        .map(Some)
-        .ok_or_else(|| window_bridge_miss_error(entry))
+    found.map(Some).ok_or_else(|| {
+        super::resolve_errors::unmatched_source_window(entry, source_window_on_screen)
+    })
 }
 
 #[cfg(target_os = "macos")]
@@ -284,21 +282,6 @@ fn window_by_title(
         found = Some(window.clone());
     }
     Ok(found)
-}
-
-#[cfg(target_os = "macos")]
-fn window_bridge_miss_error(entry: &RefEntry) -> AdapterError {
-    AdapterError::new(
-        agent_desktop_core::ErrorCode::AppUnresponsive,
-        "The verified CoreGraphics window could not be matched to one live AXWindow",
-    )
-    .with_suggestion("Retry after the application finishes updating its accessibility windows")
-    .with_details(serde_json::json!({
-        "kind": "resolution_window_bridge_miss",
-        "source_window_id": entry.source.source_window_id,
-        "complete": false,
-        "retryable": true,
-    }))
 }
 
 #[cfg(target_os = "macos")]

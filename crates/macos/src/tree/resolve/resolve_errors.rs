@@ -36,3 +36,53 @@ pub(in crate::tree) fn incomplete_traversal(phase: &str, depth: u8) -> AdapterEr
         "retryable": true,
     }))
 }
+
+/// The saved window's CoreGraphics record still exists but no live AXWindow
+/// carries its number. A window that CoreGraphics reports on screen may not
+/// have reached the accessibility tree yet, so that miss stays retryable. An
+/// off-screen record is a window the app closed but kept, as TextEdit does for
+/// a closed document; waiting cannot bring it back, so the ref is stale.
+pub(in crate::tree) fn unmatched_source_window(
+    entry: &RefEntry,
+    source_window_on_screen: bool,
+) -> AdapterError {
+    if !source_window_on_screen {
+        return AdapterError::new(
+            ErrorCode::StaleRef,
+            "The ref's window was closed or is no longer shown",
+        )
+        .with_suggestion("Run 'snapshot' to refresh, then retry with the updated ref.")
+        .with_disposition(DeliverySemantics::not_delivered())
+        .with_details(serde_json::json!({
+            "kind": "source_window_off_screen",
+            "source_window_id": entry.source.source_window_id,
+            "complete": true,
+            "retryable": false,
+        }));
+    }
+    AdapterError::new(
+        ErrorCode::AppUnresponsive,
+        "The verified CoreGraphics window could not be matched to one live AXWindow",
+    )
+    .with_suggestion("Retry after the application finishes updating its accessibility windows")
+    .with_details(serde_json::json!({
+        "kind": "resolution_window_bridge_miss",
+        "source_window_id": entry.source.source_window_id,
+        "complete": false,
+        "retryable": true,
+    }))
+}
+
+pub(in crate::tree) fn is_unmatched_source_window(error: &AdapterError) -> bool {
+    matches!(
+        error
+            .details
+            .as_ref()
+            .and_then(|details| details["kind"].as_str()),
+        Some("resolution_window_bridge_miss" | "source_window_off_screen")
+    )
+}
+
+#[cfg(test)]
+#[path = "resolve_errors_tests.rs"]
+mod tests;
