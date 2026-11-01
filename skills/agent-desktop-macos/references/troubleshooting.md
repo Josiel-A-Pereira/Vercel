@@ -89,6 +89,29 @@ For Automation, open Privacy & Security > Automation and allow the launching app
 
 The dismiss chain runs in order: the `AXDismiss` and `AXRemoveFromParent` actions, then a close button named close, clear or dismiss, then hover to reveal a hidden close button and press it. `AXPress` is never used, because it opens the source app and does not dismiss.
 
+## Chrome extension popups
+
+These notes come from agent-desktop 1.0.2 on macOS 26.6 with Chrome for Testing 156, driving an extension's action popup that the page opened through `chrome.action.openPopup()`.
+
+**Open the popup and find its window.**
+
+1. Run `list-windows --app "Google Chrome for Testing"` and note the browser window's `id` and `pid`.
+2. Run `focus-window --window-id <id>`. A ref click does not bring Chrome forward, and Chrome refuses `chrome.action.openPopup()` for a window that is not focused. `focus-window` raises the window without sending input.
+3. Click the control that opens the popup.
+4. Poll `list-windows --app "Google Chrome for Testing"` until a window with the same `pid` and a new `id` appears. That is the popup. Its title is the app name, `Google Chrome for Testing`, not the extension or popup document title, so match on the new `id`.
+5. Scope later commands with `--window-id <popup id>`.
+
+A `wait --event window-opened` started as its own command after the click takes its baseline after the popup exists, then returns `TIMEOUT` with a busy-app suggestion. Retrying it times out again ([#433](https://github.com/vercel-labs/agent-desktop/issues/433)). Start the wait before the window opens: in the same setup, a `batch` of the click and the wait caught a `window.open()` popup in 150 ms.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `find --text "Label"` returns the node and its containers | `find --text` matches a subtree's text, so ancestors of the text match too | Use `--role` with `--name` and `--exact`. Keep `--text` for presence checks |
+| `find --root` cannot use a web container such as `main` or a details group | The container has a `native_id` but no `ref_id`, and `--root` needs a ref | Search the whole window. Keep matches whose `path` contains the container's `role:name` entry, or, for an unnamed container, whose bounds sit inside its bounds |
+| `is @ref --property expanded` returns `applicable: false` on a collapsed disclosure button | A button with `aria-expanded="false"` reports the same as a control with no expanded state, and `states` has no `collapsed` entry ([#434](https://github.com/vercel-labs/agent-desktop/issues/434)) | Treat `applicable: true` with `result: true` as expanded. For collapsed, check that `get @ref --property states` lacks `expanded`, and confirm the control is expandable another way, such as its name |
+| An `aria-pressed` toggle is missing from `find --role button` | Chrome exposes it as role `checkbox` | Find it with `--role checkbox` and read `checked` in `states` |
+| A `data-*` attribute value is missing from the tree | Data attributes are not exposed to accessibility | Read the state from visible text, such as a `role="status"` line the page updates |
+| Nothing closes the popup window | There is no `close-window` command (see `close-app` in the core `commands-system` reference) | Quit the browser you launched when the run ends. Do not quit a browser the user is using |
+
 ## Keyboard shortcut does nothing
 
 **Cause.** The shortcut used `ctrl` where macOS uses `cmd`, or the keys went to the wrong app.
