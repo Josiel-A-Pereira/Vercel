@@ -125,7 +125,7 @@ impl OpWorld for Live<'_> {
         PlaceStore::in_runtime_dir()?.load(client, win.process_instance.as_deref()?)
     }
 
-    fn foreign_op(&self, win: &WindowInfo, op: &WindowOp) -> Option<Result<(), AdapterError>> {
+    fn foreign_op(&self, win: &WindowInfo, op: &WindowOp) -> Option<Result<bool, AdapterError>> {
         through_link(win, self.deadline, |link, target, deadline| {
             foreign_op::apply(link, target, op, deadline)
         })

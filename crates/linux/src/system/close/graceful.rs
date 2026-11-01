@@ -100,21 +100,25 @@ fn request_close(world: &impl World, request: &Request<'_>) -> Result<bool, Adap
         Liveness::Stopped => return Err(AdapterError::app_unresponsive(request.name)),
         Liveness::Alive => {}
     }
+    let standing = Standing::of(world, windows);
+    if standing.has_dialog() {
+        return Err(refusal::dialog_pending(request, &standing, false));
+    }
     let contested = world.contested_windows();
     if contested > 0 {
         return Err(refusal::ambiguous_close(request, contested));
     }
-    if windows.is_empty() {
+    let unproven = world.foreign_unproven();
+    if !unproven.is_empty() {
+        return Err(refusal::identity_unproven(request, &unproven));
+    }
+    if standing.windows.is_empty() {
         let refused = if world.on_wayland() && !world.has_foreign_route() {
             refusal::wayland_session(request)
         } else {
             refusal::windowless(request)
         };
         return unless_gone(world, refused);
-    }
-    let standing = Standing::of(world, windows);
-    if standing.has_dialog() {
-        return Err(refusal::dialog_pending(request, &standing, false));
     }
     let ids: Vec<u32> = standing.windows.iter().map(|window| window.id).collect();
     fan_out(world, request, &ids)
@@ -221,3 +225,7 @@ mod tests;
 #[cfg(test)]
 #[path = "graceful_foreign_tests.rs"]
 mod foreign_tests;
+
+#[cfg(test)]
+#[path = "graceful_foreign_route_tests.rs"]
+mod foreign_route_tests;

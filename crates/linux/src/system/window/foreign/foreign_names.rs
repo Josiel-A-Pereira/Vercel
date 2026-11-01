@@ -10,6 +10,8 @@ const MIN_CONTAINED: usize = 4;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(in crate::system) struct ProcessNames {
     names: Vec<String>,
+    pid: u32,
+    instance: Option<String>,
 }
 
 fn normalised(text: &str) -> String {
@@ -54,7 +56,11 @@ fn related(left: &str, right: &str) -> bool {
 impl ProcessNames {
     #[cfg(test)]
     pub(in crate::system) fn from_names(names: Vec<String>) -> Self {
-        Self { names }
+        Self {
+            names,
+            pid: 7,
+            instance: None,
+        }
     }
 
     /// The names of one process: the accessibility app name, its comm and
@@ -87,7 +93,30 @@ impl ProcessNames {
             }
             new
         });
-        Self { names }
+        Self {
+            names,
+            pid,
+            instance: Some(
+                process_facts::read(pid)
+                    .map(|facts| facts.instance)
+                    .unwrap_or_default(),
+            ),
+        }
+    }
+
+    pub(in crate::system) fn with_instance(mut self, instance: &str) -> Self {
+        self.instance = Some(instance.to_owned());
+        self
+    }
+
+    pub(in crate::system) fn is_current(&self) -> bool {
+        self.instance.as_ref().is_none_or(|instance| {
+            process_facts::read(self.pid).is_some_and(|facts| facts.instance == *instance)
+        })
+    }
+
+    pub(in crate::system) fn pid(&self) -> u32 {
+        self.pid
     }
 
     pub(in crate::system) fn relates(&self, app_id: &str) -> bool {

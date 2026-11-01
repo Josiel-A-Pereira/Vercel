@@ -79,10 +79,11 @@ fn a_title_held_only_by_another_program_is_unproven_and_nothing_is_sent() {
 }
 
 #[test]
-fn an_unrelated_window_with_the_same_title_does_not_make_the_related_one_ambiguous() {
+fn an_unrelated_window_with_the_same_title_is_unproven() {
     let port = FakePort::showing(vec![record(1, "Home", "kitty"), home(2)]);
-    assert!(run(&port).is_ok());
-    assert_eq!(port.sent(), vec![(2, ToplevelRequest::Activate)]);
+    let error = run(&port).unwrap_err();
+    assert_eq!(cause(&error), "toplevel_identity_unproven");
+    assert!(port.sent().is_empty());
 }
 
 #[test]

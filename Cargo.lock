@@ -82,6 +82,7 @@ dependencies = [
  "wayland-client",
  "wayland-protocols",
  "wayland-protocols-wlr",
+ "wayland-scanner",
  "x11rb",
  "zbus",
 ]

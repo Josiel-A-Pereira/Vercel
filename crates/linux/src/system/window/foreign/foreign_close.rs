@@ -1,14 +1,17 @@
+use std::collections::HashMap;
+
 use super::foreign_frame::Frame;
 use super::foreign_names::ProcessNames;
 use super::foreign_record::ToplevelRecord;
 use crate::system::x11::window::toplevel::Toplevel;
 use crate::system::x11::window::window_kind::WindowKind;
 
-/// The toplevels a close flow may act on, and how many it could not prove.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::system) struct ForeignStanding {
     pub(in crate::system) windows: Vec<Toplevel>,
     pub(in crate::system) contested: usize,
+    pub(in crate::system) unproven: Vec<String>,
+    pub(in crate::system) dialogs: Vec<String>,
 }
 
 fn listed(record: &ToplevelRecord, kind: WindowKind) -> Toplevel {
@@ -20,70 +23,108 @@ fn listed(record: &ToplevelRecord, kind: WindowKind) -> Toplevel {
     }
 }
 
-fn count_of(frames: &[Frame], title: &str, prompt: Option<bool>) -> usize {
-    frames
-        .iter()
-        .filter(|frame| frame.title == title && prompt.is_none_or(|wanted| frame.prompt == wanted))
-        .count()
-}
-
-fn is_late(record: &ToplevelRecord, known: &[u32]) -> bool {
-    !known.is_empty() && !known.contains(&record.id)
-}
-
-/// Reads which of the compositor's toplevels belong to the process.
-///
-/// A related toplevel that appeared after the first close request, one whose
-/// id `known` does not hold, is a prompt whatever its title, because a window
-/// that was always there is in `known`. Of the others, a title the process
-/// shows `f` times in its own frames and the compositor lists `r` times for
-/// the process's names is proven only when `r <= f`; otherwise another
-/// process may own some, so none of that title is listed and `r - f` are
-/// counted as contested. A proven title that any frame presents as a prompt is
-/// listed as a dialog, since the compositor cannot say which of its toplevels
-/// is the prompt and none of them may be closed.
 pub(in crate::system) fn read_standing(
     records: &[ToplevelRecord],
     frames: &[Frame],
     names: &ProcessNames,
     known: &[u32],
+    owners: Option<&HashMap<u32, u32>>,
 ) -> ForeignStanding {
-    let related: Vec<&ToplevelRecord> = records
-        .iter()
-        .filter(|record| names.relates(&record.app_id))
-        .collect();
     let mut windows = Vec::new();
     let mut contested = 0;
-    let mut judged: Vec<&str> = Vec::new();
-    for record in &related {
-        if is_late(record, known) {
-            windows.push(listed(record, WindowKind::Dialog));
+    let mut unproven = Vec::new();
+    let mut judged = Vec::new();
+    for frame in frames {
+        if judged.contains(&frame.title) {
             continue;
         }
-        let title = record.title.as_str();
-        let framed = count_of(frames, title, None);
-        if framed == 0 {
-            continue;
-        }
-        let shown = related
+        judged.push(frame.title.clone());
+        let same: Vec<_> = records
             .iter()
-            .filter(|other| other.title == title && !is_late(other, known))
-            .count();
-        if shown > framed {
-            if !judged.contains(&title) {
-                judged.push(title);
-                contested += shown - framed;
+            .filter(|record| record.title == frame.title)
+            .collect();
+        let candidates: Vec<_> = match owners {
+            Some(owners) => {
+                if same.iter().any(|record| !owners.contains_key(&record.id)) {
+                    unproven.extend(same.iter().map(|record| record.app_id.clone()));
+                }
+                same.into_iter()
+                    .filter(|record| owners.get(&record.id) == Some(&names.pid()))
+                    .collect()
             }
-            continue;
-        }
-        let kind = if count_of(frames, title, Some(true)) > 0 {
-            WindowKind::Dialog
-        } else {
-            WindowKind::Normal
+            None => {
+                let related: Vec<_> = same
+                    .iter()
+                    .copied()
+                    .filter(|record| names.relates(&record.app_id))
+                    .collect();
+                if related.len() > 1 {
+                    contested += related.len();
+                    Vec::new()
+                } else if same.len() > 1 || (!same.is_empty() && related.is_empty()) {
+                    unproven.extend(same.iter().map(|record| record.app_id.clone()));
+                    Vec::new()
+                } else {
+                    related
+                }
+            }
         };
-        windows.push(listed(record, kind));
+        let prompt = frames
+            .iter()
+            .any(|other| other.title == frame.title && other.prompt);
+        for record in candidates {
+            let late = !known.is_empty() && !known.contains(&record.id);
+            windows.push(listed(
+                record,
+                if prompt || late {
+                    WindowKind::Dialog
+                } else {
+                    WindowKind::Normal
+                },
+            ));
+        }
     }
-    ForeignStanding { windows, contested }
+    if let Some(owners) = owners {
+        for record in records
+            .iter()
+            .filter(|record| owners.get(&record.id) == Some(&names.pid()))
+        {
+            if !windows.iter().any(|window| window.id == record.id) {
+                let late = !known.is_empty() && !known.contains(&record.id);
+                windows.push(listed(
+                    record,
+                    if late {
+                        WindowKind::Dialog
+                    } else {
+                        WindowKind::Normal
+                    },
+                ));
+            }
+        }
+    } else if !known.is_empty() {
+        for record in records.iter().filter(|record| !known.contains(&record.id)) {
+            if names.relates(&record.app_id) && !windows.iter().any(|window| window.id == record.id)
+            {
+                unproven.push(record.app_id.clone());
+            }
+        }
+    }
+    let dialogs = frames
+        .iter()
+        .filter(|frame| {
+            frame.prompt
+                && !windows
+                    .iter()
+                    .any(|window| window.title == frame.title && window.kind == WindowKind::Dialog)
+        })
+        .map(|frame| frame.title.clone())
+        .collect();
+    ForeignStanding {
+        windows,
+        contested,
+        unproven,
+        dialogs,
+    }
 }
 
 #[cfg(test)]

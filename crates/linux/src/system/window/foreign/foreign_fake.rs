@@ -12,21 +12,21 @@ use super::foreign_target::ForeignTarget;
 use crate::system::x11::control::control_error::ControlError;
 
 /// What a compositor does to the toplevels it holds when a request arrives.
-pub(super) type Reaction = fn(&mut Vec<ToplevelRecord>, u32, ToplevelRequest);
+pub(in crate::system) type Reaction = fn(&mut Vec<ToplevelRecord>, u32, ToplevelRequest);
 
 /// A scripted `ToplevelPort`: each refresh shows the next scripted list (the
 /// last one stays), every send is recorded and then answered by `reaction`.
-pub(super) struct FakePort {
+pub(in crate::system) struct FakePort {
     shown: RefCell<Vec<ToplevelRecord>>,
     later: RefCell<VecDeque<Vec<ToplevelRecord>>>,
     sent: RefCell<Vec<(u32, ToplevelRequest)>>,
     refreshes: Cell<usize>,
     reaction: Cell<Reaction>,
-    refresh_error: Cell<Option<ControlError>>,
-    send_error: Cell<Option<ControlError>>,
+    errors: Cell<(Option<ControlError>, Option<ControlError>)>,
+    mapped: bool,
 }
 
-pub(super) fn record(id: u32, title: &str, app_id: &str) -> ToplevelRecord {
+pub(in crate::system) fn record(id: u32, title: &str, app_id: &str) -> ToplevelRecord {
     ToplevelRecord {
         id,
         title: title.to_owned(),
@@ -35,42 +35,42 @@ pub(super) fn record(id: u32, title: &str, app_id: &str) -> ToplevelRecord {
     }
 }
 
-pub(super) fn activated(mut record: ToplevelRecord) -> ToplevelRecord {
+pub(in crate::system) fn activated(mut record: ToplevelRecord) -> ToplevelRecord {
     record.flags.activated = true;
     record
 }
 
-pub(super) fn minimized(mut record: ToplevelRecord) -> ToplevelRecord {
+pub(in crate::system) fn minimized(mut record: ToplevelRecord) -> ToplevelRecord {
     record.flags.minimized = true;
     record
 }
 
-pub(super) fn maximized(mut record: ToplevelRecord) -> ToplevelRecord {
+pub(in crate::system) fn maximized(mut record: ToplevelRecord) -> ToplevelRecord {
     record.flags.maximized = true;
     record
 }
 
-pub(super) fn fullscreen(mut record: ToplevelRecord) -> ToplevelRecord {
+pub(in crate::system) fn fullscreen(mut record: ToplevelRecord) -> ToplevelRecord {
     record.flags.fullscreen = true;
     record
 }
 
-pub(super) fn thunar() -> ProcessNames {
+pub(in crate::system) fn thunar() -> ProcessNames {
     ProcessNames::from_names(vec!["thunar".to_owned()])
 }
 
-pub(super) fn target(title: &str) -> ForeignTarget<'_> {
+pub(in crate::system) fn target(title: &str) -> ForeignTarget<'_> {
     ForeignTarget {
         title,
         names: thunar(),
     }
 }
 
-pub(super) fn deadline() -> Deadline {
+pub(in crate::system) fn deadline() -> Deadline {
     Deadline::detached_after(300).expect("a 300 ms deadline is representable")
 }
 
-pub(super) fn cause(error: &AdapterError) -> String {
+pub(in crate::system) fn cause(error: &AdapterError) -> String {
     error
         .details
         .as_ref()
@@ -98,7 +98,11 @@ fn apply(records: &mut [ToplevelRecord], id: u32, request: ToplevelRequest, mini
 }
 
 /// A compositor that does what it is asked, and removes a closed window.
-pub(super) fn obeys(records: &mut Vec<ToplevelRecord>, id: u32, request: ToplevelRequest) {
+pub(in crate::system) fn obeys(
+    records: &mut Vec<ToplevelRecord>,
+    id: u32,
+    request: ToplevelRequest,
+) {
     if request == ToplevelRequest::Close {
         records.retain(|each| each.id != id);
     }
@@ -106,7 +110,11 @@ pub(super) fn obeys(records: &mut Vec<ToplevelRecord>, id: u32, request: Topleve
 }
 
 /// Hyprland: activate and maximize work, minimize changes nothing.
-pub(super) fn hyprland(records: &mut Vec<ToplevelRecord>, id: u32, request: ToplevelRequest) {
+pub(in crate::system) fn hyprland(
+    records: &mut Vec<ToplevelRecord>,
+    id: u32,
+    request: ToplevelRequest,
+) {
     if request == ToplevelRequest::Close {
         records.retain(|each| each.id != id);
     }
@@ -114,52 +122,57 @@ pub(super) fn hyprland(records: &mut Vec<ToplevelRecord>, id: u32, request: Topl
 }
 
 /// A compositor that takes every request and changes nothing.
-pub(super) fn ignores(_: &mut Vec<ToplevelRecord>, _: u32, _: ToplevelRequest) {}
+pub(in crate::system) fn ignores(_: &mut Vec<ToplevelRecord>, _: u32, _: ToplevelRequest) {}
 
 /// A window that closes the moment it is asked anything.
-pub(super) fn vanishes(records: &mut Vec<ToplevelRecord>, id: u32, _: ToplevelRequest) {
+pub(in crate::system) fn vanishes(records: &mut Vec<ToplevelRecord>, id: u32, _: ToplevelRequest) {
     records.retain(|each| each.id != id);
 }
 
 impl FakePort {
-    pub(super) fn showing(records: Vec<ToplevelRecord>) -> Self {
+    pub(in crate::system) fn showing(records: Vec<ToplevelRecord>) -> Self {
         Self {
             shown: RefCell::new(records),
             later: RefCell::new(VecDeque::new()),
             sent: RefCell::new(Vec::new()),
             refreshes: Cell::new(0),
             reaction: Cell::new(obeys),
-            refresh_error: Cell::new(None),
-            send_error: Cell::new(None),
+            errors: Cell::new((None, None)),
+            mapped: false,
         }
     }
 
+    pub(in crate::system) fn mapped(mut self) -> Self {
+        self.mapped = true;
+        self
+    }
+
     /// The list the next refresh shows after the ones already scripted.
-    pub(super) fn then_showing(self, records: Vec<ToplevelRecord>) -> Self {
+    pub(in crate::system) fn then_showing(self, records: Vec<ToplevelRecord>) -> Self {
         self.later.borrow_mut().push_back(records);
         self
     }
 
-    pub(super) fn reacting(self, reaction: Reaction) -> Self {
+    pub(in crate::system) fn reacting(self, reaction: Reaction) -> Self {
         self.reaction.set(reaction);
         self
     }
 
-    pub(super) fn failing_refresh(self, error: ControlError) -> Self {
-        self.refresh_error.set(Some(error));
+    pub(in crate::system) fn failing_refresh(self, error: ControlError) -> Self {
+        self.errors.set((Some(error), self.errors.get().1));
         self
     }
 
-    pub(super) fn failing_send(self, error: ControlError) -> Self {
-        self.send_error.set(Some(error));
+    pub(in crate::system) fn failing_send(self, error: ControlError) -> Self {
+        self.errors.set((self.errors.get().0, Some(error)));
         self
     }
 
-    pub(super) fn sent(&self) -> Vec<(u32, ToplevelRequest)> {
+    pub(in crate::system) fn sent(&self) -> Vec<(u32, ToplevelRequest)> {
         self.sent.borrow().clone()
     }
 
-    pub(super) fn refreshes(&self) -> usize {
+    pub(in crate::system) fn refreshes(&self) -> usize {
         self.refreshes.get()
     }
 }
@@ -167,7 +180,7 @@ impl FakePort {
 impl ToplevelPort for FakePort {
     fn refresh(&self, _: Deadline) -> Result<(), ControlError> {
         self.refreshes.set(self.refreshes.get() + 1);
-        if let Some(error) = self.refresh_error.get() {
+        if let Some(error) = self.errors.get().0 {
             return Err(error);
         }
         if let Some(next) = self.later.borrow_mut().pop_front() {
@@ -180,8 +193,17 @@ impl ToplevelPort for FakePort {
         self.shown.borrow().clone()
     }
 
+    fn owners(
+        &self,
+        _: Deadline,
+    ) -> Result<Option<std::collections::HashMap<u32, u32>>, ControlError> {
+        Ok(self
+            .mapped
+            .then(|| self.records().iter().map(|record| (record.id, 7)).collect()))
+    }
+
     fn send(&self, id: u32, request: ToplevelRequest) -> Result<(), ControlError> {
-        if let Some(error) = self.send_error.get() {
+        if let Some(error) = self.errors.get().1 {
             return Err(error);
         }
         if !self.shown.borrow().iter().any(|each| each.id == id) {

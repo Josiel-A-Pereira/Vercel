@@ -12,7 +12,7 @@ fn home() -> ToplevelRecord {
     record(1, "Home", "thunar")
 }
 
-fn run(port: &FakePort, op: WindowOp) -> Result<(), AdapterError> {
+fn run(port: &FakePort, op: WindowOp) -> Result<bool, AdapterError> {
     apply(port, &target("Home"), &op, deadline())
 }
 
@@ -63,7 +63,7 @@ fn minimize_that_sets_the_flag_succeeds() {
 #[test]
 fn minimizing_a_window_that_is_already_minimized_sends_nothing() {
     let port = FakePort::showing(vec![minimized(home())]);
-    assert!(run(&port, WindowOp::Minimize).is_ok());
+    assert!(!run(&port, WindowOp::Minimize).unwrap());
     assert!(port.sent().is_empty());
 }
 
@@ -97,7 +97,7 @@ fn fullscreen_does_not_count_as_maximized() {
 #[test]
 fn maximizing_a_maximized_window_sends_nothing() {
     let port = FakePort::showing(vec![maximized(home())]);
-    assert!(run(&port, WindowOp::Maximize).is_ok());
+    assert!(!run(&port, WindowOp::Maximize).unwrap());
     assert!(port.sent().is_empty());
 }
 
@@ -134,7 +134,7 @@ fn restore_from_both_sends_unminimize_then_unmaximize_to_the_same_window() {
 #[test]
 fn restore_from_neither_sends_nothing() {
     let port = FakePort::showing(vec![activated(home())]);
-    assert!(run(&port, WindowOp::Restore).is_ok());
+    assert!(!run(&port, WindowOp::Restore).unwrap());
     assert!(port.sent().is_empty());
 }
 

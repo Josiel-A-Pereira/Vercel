@@ -18,18 +18,19 @@ fn reached<L>(opened: Result<Option<L>, AdapterError>) -> Option<Result<L, Adapt
 /// `None` when the session offers no foreign toplevel manager so the caller
 /// keeps its own refusal. A link that cannot be opened in time is a failure
 /// with nothing delivered.
-pub(in crate::system) fn through_link(
+pub(in crate::system) fn through_link<T>(
     win: &WindowInfo,
     deadline: Deadline,
-    act: impl FnOnce(&ForeignLink, &ForeignTarget<'_>, Deadline) -> Result<(), AdapterError>,
-) -> Option<Result<(), AdapterError>> {
+    act: impl FnOnce(&ForeignLink, &ForeignTarget<'_>, Deadline) -> Result<T, AdapterError>,
+) -> Option<Result<T, AdapterError>> {
     let link = match reached(ForeignLink::open(deadline))? {
         Ok(link) => link,
         Err(error) => return Some(Err(error)),
     };
     let target = ForeignTarget {
         title: &win.title,
-        names: ProcessNames::of(win.pid.get(), &win.app),
+        names: ProcessNames::of(win.pid.get(), &win.app)
+            .with_instance(win.process_instance.as_deref().unwrap_or_default()),
     };
     Some(act(&link, &target, deadline))
 }

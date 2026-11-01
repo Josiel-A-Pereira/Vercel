@@ -26,7 +26,7 @@ fn several_toplevels_are_an_ambiguous_target_that_names_the_candidates() {
     assert_eq!(details(&error)["candidates"], 3);
     assert_eq!(details(&error)["physical_delivery_started"], false);
     assert_eq!(error.disposition, not_delivered());
-    assert!(error.message.contains("names no process"));
+    assert!(error.message.contains("More than one candidate"));
     assert!(error.suggestion.is_some());
 }
 

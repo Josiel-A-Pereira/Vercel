@@ -49,6 +49,14 @@ pub(super) trait World {
         0
     }
 
+    fn foreign_unproven(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn foreign_dialogs(&self) -> Vec<String> {
+        Vec::new()
+    }
+
     /// Whether the windows were read from the compositor's toplevel list.
     fn has_foreign_route(&self) -> bool {
         false
@@ -80,7 +88,7 @@ impl Live<'_> {
             Ok(false) => return x11,
             Err(_) => return ControlRead::Unavailable,
         }
-        let names = ProcessNames::of(self.pid, self.name);
+        let names = ProcessNames::of(self.pid, self.name).with_instance(self.instance);
         let frames = || {
             listed_of_process(self.bus, self.pid, deadline)
                 .map(|windows| {
@@ -167,5 +175,13 @@ impl World for Live<'_> {
 
     fn has_foreign_route(&self) -> bool {
         self.foreign.in_use()
+    }
+
+    fn foreign_unproven(&self) -> Vec<String> {
+        self.foreign.unproven()
+    }
+
+    fn foreign_dialogs(&self) -> Vec<String> {
+        self.foreign.dialogs()
     }
 }

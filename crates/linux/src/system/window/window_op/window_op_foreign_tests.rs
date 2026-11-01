@@ -85,3 +85,14 @@ fn an_x11_window_is_driven_by_x11_and_never_asks_the_route() {
     assert!(world.foreign_ops.borrow().is_empty());
     assert_eq!(world.writes(), 1);
 }
+
+#[test]
+fn an_already_satisfied_foreign_state_reports_no_delivery() {
+    for op in [WindowOp::Maximize, WindowOp::Restore] {
+        let mut world = native_wayland(Some(Ok(())));
+        world.foreign_sent = false;
+        let report = run(&world, &window(), &op, budget()).expect("already satisfied");
+        assert_eq!(report.disposition(), DeliverySemantics::not_delivered());
+        assert_eq!(world.writes(), 0);
+    }
+}

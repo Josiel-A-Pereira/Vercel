@@ -122,7 +122,7 @@ fn a_contested_title_is_counted_and_none_of_it_is_listed() {
     ]);
     let route = ForeignCloseRoute::over(port);
     assert!(read(&route, &["Home"]).is_empty());
-    assert_eq!(route.contested(), 1);
+    assert_eq!(route.contested(), 2);
 }
 
 #[test]
@@ -140,7 +140,9 @@ fn a_related_toplevel_on_screen_before_any_close_is_not_listed() {
 
 #[test]
 fn the_toplevel_a_close_raises_is_a_dialog_and_is_never_sent_a_close() {
-    let port = FakePort::showing(vec![record(1, "Home", "thunar")]).reacting(raises_a_save_prompt);
+    let port = FakePort::showing(vec![record(1, "Home", "thunar")])
+        .mapped()
+        .reacting(raises_a_save_prompt);
     let route = ForeignCloseRoute::over(port);
     assert_eq!(ids(&read(&route, &["Home"])), vec![1]);
     route.close(1, deadline()).expect("sent");
@@ -156,7 +158,9 @@ fn the_toplevel_a_close_raises_is_a_dialog_and_is_never_sent_a_close() {
 
 #[test]
 fn a_prompt_that_shows_up_as_a_frame_is_still_a_dialog() {
-    let port = FakePort::showing(vec![record(1, "Home", "thunar")]).reacting(raises_a_save_prompt);
+    let port = FakePort::showing(vec![record(1, "Home", "thunar")])
+        .mapped()
+        .reacting(raises_a_save_prompt);
     let route = ForeignCloseRoute::over(port);
     assert_eq!(ids(&read(&route, &["Home"])), vec![1]);
     route.close(1, deadline()).expect("sent");
@@ -176,7 +180,7 @@ fn the_ids_on_screen_are_recorded_once_at_the_first_close() {
     read(&route, &["Home", "Docs"]);
     route.close(1, deadline()).expect("sent");
     route.close(2, deadline()).expect("sent");
-    assert_eq!(*route.known.borrow(), vec![1, 2]);
+    assert_eq!(route.evidence.borrow().known, vec![1, 2]);
 }
 
 #[test]
@@ -201,6 +205,7 @@ fn no_frames_means_nothing_is_listed_and_the_titles_are_read_again_next_time() {
 #[test]
 fn a_prompt_titled_like_its_window_is_a_dialog_not_a_contested_title() {
     let port = FakePort::showing(vec![record(1, "Home", "thunar")])
+        .mapped()
         .reacting(raises_a_prompt_titled_like_its_window);
     let route = ForeignCloseRoute::over(port);
     assert_eq!(ids(&read(&route, &["Home"])), vec![1]);
@@ -240,4 +245,43 @@ fn a_prompt_already_open_at_the_first_read_is_never_sent_a_close() {
     assert_eq!(windows[1].kind, WindowKind::Dialog);
     assert_eq!(route.close(2, deadline()), Err(ControlError::BadWindow));
     assert!(route.port().expect("a port").sent().is_empty());
+}
+
+struct ChangingAddress(FakePort);
+
+impl ToplevelPort for ChangingAddress {
+    fn refresh(&self, deadline: Deadline) -> Result<(), ControlError> {
+        self.0.refresh(deadline)
+    }
+
+    fn records(&self) -> Vec<ToplevelRecord> {
+        self.0.records()
+    }
+
+    fn owners(
+        &self,
+        _: Deadline,
+    ) -> Result<Option<std::collections::HashMap<u32, u32>>, ControlError> {
+        Ok(Some(std::collections::HashMap::from([(1, 7)])))
+    }
+
+    fn address(&self, _: u32) -> Option<u64> {
+        Some(self.0.refreshes() as u64)
+    }
+
+    fn send(&self, id: u32, request: ToplevelRequest) -> Result<(), ControlError> {
+        self.0.send(id, request)
+    }
+}
+
+#[test]
+fn changed_mapped_address_is_never_closed_under_a_reused_handle_id() {
+    let route = ForeignCloseRoute::over(ChangingAddress(FakePort::showing(vec![record(
+        1, "Home", "thunar",
+    )])));
+    route
+        .standing(&thunar(), || frames(&["Home"]), deadline())
+        .unwrap();
+    assert_eq!(route.close(1, deadline()), Err(ControlError::StaleWindow));
+    assert!(route.port().unwrap().0.sent().is_empty());
 }

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use agent_desktop_core::Deadline;
 
 use super::foreign_record::ToplevelRecord;
@@ -12,6 +14,14 @@ pub(in crate::system) trait ToplevelPort {
 
     /// Open toplevels whose first `done` arrived, in arrival order.
     fn records(&self) -> Vec<ToplevelRecord>;
+
+    fn owners(&self, _deadline: Deadline) -> Result<Option<HashMap<u32, u32>>, ControlError> {
+        Ok(None)
+    }
+
+    fn address(&self, _id: u32) -> Option<u64> {
+        None
+    }
 
     /// Sends and flushes. `Err(BadWindow)` for an unknown or closed id,
     /// `Err(NoDisplay)` when no `wl_seat` exists for `Activate`,

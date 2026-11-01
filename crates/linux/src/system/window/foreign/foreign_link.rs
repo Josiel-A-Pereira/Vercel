@@ -1,11 +1,15 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::os::unix::net::UnixStream;
 
 use agent_desktop_core::{AdapterError, Deadline};
 use wayland_client::protocol::wl_seat::WlSeat;
-use wayland_client::{Connection, EventQueue};
+use wayland_client::{Connection, EventQueue, Proxy};
 use wayland_protocols_wlr::foreign_toplevel::v1::client::zwlr_foreign_toplevel_manager_v1::ZwlrForeignToplevelManagerV1;
 
+use super::foreign_hypr_ipc;
+use super::foreign_hypr_mapping;
+use super::foreign_hypr_protocol::hyprland_toplevel_mapping_manager_v1::HyprlandToplevelMappingManagerV1;
 use super::foreign_port::ToplevelPort;
 use super::foreign_record::ToplevelRecord;
 use super::foreign_request::ToplevelRequest;
@@ -25,6 +29,7 @@ pub(in crate::system) struct ForeignLink {
     queue: RefCell<EventQueue<ForeignState>>,
     state: RefCell<ForeignState>,
     _manager: ZwlrForeignToplevelManagerV1,
+    mapping: Option<HyprlandToplevelMappingManagerV1>,
 }
 
 impl ForeignLink {
@@ -63,6 +68,11 @@ impl ForeignLink {
             &qh,
             (),
         );
+        let mapping = state
+            .globals
+            .iter()
+            .find(|global| global.interface == "hyprland_toplevel_mapping_manager_v1")
+            .map(|global| registry.bind(global.name, 1, &qh, ()));
         if let Some(seat_global) = state
             .globals
             .iter()
@@ -84,6 +94,7 @@ impl ForeignLink {
             queue: RefCell::new(queue),
             state: RefCell::new(state),
             _manager: manager,
+            mapping,
         }))
     }
 }
@@ -101,6 +112,59 @@ impl ToplevelPort for ForeignLink {
 
     fn records(&self) -> Vec<ToplevelRecord> {
         self.state.borrow().records()
+    }
+
+    fn owners(&self, deadline: Deadline) -> Result<Option<HashMap<u32, u32>>, ControlError> {
+        let Some(manager) = &self.mapping else {
+            return Ok(None);
+        };
+        let Some(clients) = foreign_hypr_ipc::clients(deadline) else {
+            return if deadline.is_expired() {
+                Err(ControlError::TimedOut)
+            } else {
+                Ok(None)
+            };
+        };
+        let mut queue = self.queue.borrow_mut();
+        let mut state = self.state.borrow_mut();
+        state.addresses.clear();
+        let handles: Vec<_> = state
+            .tracked
+            .iter()
+            .filter(|item| item.shown.is_some())
+            .map(|item| item.handle.clone())
+            .collect();
+        for handle in &handles {
+            manager.get_window_for_toplevel_wlr(handle, &queue.handle(), handle.id().protocol_id());
+        }
+        match roundtrip(&self.connection, &mut queue, &mut state, deadline) {
+            Ok(true) => {}
+            Ok(false) => return Err(ControlError::NoDisplay),
+            Err(_) => return Err(ControlError::TimedOut),
+        }
+        let Some(after) = foreign_hypr_ipc::clients(deadline) else {
+            return if deadline.is_expired() {
+                Err(ControlError::TimedOut)
+            } else {
+                Err(ControlError::NoDisplay)
+            };
+        };
+        let clients = foreign_hypr_mapping::stable_clients(&clients, &after);
+        let addresses = handles
+            .iter()
+            .filter_map(|handle| {
+                let id = handle.id().protocol_id();
+                if !state.handle_of(id).is_some_and(|current| current == handle) {
+                    return None;
+                }
+                state.addresses.get(&id).map(|address| (id, *address))
+            })
+            .collect();
+        Ok(Some(foreign_hypr_mapping::join(&addresses, &clients)))
+    }
+
+    fn address(&self, id: u32) -> Option<u64> {
+        self.state.borrow().addresses.get(&id).copied()
     }
 
     fn send(&self, id: u32, request: ToplevelRequest) -> Result<(), ControlError> {

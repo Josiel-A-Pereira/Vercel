@@ -14,10 +14,9 @@ pub(super) struct Standing {
 
 impl Standing {
     pub(super) fn of(world: &impl World, windows: Vec<Toplevel>) -> Self {
-        Self {
-            windows,
-            nested: world.nested_dialogs(),
-        }
+        let mut nested = world.nested_dialogs();
+        nested.extend(world.foreign_dialogs());
+        Self { windows, nested }
     }
 
     pub(super) fn read(world: &impl World) -> Option<Self> {

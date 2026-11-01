@@ -23,7 +23,7 @@ fn ids(standing: &ForeignStanding) -> Vec<u32> {
 }
 
 fn read(records: &[ToplevelRecord], frames: &[&str], known: &[u32]) -> ForeignStanding {
-    read_standing(records, &titles(frames), &thunar(), known)
+    read_standing(records, &titles(frames), &thunar(), known, None)
 }
 
 #[test]
@@ -38,11 +38,11 @@ fn one_frame_and_one_record_with_the_title_is_listed_as_a_normal_window() {
 }
 
 #[test]
-fn as_many_records_as_frames_are_all_listed() {
+fn two_related_records_remain_ambiguous_even_with_two_frames() {
     let records = [record(1, "Home", "thunar"), record(2, "Home", "thunar")];
     let standing = read(&records, &["Home", "Home"], &[]);
-    assert_eq!(ids(&standing), vec![1, 2]);
-    assert_eq!(standing.contested, 0);
+    assert!(standing.windows.is_empty());
+    assert_eq!(standing.contested, 2);
 }
 
 #[test]
@@ -57,11 +57,11 @@ fn more_records_than_frames_are_contested_and_none_is_listed() {
     let records = [record(1, "Home", "thunar"), record(2, "Home", "thunar")];
     let standing = read(&records, &["Home"], &[]);
     assert!(standing.windows.is_empty());
-    assert_eq!(standing.contested, 1);
+    assert_eq!(standing.contested, 2);
 }
 
 #[test]
-fn the_contested_count_is_the_surplus_of_records_over_frames() {
+fn contested_count_includes_all_related_candidates() {
     let records = [
         record(1, "Home", "thunar"),
         record(2, "Home", "thunar"),
@@ -70,7 +70,7 @@ fn the_contested_count_is_the_surplus_of_records_over_frames() {
     ];
     let standing = read(&records, &["Home", "Home"], &[]);
     assert!(standing.windows.is_empty());
-    assert_eq!(standing.contested, 2);
+    assert_eq!(standing.contested, 4);
 }
 
 #[test]
@@ -82,15 +82,15 @@ fn a_contested_title_does_not_hide_a_proven_one() {
     ];
     let standing = read(&records, &["Home", "Docs"], &[]);
     assert_eq!(ids(&standing), vec![3]);
-    assert_eq!(standing.contested, 1);
+    assert_eq!(standing.contested, 2);
 }
 
 #[test]
-fn records_of_unrelated_app_ids_are_ignored() {
+fn a_same_title_record_of_an_unrelated_app_id_leaves_identity_unproven() {
     let records = [record(1, "Home", "thunar"), record(2, "Home", "kitty")];
     let standing = read(&records, &["Home"], &[]);
-    assert_eq!(ids(&standing), vec![1]);
-    assert_eq!(standing.contested, 0);
+    assert!(standing.windows.is_empty());
+    assert_eq!(standing.unproven, vec!["thunar", "kitty"]);
 }
 
 #[test]
@@ -101,12 +101,13 @@ fn a_title_with_no_frame_and_no_known_ids_is_not_listed() {
 }
 
 #[test]
-fn a_late_unmatched_related_toplevel_is_a_dialog_when_known_is_not_empty() {
+fn a_late_mapped_toplevel_is_a_dialog_when_known_is_not_empty() {
     let records = [
         record(1, "Home", "thunar"),
         record(2, "Save changes?", "thunar"),
     ];
-    let standing = read(&records, &["Home"], &[1]);
+    let owners = HashMap::from([(1, 7), (2, 7)]);
+    let standing = read_standing(&records, &titles(&["Home"]), &thunar(), &[1], Some(&owners));
     assert_eq!(ids(&standing), vec![1, 2]);
     assert_eq!(standing.windows[0].kind, WindowKind::Normal);
     assert_eq!(standing.windows[1].kind, WindowKind::Dialog);
@@ -145,7 +146,7 @@ fn a_frame_the_toolkit_presents_as_a_prompt_makes_its_toplevel_a_dialog() {
     ];
     let mut frames = titles(&["Home"]);
     frames.push(prompt("Save changes?"));
-    let standing = read_standing(&records, &frames, &thunar(), &[]);
+    let standing = read_standing(&records, &frames, &thunar(), &[], None);
     assert_eq!(ids(&standing), vec![1, 2]);
     assert_eq!(standing.windows[0].kind, WindowKind::Normal);
     assert_eq!(standing.windows[1].kind, WindowKind::Dialog);
@@ -157,7 +158,8 @@ fn a_prompt_sharing_its_windows_title_lists_every_toplevel_of_that_title_as_a_di
     let records = [record(1, "Doc", "thunar"), record(2, "Doc", "thunar")];
     let mut frames = titles(&["Doc"]);
     frames.push(prompt("Doc"));
-    let standing = read_standing(&records, &frames, &thunar(), &[]);
+    let owners = HashMap::from([(1, 7), (2, 7)]);
+    let standing = read_standing(&records, &frames, &thunar(), &[], Some(&owners));
     assert_eq!(ids(&standing), vec![1, 2]);
     assert!(
         standing
@@ -170,7 +172,8 @@ fn a_prompt_sharing_its_windows_title_lists_every_toplevel_of_that_title_as_a_di
 #[test]
 fn a_toplevel_that_appeared_after_the_first_request_is_a_dialog_even_with_a_framed_title() {
     let records = [record(1, "Doc", "thunar"), record(9, "Doc", "thunar")];
-    let standing = read(&records, &["Doc"], &[1]);
+    let owners = HashMap::from([(1, 7), (9, 7)]);
+    let standing = read_standing(&records, &titles(&["Doc"]), &thunar(), &[1], Some(&owners));
     assert_eq!(ids(&standing), vec![1, 9]);
     assert_eq!(standing.windows[0].kind, WindowKind::Normal);
     assert_eq!(standing.windows[1].kind, WindowKind::Dialog);
@@ -184,7 +187,46 @@ fn a_late_toplevel_does_not_make_a_known_one_contested() {
         record(2, "Doc", "thunar"),
         record(9, "Doc", "thunar"),
     ];
-    let standing = read(&records, &["Doc", "Doc"], &[1, 2]);
+    let owners = HashMap::from([(1, 7), (2, 7), (9, 7)]);
+    let standing = read_standing(
+        &records,
+        &titles(&["Doc", "Doc"]),
+        &thunar(),
+        &[1, 2],
+        Some(&owners),
+    );
     assert_eq!(ids(&standing), vec![1, 2, 9]);
     assert_eq!(standing.contested, 0);
+}
+
+#[test]
+fn a_same_title_window_of_another_program_is_unproven() {
+    let records = [
+        record(1, "Home", "zzqqxx"),
+        record(2, "Home", "thunar-viewer"),
+    ];
+    let standing = read(&records, &["Home"], &[]);
+    assert!(standing.windows.is_empty());
+    assert_eq!(standing.unproven, vec!["zzqqxx", "thunar-viewer"]);
+}
+
+#[test]
+fn a_dialog_frame_without_a_related_toplevel_blocks_the_close() {
+    let records = [
+        record(1, "Doc", "thunar"),
+        record(2, "Save As", "unrelated"),
+    ];
+    let frames = [titles(&["Doc"]).remove(0), prompt("Save As")];
+    let standing = read_standing(&records, &frames, &thunar(), &[], None);
+    assert_eq!(standing.dialogs, vec!["Save As"]);
+}
+
+#[test]
+fn a_late_window_of_another_pid_is_not_a_target_prompt() {
+    let records = [record(1, "Doc", "thunar"), record(9, "Save", "thunar")];
+    let owners = HashMap::from([(1, 7), (9, 8)]);
+    let standing = read_standing(&records, &titles(&["Doc"]), &thunar(), &[1], Some(&owners));
+    assert_eq!(ids(&standing), vec![1]);
+    assert!(standing.dialogs.is_empty());
+    assert_eq!(standing.windows[0].kind, WindowKind::Normal);
 }

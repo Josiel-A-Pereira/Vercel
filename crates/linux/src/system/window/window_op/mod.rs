@@ -49,7 +49,7 @@ trait OpWorld: ClientWorld {
     fn on_wayland(&self) -> bool;
     /// Applies the operation through the compositor's toplevel manager, or
     /// `None` when the session has no such manager.
-    fn foreign_op(&self, win: &WindowInfo, op: &WindowOp) -> Option<Result<(), AdapterError>>;
+    fn foreign_op(&self, win: &WindowInfo, op: &WindowOp) -> Option<Result<bool, AdapterError>>;
     fn remember(&self, win: &WindowInfo, client: u32, rectangle: Option<Extents>);
     fn remembered(&self, win: &WindowInfo, client: u32) -> Option<Extents>;
 }
@@ -221,7 +221,7 @@ fn dispatch(
     win: &WindowInfo,
     op: &WindowOp,
     deadline: Deadline,
-) -> Result<Option<Value>, AdapterError> {
+) -> Result<(Option<Value>, bool), AdapterError> {
     let write = requested(op)?;
     ensure_owned_before(world, win)?;
     if world.stopped(win.pid.get()) {
@@ -232,7 +232,7 @@ fn dispatch(
         Ok(located) => located,
         Err(error) if is_wayland_session(&error) => {
             return match world.foreign_op(win, op) {
-                Some(done) => done.map(|()| None),
+                Some(done) => done.map(|sent| (None, sent)),
                 None => Err(error),
             };
         }
@@ -247,12 +247,17 @@ fn dispatch(
         Some(write) => apply(world, win, client, &to_client(write, shadow), deadline),
         None => restore(world, win, client, deadline),
     };
-    done.map(|()| match op {
-        WindowOp::Resize { .. } => world
-            .facts(client)
-            .ready()
-            .map(|facts| visible_of(observed_of(Some(&facts)), shadow)),
-        _ => None,
+    done.map(|()| {
+        (
+            match op {
+                WindowOp::Resize { .. } => world
+                    .facts(client)
+                    .ready()
+                    .map(|facts| visible_of(observed_of(Some(&facts)), shadow)),
+                _ => None,
+            },
+            true,
+        )
     })
     .map_err(|error| to_visible(error, shadow))
 }
@@ -264,13 +269,23 @@ fn run(
     deadline: Deadline,
 ) -> Result<OperationReport, AdapterError> {
     let dispatched = dispatch(world, win, op, deadline);
-    let observed = dispatched.as_ref().ok().cloned().flatten();
+    let observed = dispatched
+        .as_ref()
+        .ok()
+        .and_then(|(value, _)| value.clone());
+    let satisfied = dispatched.as_ref().is_ok_and(|(_, sent)| !sent);
     let mut report = OperationReport::from_window_dispatch(
         win,
         op,
         super::window_report::window_readback(op),
         dispatched.map(drop),
     )?;
+    if satisfied {
+        return Ok(OperationReport::satisfied_without_delivery(
+            report.result.action,
+            report.target,
+        ));
+    }
     if let (Some(observed), Some(Value::Object(details))) =
         (observed, report.result.details.as_mut())
     {

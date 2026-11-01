@@ -32,7 +32,7 @@ fn flags_of(flags: &ToplevelFlags) -> Value {
 
 pub(in crate::system) fn ambiguous(candidates: usize) -> AdapterError {
     AdapterError::ambiguous_target(
-        "More than one toplevel has this title and belongs to this program, and the compositor names no process, so none is changed",
+        "More than one candidate toplevel has this title, so none is changed",
     )
     .with_suggestion("Give the windows different titles, then retry")
     .with_details(json!({
@@ -47,7 +47,7 @@ pub(in crate::system) fn unrelated(app_ids: &[String]) -> AdapterError {
     let error = refused(
         ErrorCode::ActionFailed,
         "toplevel_identity_unproven",
-        "The only toplevel with this title has an app id unrelated to this process, so none is changed",
+        "Another program may have a window with this title, and the compositor cannot prove its process, so none is changed",
     )
     .with_suggestion(RUN_LIST_WINDOWS);
     with_extra(error, "app_ids", json!(app_ids))
@@ -57,7 +57,7 @@ pub(in crate::system) fn no_window() -> AdapterError {
     refused(
         ErrorCode::WindowNotFound,
         "window_not_mapped",
-        "No toplevel with this title is open on the compositor",
+        "No toplevel for this target with this title could be found on the compositor",
     )
     .with_suggestion("Run 'list-windows' to see the open windows")
 }

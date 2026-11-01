@@ -55,6 +55,7 @@ pub(super) struct World {
     pub(super) twins: Option<Twins>,
     pub(super) active: Option<u32>,
     pub(super) foreign: Option<Result<(), AdapterError>>,
+    pub(super) foreign_sent: bool,
     pub(super) foreign_ops: RefCell<Vec<WindowOp>>,
 }
 
@@ -115,6 +116,7 @@ impl World {
             twins: None,
             active: None,
             foreign: None,
+            foreign_sent: true,
             foreign_ops: RefCell::new(Vec::new()),
         }
     }
@@ -206,9 +208,11 @@ impl OpWorld for World {
         self.wayland
     }
 
-    fn foreign_op(&self, _win: &WindowInfo, op: &WindowOp) -> Option<Result<(), AdapterError>> {
+    fn foreign_op(&self, _win: &WindowInfo, op: &WindowOp) -> Option<Result<bool, AdapterError>> {
         self.foreign_ops.borrow_mut().push(op.clone());
-        self.foreign.clone()
+        self.foreign
+            .clone()
+            .map(|outcome| outcome.map(|()| self.foreign_sent))
     }
 
     fn displays(&self) -> Vec<Rect> {

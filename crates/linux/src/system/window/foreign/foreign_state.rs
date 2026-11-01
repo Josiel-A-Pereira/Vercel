@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use wayland_client::protocol::wl_callback::{self, WlCallback};
 use wayland_client::protocol::wl_registry::{self, WlRegistry};
 use wayland_client::protocol::wl_seat::{self, WlSeat};
@@ -19,6 +21,7 @@ pub(super) struct ForeignState {
     pub(super) globals: Vec<Global>,
     pub(super) seat: Option<WlSeat>,
     pub(super) tracked: Vec<Tracked>,
+    pub(super) addresses: HashMap<u32, u64>,
     synced: bool,
 }
 

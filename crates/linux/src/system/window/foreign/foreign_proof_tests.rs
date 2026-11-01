@@ -56,13 +56,61 @@ fn a_title_held_only_by_another_program_is_unrelated() {
 }
 
 #[test]
-fn an_unrelated_window_with_the_same_title_does_not_make_a_related_one_ambiguous() {
+fn an_unrelated_window_with_the_same_title_is_unproven() {
     let records = [record(1, "Home", "kitty"), record(2, "Home", "thunar")];
-    assert_eq!(prove("Home", &thunar(), &records), Proof::One(2));
+    assert_eq!(
+        prove("Home", &thunar(), &records),
+        Proof::Unrelated(vec!["kitty".to_owned(), "thunar".to_owned()])
+    );
+}
+
+#[test]
+fn a_target_with_an_unrelated_app_id_is_not_swapped_for_a_related_window() {
+    let names = ProcessNames::from_names(vec!["targettool".to_owned()]);
+    let records = [
+        record(1, "Home", "zzqqxx"),
+        record(2, "Home", "targettool-viewer"),
+    ];
+    assert_eq!(
+        prove("Home", &names, &records),
+        Proof::Unrelated(vec!["zzqqxx".to_owned(), "targettool-viewer".to_owned()])
+    );
 }
 
 #[test]
 fn titles_are_compared_exactly() {
     let records = [record(1, "Home ", "thunar")];
     assert_eq!(prove("Home", &thunar(), &records), Proof::NoWindow);
+}
+
+#[test]
+fn mapped_pid_selects_target_even_when_the_other_app_id_looks_related() {
+    let records = [
+        record(1, "Home", "zzqqxx"),
+        record(2, "Home", "thunar-viewer"),
+    ];
+    let owners = HashMap::from([(1, 7), (2, 8)]);
+    assert_eq!(
+        prove_owned("Home", &thunar(), &records, Some(&owners)),
+        Proof::One(1)
+    );
+    let missing = HashMap::from([(2, 8)]);
+    assert!(matches!(
+        prove_owned("Home", &thunar(), &records, Some(&missing)),
+        Proof::Unrelated(_)
+    ));
+}
+
+#[test]
+fn mapped_same_title_twins_of_one_process_are_ambiguous() {
+    let records = [
+        record(1, "Home", "x"),
+        record(2, "Home", "y"),
+        record(3, "Home", "thunar"),
+    ];
+    let owners = HashMap::from([(1, 7), (2, 7), (3, 8)]);
+    assert_eq!(
+        prove_owned("Home", &thunar(), &records, Some(&owners)),
+        Proof::Several(vec![1, 2])
+    );
 }

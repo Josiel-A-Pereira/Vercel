@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use agent_desktop_core::{AdapterError, Deadline, WindowOp};
+use agent_desktop_core::{AdapterError, Deadline, DeliverySemantics, WindowOp};
 
 use super::foreign_await::{await_flags, flags_of};
 use super::foreign_awaited::Awaited;
@@ -28,7 +28,14 @@ fn send_and_verify(
     id: u32,
     request: ToplevelRequest,
     deadline: Deadline,
+    target: &ForeignTarget<'_>,
 ) -> Result<(), AdapterError> {
+    if !target.names.is_current() {
+        return Err(AdapterError::stale_ref_because(
+            "The target process instance changed or could not be verified",
+        )
+        .with_disposition(DeliverySemantics::not_delivered()));
+    }
     port.send(id, request)
         .map_err(|error| control_failure(error, deadline))?;
     let limit = deadline.capped(SETTLE_BUDGET);
@@ -44,12 +51,12 @@ fn set(
     target: &ForeignTarget<'_>,
     request: ToplevelRequest,
     deadline: Deadline,
-) -> Result<(), AdapterError> {
+) -> Result<bool, AdapterError> {
     let id = locate(port, target, deadline)?;
     if flags_of(port, id).is_some_and(|flags| request.holds(&flags)) {
-        return Ok(());
+        return Ok(false);
     }
-    send_and_verify(port, id, request, deadline)
+    send_and_verify(port, id, request, deadline, target).map(|()| true)
 }
 
 /// The window is proven once; every step then addresses that same toplevel,
@@ -58,17 +65,39 @@ fn restore(
     port: &impl ToplevelPort,
     target: &ForeignTarget<'_>,
     deadline: Deadline,
-) -> Result<(), AdapterError> {
+) -> Result<bool, AdapterError> {
     let id = locate(port, target, deadline)?;
     let mut flags = flags_of(port, id).ok_or_else(no_window)?;
+    let mut sent = false;
     if flags.minimized {
-        send_and_verify(port, id, ToplevelRequest::SetMinimized(false), deadline)?;
+        send_and_verify(
+            port,
+            id,
+            ToplevelRequest::SetMinimized(false),
+            deadline,
+            target,
+        )?;
+        sent = true;
         flags = flags_of(port, id).ok_or_else(window_destroyed)?;
     }
     if flags.maximized {
-        send_and_verify(port, id, ToplevelRequest::SetMaximized(false), deadline)?;
+        send_and_verify(
+            port,
+            id,
+            ToplevelRequest::SetMaximized(false),
+            deadline,
+            target,
+        )
+        .map_err(|error| {
+            if sent && error.disposition == DeliverySemantics::not_delivered() {
+                error.with_disposition(DeliverySemantics::delivered_unverified())
+            } else {
+                error
+            }
+        })?;
+        sent = true;
     }
-    Ok(())
+    Ok(sent)
 }
 
 /// Applies a window operation to the proven toplevel of the target. Move and
@@ -78,7 +107,7 @@ pub(in crate::system) fn apply(
     target: &ForeignTarget<'_>,
     op: &WindowOp,
     deadline: Deadline,
-) -> Result<(), AdapterError> {
+) -> Result<bool, AdapterError> {
     match op {
         WindowOp::Move { .. } | WindowOp::Resize { .. } => Err(move_or_resize()),
         WindowOp::Minimize => set(port, target, ToplevelRequest::SetMinimized(true), deadline),

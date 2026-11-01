@@ -288,7 +288,8 @@ compositor without the protocol are unchanged: `ACTION_NOT_SUPPORTED`, cause
   `focus-window` returned ok and the compositor's `activated` agreed. A physical
   keyboard on a real desktop was not measured.
 - `maximize` is `delivered_verified` from the compositor's state. `restore`
-  undoes it and is `delivered_unverified`, as on X11.
+  undoes it and is `delivered_unverified`, as on X11. If the requested state
+  already holds, the operation sends nothing and returns `not_delivered`.
 - `minimize`: Hyprland takes the request and changes nothing. The command ends
   `ACTION_FAILED`, cause `minimize_not_applied`, `delivered_unverified`, and the
   window stays on screen. Operate the window from the compositor's own controls.
@@ -302,23 +303,25 @@ compositor without the protocol are unchanged: `ACTION_NOT_SUPPORTED`, cause
   second `close-app` while a prompt is open is `dialog_pending`,
   `not_delivered`. `close-app --force` still sends signals.
 
-The protocol names no process, only an app id and a title. A window is matched
-by its exact title plus an app id related to the process's names.
+The foreign toplevel protocol names an app ID and a title, but no process.
+When Hyprland's toplevel mapping protocol and IPC socket are both available,
+agent-desktop maps each toplevel to a window address and checks its PID against
+the target process instance. The exact title selects among that process's
+windows. A same-title window owned by another process is left alone. Two
+same-title windows of the target process make a single-window operation
+`AMBIGUOUS_TARGET`, cause `ambiguous_window`; graceful `close-app` can close
+both. A prompt frame blocks the close even when it has no mapped toplevel.
 
-- Two windows of one program with the same title are `AMBIGUOUS_TARGET`, cause
-  `ambiguous_window`, `details.candidates: n`, `not_delivered`; nothing changes.
-  Give the windows different titles, then retry. `close-app` on such a process
-  closes all of them, because they all belong to it. It refuses only when the
-  compositor lists more windows of a title, for this process's names, than the
-  process shows itself, because another program with a related app id may own the
-  rest: `AMBIGUOUS_TARGET`, cause `ambiguous_window`, `details.contested` (the
-  excess count), `not_delivered`, no window sent a request. Give the windows
-  different titles and retry, or use `--force` to end the process.
-- A same-titled window of an unrelated program does not make the target
-  ambiguous and is left alone.
-- A window whose app id does not relate to its process name is `ACTION_FAILED`,
-  cause `toplevel_identity_unproven`, `not_delivered`.
-- No such window is `WINDOW_NOT_FOUND`, cause `window_not_mapped`.
+Without the mapping protocol or IPC, discovery uses the exact title and an app
+ID related to the process's names. This is a heuristic, not proof of ownership.
+When another toplevel shares the title and its ownership is unproven, the
+operation returns `ACTION_FAILED`, cause `toplevel_identity_unproven`, with the
+observed app IDs. Two related candidates return `AMBIGUOUS_TARGET`, cause
+`ambiguous_window`. These refusals send nothing. Give the windows distinct
+titles, or use `close-app --force` if ending the process is appropriate. An
+unmatched prompt frame returns `dialog_pending` with its title. A title with no
+listed toplevel returns `WINDOW_NOT_FOUND`, cause `window_not_mapped` for
+single-window operations.
 
 ## Workspaces
 

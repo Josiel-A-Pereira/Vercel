@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::foreign_names::ProcessNames;
 use super::foreign_record::ToplevelRecord;
 
@@ -12,8 +14,8 @@ pub(in crate::system) enum Proof {
 
 /// Picks the toplevel a title and a process name stand for. The compositor
 /// names no process, so a toplevel counts only when its title matches and its
-/// app id relates to the process; an unrelated window with the same title
-/// never makes a related one ambiguous.
+/// app id relates to the process. A same-title window with an unrelated app id
+/// leaves ownership unproven; related same-title candidates are ambiguous.
 pub(in crate::system) fn prove(
     title: &str,
     names: &ProcessNames,
@@ -41,8 +43,45 @@ pub(in crate::system) fn prove(
                 .map(|record| record.app_id.clone())
                 .collect(),
         ),
-        [only] => Proof::One(*only),
+        [only] if same_title.len() == 1 => Proof::One(*only),
+        [_] => Proof::Unrelated(
+            same_title
+                .iter()
+                .map(|record| record.app_id.clone())
+                .collect(),
+        ),
         _ => Proof::Several(related),
+    }
+}
+
+pub(in crate::system) fn prove_owned(
+    title: &str,
+    names: &ProcessNames,
+    records: &[ToplevelRecord],
+    owners: Option<&HashMap<u32, u32>>,
+) -> Proof {
+    let Some(owners) = owners else {
+        return prove(title, names, records);
+    };
+    if title.is_empty() {
+        return Proof::NoWindow;
+    }
+    let same: Vec<_> = records
+        .iter()
+        .filter(|record| record.title == title)
+        .collect();
+    if same.iter().any(|record| !owners.contains_key(&record.id)) {
+        return Proof::Unrelated(same.iter().map(|record| record.app_id.clone()).collect());
+    }
+    let ids: Vec<_> = same
+        .iter()
+        .filter(|record| owners.get(&record.id) == Some(&names.pid()))
+        .map(|record| record.id)
+        .collect();
+    match ids.as_slice() {
+        [] => Proof::NoWindow,
+        [id] => Proof::One(*id),
+        _ => Proof::Several(ids),
     }
 }
 

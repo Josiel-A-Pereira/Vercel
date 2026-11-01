@@ -3,6 +3,7 @@ use std::cell::{Cell, OnceCell, RefCell};
 use agent_desktop_core::{AdapterError, Deadline};
 
 use super::foreign_close::read_standing;
+use super::foreign_close_evidence::CloseEvidence;
 use super::foreign_frame::Frame;
 use super::foreign_names::ProcessNames;
 use super::foreign_port::ToplevelPort;
@@ -14,29 +15,23 @@ use crate::system::x11::window::window_kind::WindowKind;
 /// The compositor's toplevel list as one close reads it: opened on first use,
 /// remembering what a close needs between reads.
 ///
-/// The frames are read once, before any close request, because a prompt
-/// raised by the request may itself show up as a frame and would then pass for
-/// a proven window. The ids on screen at the first close request are kept so a
-/// toplevel that appears later is told apart from one that was always there,
-/// and an id once listed as a prompt is never sent a close request.
+/// Frames and toplevels are refreshed on each read. The first close retains
+/// the ids already present, and a later target toplevel is treated as a
+/// prompt. A selected window is checked again immediately before each send.
 pub(in crate::system) struct ForeignCloseRoute<P: ToplevelPort> {
     link: OnceCell<Option<P>>,
-    frames: OnceCell<Vec<Frame>>,
     in_use: Cell<bool>,
     contested: Cell<usize>,
-    known: RefCell<Vec<u32>>,
-    prompts: RefCell<Vec<u32>>,
+    evidence: RefCell<CloseEvidence>,
 }
 
 impl<P: ToplevelPort> Default for ForeignCloseRoute<P> {
     fn default() -> Self {
         Self {
             link: OnceCell::new(),
-            frames: OnceCell::new(),
             in_use: Cell::new(false),
             contested: Cell::new(0),
-            known: RefCell::new(Vec::new()),
-            prompts: RefCell::new(Vec::new()),
+            evidence: RefCell::new(CloseEvidence::default()),
         }
     }
 }
@@ -79,6 +74,14 @@ impl<P: ToplevelPort> ForeignCloseRoute<P> {
         self.contested.get()
     }
 
+    pub(in crate::system) fn unproven(&self) -> Vec<String> {
+        self.evidence.borrow().unproven.clone()
+    }
+
+    pub(in crate::system) fn dialogs(&self) -> Vec<String> {
+        self.evidence.borrow().dialogs.clone()
+    }
+
     /// One bounded refresh, then the windows of the process the compositor
     /// lists. Nothing is sent.
     pub(in crate::system) fn standing(
@@ -88,25 +91,34 @@ impl<P: ToplevelPort> ForeignCloseRoute<P> {
         deadline: Deadline,
     ) -> Result<Vec<Toplevel>, ControlError> {
         let port = self.port()?;
-        let fresh;
-        let frames: &[Frame] = match self.frames.get() {
-            Some(frames) => frames,
-            None => {
-                fresh = read_frames()?;
-                if !fresh.is_empty() {
-                    let _ = self.frames.set(fresh.clone());
-                }
-                &fresh
-            }
-        };
+        let frames = read_frames()?;
         port.refresh(deadline)?;
-        let standing = read_standing(&port.records(), frames, names, &self.known.borrow());
+        let owners = port.owners(deadline)?;
+        let mut evidence = self.evidence.borrow_mut();
+        let records = port.records();
+        let standing = read_standing(&records, &frames, names, &evidence.known, owners.as_ref());
+        evidence.selected = records
+            .into_iter()
+            .filter(|record| standing.windows.iter().any(|window| window.id == record.id))
+            .map(|record| {
+                (
+                    record.id,
+                    (
+                        record.clone(),
+                        owners.as_ref().and_then(|_| port.address(record.id)),
+                    ),
+                )
+            })
+            .collect();
+        evidence.names = Some(names.clone());
+        evidence.frames = frames;
+        evidence.unproven = standing.unproven.clone();
+        evidence.dialogs = standing.dialogs.clone();
         self.in_use.set(true);
         self.contested.set(standing.contested);
-        let mut prompts = self.prompts.borrow_mut();
         for window in &standing.windows {
-            if window.kind == WindowKind::Dialog && !prompts.contains(&window.id) {
-                prompts.push(window.id);
+            if window.kind == WindowKind::Dialog && !evidence.prompts.contains(&window.id) {
+                evidence.prompts.push(window.id);
             }
         }
         Ok(standing.windows)
@@ -116,17 +128,53 @@ impl<P: ToplevelPort> ForeignCloseRoute<P> {
     /// screen. A toplevel read as a prompt is refused as an unknown window.
     pub(in crate::system) fn close(&self, id: u32, deadline: Deadline) -> Result<(), ControlError> {
         let port = self.port()?;
-        if self.prompts.borrow().contains(&id) {
+        let mut evidence = self.evidence.borrow_mut();
+        if evidence.prompts.contains(&id) {
             return Err(ControlError::BadWindow);
         }
-        if self.known.borrow().is_empty() {
-            port.refresh(deadline)?;
-            *self.known.borrow_mut() = port.records().iter().map(|record| record.id).collect();
+        port.refresh(deadline)?;
+        let owners = port.owners(deadline)?;
+        let records = port.records();
+        let names = evidence.names.as_ref().ok_or(ControlError::StaleWindow)?;
+        let (before, address) = evidence.selected.get(&id).ok_or(ControlError::BadWindow)?;
+        let current = records
+            .iter()
+            .find(|record| record.id == id)
+            .ok_or(ControlError::BadWindow)?;
+        if before.title != current.title
+            || before.app_id != current.app_id
+            || *address != owners.as_ref().and_then(|_| port.address(id))
+        {
+            return Err(ControlError::StaleWindow);
+        }
+        if !names.is_current() {
+            return Err(ControlError::StaleWindow);
+        }
+        let standing = read_standing(
+            &records,
+            &evidence.frames,
+            names,
+            &evidence.known,
+            owners.as_ref(),
+        );
+        if standing.contested > 0
+            || !standing.unproven.is_empty()
+            || !standing.dialogs.is_empty()
+            || standing
+                .windows
+                .iter()
+                .any(|window| window.kind == WindowKind::Dialog)
+            || !standing.windows.iter().any(|window| window.id == id)
+        {
+            return Err(ControlError::StaleWindow);
+        }
+        if evidence.known.is_empty() {
+            evidence.known = records.iter().map(|record| record.id).collect();
         }
         port.send(id, ToplevelRequest::Close)
     }
 
-    fn port(&self) -> Result<&P, ControlError> {
+    pub(in crate::system) fn port(&self) -> Result<&P, ControlError> {
         self.link
             .get()
             .and_then(Option::as_ref)
