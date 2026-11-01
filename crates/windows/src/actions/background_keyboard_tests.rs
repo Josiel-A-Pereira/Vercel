@@ -124,3 +124,28 @@ fn expired_deadline_sends_nothing_and_reports_not_delivered() {
     );
     assert!(sent().is_empty());
 }
+
+#[test]
+fn deadline_exhausted_while_focusing_still_deactivates() {
+    sink::reset();
+
+    let error = type_text_by_messages(
+        plan(false),
+        deadline(50),
+        |deadline| {
+            std::thread::sleep(deadline.remaining());
+            Ok(())
+        },
+        || true,
+    )
+    .expect_err("budget spent");
+
+    assert_eq!(
+        error.disposition.delivery(),
+        DeliveryDisposition::NotDelivered
+    );
+    assert_eq!(
+        sent(),
+        expected(&[&activation_messages(true), &activation_messages(false)])
+    );
+}

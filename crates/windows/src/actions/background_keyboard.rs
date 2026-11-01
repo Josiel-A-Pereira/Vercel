@@ -28,6 +28,7 @@ use crate::tree::live_read::corroborate_verified_process;
 const TYPE_TEXT_LABEL: &str = "WindowMessage.type_text";
 const FOCUS_BUDGET: Duration = Duration::from_millis(500);
 const CARET_BUDGET: Duration = Duration::from_millis(500);
+const DEACTIVATION_BUDGET_MS: u64 = 1_000;
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 /// Types `text` by window messages when `element` lives in a Chromium
@@ -71,7 +72,8 @@ pub(crate) struct BackgroundTypePlan<'a> {
 /// The message sequence past the window checks, with target focusing and
 /// the foreground re-read injected so a test drives the same code the
 /// adapter runs. Deactivation is sent whenever activation was, even when a
-/// later step fails, so the window is never left believing it is active.
+/// later step fails or exhausts `deadline`, so the window is never left
+/// believing it is active.
 pub(crate) fn type_text_by_messages(
     plan: BackgroundTypePlan<'_>,
     deadline: Deadline,
@@ -83,13 +85,15 @@ pub(crate) fn type_text_by_messages(
         let activation = activation_messages(true);
         let delivered = send_window_messages(plan.root, &activation, deadline);
         if delivered < activation.len() {
-            deactivate(plan.root, deadline);
+            if delivered > 0 {
+                deactivate(plan.root);
+            }
             return Err(stopped_before_text(deadline));
         }
     }
     let result = focus_target(deadline).and_then(|()| send_text(plan.root, plan.text, deadline));
     if activate && still_background() {
-        deactivate(plan.root, deadline);
+        deactivate(plan.root);
     }
     result.map(|()| {
         ActionStep::succeeded(TYPE_TEXT_LABEL)
@@ -107,7 +111,12 @@ fn send_text(root: isize, text: &str, deadline: Deadline) -> Result<(), AdapterE
     Ok(())
 }
 
-fn deactivate(root: isize, deadline: Deadline) {
+/// Runs on its own budget, because a focus or typing step that exhausted
+/// the operation deadline would otherwise leave nothing to send it with.
+fn deactivate(root: isize) {
+    let Ok(deadline) = Deadline::detached_after(DEACTIVATION_BUDGET_MS) else {
+        return;
+    };
     send_window_messages(root, &activation_messages(false), deadline);
 }
 
