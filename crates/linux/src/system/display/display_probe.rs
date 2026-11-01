@@ -41,8 +41,16 @@ pub(crate) fn reach_from(table: &str, path: &str, file_is_socket: bool) -> Reach
     }
 }
 
+/// Reads the socket table without requiring UTF-8. Socket names are raw bytes,
+/// so one non-UTF-8 name must not discard the rows of every other socket.
+fn read_table(table: &Path) -> String {
+    std::fs::read(table)
+        .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+        .unwrap_or_default()
+}
+
 fn reach(path: &str) -> Reach {
-    let table = std::fs::read_to_string(UNIX_TABLE).unwrap_or_default();
+    let table = read_table(Path::new(UNIX_TABLE));
     let is_socket = std::fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_socket());
     reach_from(&table, path, is_socket)
 }
