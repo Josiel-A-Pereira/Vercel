@@ -56,6 +56,9 @@ pub(in crate::system) trait FocusWorld: ClientWorld {
     /// popup while the X11 window manager continues to name the main client.
     fn app_frame_active(&self) -> bool;
     fn overview_open(&self) -> Option<bool>;
+    /// Focuses the window through the compositor's toplevel manager, or
+    /// `None` when the session has no such manager.
+    fn foreign_focus(&self, win: &WindowInfo) -> Option<Result<(), AdapterError>>;
     fn arm_wake(&self) {}
     fn wait_for_change(&self, deadline: Deadline) {
         std::thread::sleep(deadline.remaining());
@@ -226,7 +229,11 @@ pub(in crate::system) fn run(
     }
     match world.session() {
         Session::X11 => {}
-        Session::Wayland => return Err(refusal(Cause::WaylandSession)),
+        Session::Wayland => {
+            return world
+                .foreign_focus(win)
+                .unwrap_or_else(|| Err(refusal(Cause::WaylandSession)));
+        }
         Session::NoDisplay => return Err(refusal(Cause::NoDisplay)),
     }
     let frame = world.frame()?;
@@ -320,6 +327,10 @@ mod fake;
 #[cfg(test)]
 #[path = "focus_window_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "focus_window_foreign_tests.rs"]
+mod foreign_tests;
 
 #[cfg(test)]
 #[path = "focus_fallback_tests.rs"]

@@ -1,10 +1,10 @@
-use agent_desktop_core::{Deadline, ProcessIdentity, WindowOp};
+use agent_desktop_core::{Deadline, WindowOp};
 use x11rb::connection::Connection;
 use x11rb::protocol::xproto::{AtomEnum, ConnectionExt, PropMode};
 use x11rb::rust_connection::RustConnection;
 use x11rb::wrapper::ConnectionExt as _;
 
-use super::super::{FrameWorld, Live, SharedBus};
+use super::super::{Live, SharedBus};
 use super::{DeliverySemantics, ErrorCode, ensure_owned_after};
 use crate::system::window::window_op_live_tests::{
     apply, maximized, spawn, text, wait_for, xid_of,
@@ -33,11 +33,7 @@ fn window_op_live_missing_client_list_does_not_claim_a_live_window_disappeared()
         apply(&win, WindowOp::Maximize).expect("real window write");
         assert_eq!(maximized(&xid), (true, true), "xprop verifies the write");
         let deadline = Deadline::after(10_000).expect("budget");
-        let live = Live {
-            frame: FrameWorld::new(&bus, &win, deadline).expect("live frame"),
-            owner: ProcessIdentity::new(pid, win.process_instance.clone().expect("instance")),
-            deadline,
-        };
+        let live = Live::new(&bus, &win, deadline).expect("live world");
         let listed = connection
             .get_property(false, root, atom, AtomEnum::WINDOW, 0, 4096)
             .expect("list request")

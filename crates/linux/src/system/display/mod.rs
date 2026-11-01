@@ -209,3 +209,4 @@ pub(super) mod display_wayland_assemble;
 pub(super) mod display_wayland_record;
 pub(super) mod display_wayland_state;
 pub(crate) mod route;
+pub(crate) mod wayland_link;

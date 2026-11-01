@@ -2,7 +2,8 @@
 
 Window control uses EWMH client messages on the X11 display: an X11 session's
 display, or the Xwayland display of a Wayland session. `wmctrl` and `xdotool`
-are not used.
+are not used. A Wayland compositor that offers `zwlr_foreign_toplevel_manager_v1`
+has its own route, described under "Wayland toplevel protocol".
 
 ## Naming an app
 
@@ -21,8 +22,8 @@ are not used.
   `bounds` when the display maps one.
 - Several instances of one app share a name: pick one with `--window-id`.
   `close-app` and `launch` cannot choose and answer `AMBIGUOUS_TARGET`.
-- Two windows of one process with the same title are told apart by the one the
-  toolkit reports active: `focus-window --window-id` and the window operations
+- On X11, two windows of one process with the same title are told apart by the
+  one the toolkit reports active: `focus-window --window-id` and the window operations
   act on the active one and, when exactly two share the title, on its twin. Any
   other tie (no active window, a window that is not the active one among three or
   more twins, an active window of another title) is refused with cause
@@ -142,7 +143,7 @@ it can still list the window. The batch waits for `window-closed` and prints the
 event of the closed window. If a save prompt appears, the wait times out:
 snapshot `--surface sheet`, answer it, then run `list-windows`.
 
-- Graceful close sends `_NET_CLOSE_WINDOW` to each top-level window of the pid and
+- On X11, graceful close sends `_NET_CLOSE_WINDOW` to each top-level window of the pid and
   no signal. A file manager that outlives its windows ends in `TIMEOUT`,
   `delivered_unverified`; `--force` ends it. A terminal server closes like any
   other app under the name `list-apps` prints: `close-app gnome-terminal-server`
@@ -170,7 +171,8 @@ snapshot `--surface sheet`, answer it, then run `list-windows`.
 - `--force` sends `SIGTERM` through a pidfd, then `SIGKILL` after 2 s; a stopped
   process gets `SIGKILL` at once.
 - A process of a Wayland session with no X11 window is `ACTION_NOT_SUPPORTED`,
-  cause `wayland_session`.
+  cause `wayland_session`, unless the compositor offers the foreign toplevel
+  protocol; see "Wayland toplevel protocol".
 - Protection follows the target process instance, never its name. `INVALID_ARGS`,
   `not_delivered`, for:
   - the owner of the active display socket, or of the X root's supporting-WM
@@ -192,7 +194,7 @@ snapshot `--surface sheet`, answer it, then run `list-windows`.
 
 ## Window operations
 
-`move-window`, `resize-window`, `minimize`, `maximize` and `restore` use EWMH.
+On X11, `move-window`, `resize-window`, `minimize`, `maximize` and `restore` use EWMH.
 Move and resize read back geometry inside 250 ms with a 2 px tolerance; minimize
 and maximize read back their state. Their successful reports name
 `details.verification_scope`. `restore` has no uniform final read-back across its
@@ -214,8 +216,9 @@ Reports carry `action`, `target`, `steps` and `disposition`, without a `moved`,
 - Without `--app` or `--window-id` all five act on the focused window, and
   `data.target` names the window id, title and process identity, even when no
   selector was supplied. Pass one unless you mean the focused window.
-- A Wayland-native window, and an un-minimize on a Wayland session, are refused
-  with cause `wayland_session` before anything is sent.
+- Without the foreign toplevel protocol (GNOME), a Wayland-native window, and an
+  un-minimize on a Wayland session, are refused with cause `wayland_session`
+  before anything is sent.
 - A window the process cannot be mapped to is refused before any write: no client
   is `ACTION_NOT_SUPPORTED`, cause `window_not_mapped`; two clients are
   `AMBIGUOUS_TARGET`, cause `ambiguous_window`.
@@ -233,7 +236,7 @@ Reports carry `action`, `target`, `steps` and `disposition`, without a `moved`,
 agent-desktop focus-window --app gnome-calculator
 ```
 
-`focus-window` succeeds only when `_NET_ACTIVE_WINDOW` names the window and its
+On X11, `focus-window` succeeds only when `_NET_ACTIVE_WINDOW` names the window and its
 application reports it active: its frame or another frame of the app carries
 `ACTIVE`, one of its menus is open, or it is a modal or dialog frame that holds
 the input focus without `ACTIVE`. After the request is sent, a failed read-back
@@ -256,7 +259,8 @@ safe to repeat.
   every window. Send a global `--headed press escape` (no `--app`), then call
   `focus-window --app <name>` again. A headed ref action runs `focus-window` for
   you and ends the same way.
-- A Wayland session is `ACTION_NOT_SUPPORTED`, cause `wayland_session`.
+- Without the foreign toplevel protocol (GNOME), a Wayland session is
+  `ACTION_NOT_SUPPORTED`, cause `wayland_session`.
 - A headless ref `click` on a minimized window refuses with live `offscreen`
   evidence and leaves it minimized. On X11, `--headed click`, `--headed hover`
   and `--headed drag` first focus the ref's exact source window, restoring it if
@@ -267,6 +271,54 @@ safe to repeat.
   proves nothing was sent. Ordinary-app headed pointer actions on Wayland refuse
   with cause `wayland_session` before delivery. Use `restore` to restore a window
   without clicking it.
+
+## Wayland toplevel protocol
+
+On a Wayland compositor that offers `zwlr_foreign_toplevel_manager_v1`, window
+control and graceful `close-app` go through that protocol. Measured on Hyprland
+0.56.2 in a nested compositor; no other compositor was measured. GNOME and any
+compositor without the protocol are unchanged: `ACTION_NOT_SUPPORTED`, cause
+`wayland_session`.
+
+- `focus-window` succeeds when the compositor reports the window `activated`.
+  The toolkit reports focus only when the seat has a keyboard. With none (a
+  headless test session) the compositor activates the window and the command
+  still ends `ACTION_FAILED`, "Window focus did not settle". With a virtual
+  keyboard on the test seat (`wtype -M shift -s 1800000 -m shift`),
+  `focus-window` returned ok and the compositor's `activated` agreed. A physical
+  keyboard on a real desktop was not measured.
+- `maximize` is `delivered_verified` from the compositor's state. `restore`
+  undoes it and is `delivered_unverified`, as on X11.
+- `minimize`: Hyprland takes the request and changes nothing. The command ends
+  `ACTION_FAILED`, cause `minimize_not_applied`, `delivered_unverified`, and the
+  window stays on screen. Operate the window from the compositor's own controls.
+- `move-window` and `resize-window` are `ACTION_NOT_SUPPORTED`, cause
+  `wayland_session`: the protocol has no such request.
+- Graceful `close-app` is `delivered_verified` with
+  `details.evidence: "process_instance_exited"` once the process exits. A save
+  prompt keeps the app open: `ACTION_FAILED`, cause `dialog_pending`, the
+  title in `details.dialog`, `delivered_unverified`. The tool never closes the prompt,
+  because that would answer it: answer it with a click, and the app exits. A
+  second `close-app` while a prompt is open is `dialog_pending`,
+  `not_delivered`. `close-app --force` still sends signals.
+
+The protocol names no process, only an app id and a title. A window is matched
+by its exact title plus an app id related to the process's names.
+
+- Two windows of one program with the same title are `AMBIGUOUS_TARGET`, cause
+  `ambiguous_window`, `details.candidates: n`, `not_delivered`; nothing changes.
+  Give the windows different titles, then retry. `close-app` on such a process
+  closes all of them, because they all belong to it. It refuses only when the
+  compositor lists more windows of a title, for this process's names, than the
+  process shows itself, because another program with a related app id may own the
+  rest: `AMBIGUOUS_TARGET`, cause `ambiguous_window`, `details.contested` (the
+  excess count), `not_delivered`, no window sent a request. Give the windows
+  different titles and retry, or use `--force` to end the process.
+- A same-titled window of an unrelated program does not make the target
+  ambiguous and is left alone.
+- A window whose app id does not relate to its process name is `ACTION_FAILED`,
+  cause `toplevel_identity_unproven`, `not_delivered`.
+- No such window is `WINDOW_NOT_FOUND`, cause `window_not_mapped`.
 
 ## Workspaces
 
@@ -280,9 +332,11 @@ Headless `press --app <name>` delivers only while the target process owns the
 active window. On X11 a background or minimized app is refused: `ACTION_FAILED`,
 `check: window_active`, cause `display_active_window`, `not_delivered`; the
 message says the application's active window could not be confirmed. `--headed`
-brings the window forward, un-minimizes it and sends the keys (X11). On Wayland,
-`focus-window` and headed app- or window-scoped `press` refuse with
-`ACTION_NOT_SUPPORTED`, cause `wayland_session`, Xwayland clients included.
+brings the window forward, un-minimizes it and sends the keys (X11). Without the
+foreign toplevel protocol (GNOME), `focus-window` and headed app- or
+window-scoped `press` on Wayland refuse with `ACTION_NOT_SUPPORTED`, cause
+`wayland_session`, Xwayland clients included. Headed scoped `press` was not
+measured on Hyprland.
 
 Headless scoped `press` does not activate a window: it requires the live focus
 guard to confirm the target. If focus cannot be confirmed, bring the target

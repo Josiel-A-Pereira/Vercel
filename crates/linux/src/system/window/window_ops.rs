@@ -106,13 +106,15 @@ pub(crate) fn list_windows(
         .collect())
 }
 
-/// The windows of one process, placed as `list_windows` places them. Only
-/// that process is read, so an unrelated stopped application costs nothing.
-pub(crate) fn windows_of_process(
+/// The windows of one process as the registry lists them, placed as
+/// `list_windows` places them, with what each shows about being a prompt.
+/// Only that process is read, so an unrelated stopped application costs
+/// nothing.
+pub(crate) fn listed_of_process(
     bus: &SharedBus,
     pid: u32,
     deadline: Deadline,
-) -> Result<Vec<WindowInfo>, AdapterError> {
+) -> Result<Vec<ListedWindow>, AdapterError> {
     let pending = x11::start(|| DisplayReader.read());
     let desktops = x11::start(desktops::read);
     let registry = read_registry_for(bus, Some(pid), deadline)?;
@@ -124,7 +126,17 @@ pub(crate) fn windows_of_process(
         &state,
         desktops.finish(deadline).flatten().as_ref(),
     );
-    Ok(pass.windows.into_iter().map(|window| window.info).collect())
+    Ok(pass.windows)
+}
+
+/// The windows of one process, placed as `list_windows` places them.
+pub(crate) fn windows_of_process(
+    bus: &SharedBus,
+    pid: u32,
+    deadline: Deadline,
+) -> Result<Vec<WindowInfo>, AdapterError> {
+    listed_of_process(bus, pid, deadline)
+        .map(|windows| windows.into_iter().map(|window| window.info).collect())
 }
 
 /// The focused window, or none when the available sources do not agree.

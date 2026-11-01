@@ -27,12 +27,17 @@ A stale `WAYLAND_DISPLAY` from another session falls through to a working
 | Clipboard | Native selection owner | `wl-clipboard` |
 | GNOME Shell ref click, popup opener | `--headed`, receiver proof from the shell's own tree | Ref click refused with `wayland_session`, popup opener refused as unproven; see shell reference |
 
+The Wayland column is GNOME. A compositor that offers
+`zwlr_foreign_toplevel_manager_v1` (measured on Hyprland) serves `focus-window`,
+window control and graceful `close-app` through that protocol; see
+`references/windows-and-lifecycle.md`.
+
 On Wayland, `list-displays` and `screenshot --screen N` read the same list. GNOME
 answers through `org.gnome.Mutter.DisplayConfig`. When that interface does not
 answer, the CLI reads the core `wl_output` protocol (version 4, for the output
 name) and `zxdg_output_manager_v1` (xdg-output, for logical position and size).
-Only the display listing uses the second source; window control and keyboard
-input on a non-GNOME compositor are unchanged.
+Only the display listing uses the second source. Keyboard input on a non-GNOME
+compositor is unchanged; window control has its own route, in the paragraph above.
 
 - `scale` is the current mode's pixels divided by the logical width on the same
   axis, so a fractional scale is reported. A 90 or 270 degree transform uses the

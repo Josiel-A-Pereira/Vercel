@@ -80,6 +80,23 @@ pub(super) fn windowless(request: &Request<'_>) -> AdapterError {
     .with_details(json!({ "app": request.name, "pid": request.pid }))
 }
 
+pub(super) fn ambiguous_close(request: &Request<'_>, contested: usize) -> AdapterError {
+    AdapterError::ambiguous_target(
+        "Windows of this program share a title the compositor cannot tell apart by process, so no window was sent a close request",
+    )
+    .with_suggestion(
+        "Give the windows different titles and retry, or use --force to end the process.",
+    )
+    .with_details(json!({
+        "cause": "ambiguous_window",
+        "physical_delivery_started": false,
+        "app": request.name,
+        "pid": request.pid,
+        "contested": contested,
+    }))
+    .with_disposition(DeliverySemantics::not_delivered())
+}
+
 pub(super) fn send_failed(request: &Request<'_>, error: ControlError) -> AdapterError {
     refused(
         ErrorCode::ActionFailed,

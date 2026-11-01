@@ -4,6 +4,7 @@ use agent_desktop_core::{AdapterError, AppInfo, InteractionLease, OperationRepor
 
 use super::SharedBus;
 use crate::system::process::process_lookup::Lookup;
+use crate::system::window::foreign::foreign_close_route::ForeignCloseRoute;
 use world::{Live, World};
 
 #[cfg(test)]
@@ -75,9 +76,11 @@ pub(crate) fn close_app(
     let live = Live {
         bus,
         pid,
+        name: &app.name,
         instance: app.process_instance.as_deref().unwrap_or_default(),
         deadline: lease.deadline(),
         started: Instant::now(),
+        foreign: ForeignCloseRoute::default(),
     };
     run_report(&live, app, force)
 }

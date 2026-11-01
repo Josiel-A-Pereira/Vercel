@@ -12,6 +12,8 @@ use crate::system::menu::overview::overview_open;
 use crate::system::process::process_lookup::Lookup;
 use crate::system::process::{proc_stat, process_facts};
 use crate::system::registry::toolkit;
+use crate::system::window::foreign::foreign_focus;
+use crate::system::window::foreign::foreign_route::through_link;
 use crate::system::window::window_client::ClientWorld;
 use crate::system::window::window_filter::frame_state;
 use crate::system::x11::control::activate::active_window_within;
@@ -196,6 +198,10 @@ impl FocusWorld for LiveWorld<'_> {
 
     fn overview_open(&self) -> Option<bool> {
         overview_open()
+    }
+
+    fn foreign_focus(&self, win: &WindowInfo) -> Option<Result<(), AdapterError>> {
+        through_link(win, self.deadline, foreign_focus::activate)
     }
 
     fn modal_over(&self, client: u32) -> Option<String> {

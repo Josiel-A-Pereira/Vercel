@@ -8,6 +8,7 @@ use wayland_protocols::xdg::xdg_output::zv1::client::zxdg_output_manager_v1::{
 use wayland_protocols::xdg::xdg_output::zv1::client::zxdg_output_v1::{self, ZxdgOutputV1};
 
 use crate::system::display::display_wayland_record::OutputRecord;
+use crate::system::display::wayland_link::SyncDone;
 
 /// One global the compositor advertised on the registry.
 #[derive(Debug, Clone, PartialEq)]
@@ -24,6 +25,12 @@ pub(crate) struct WaylandState {
     pub(crate) records: Vec<OutputRecord>,
     pub(crate) globals: Vec<Global>,
     pub(crate) done: bool,
+}
+
+impl SyncDone for WaylandState {
+    fn sync_done(&mut self) -> &mut bool {
+        &mut self.done
+    }
 }
 
 impl WaylandState {

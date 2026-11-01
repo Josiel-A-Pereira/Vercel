@@ -100,8 +100,12 @@ fn request_close(world: &impl World, request: &Request<'_>) -> Result<bool, Adap
         Liveness::Stopped => return Err(AdapterError::app_unresponsive(request.name)),
         Liveness::Alive => {}
     }
+    let contested = world.contested_windows();
+    if contested > 0 {
+        return Err(refusal::ambiguous_close(request, contested));
+    }
     if windows.is_empty() {
-        let refused = if world.on_wayland() {
+        let refused = if world.on_wayland() && !world.has_foreign_route() {
             refusal::wayland_session(request)
         } else {
             refusal::windowless(request)
@@ -213,3 +217,7 @@ pub(super) fn close(world: &impl World, request: &Request<'_>) -> Result<bool, A
 #[cfg(test)]
 #[path = "graceful_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "graceful_foreign_tests.rs"]
+mod foreign_tests;
