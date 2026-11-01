@@ -22,6 +22,23 @@ fn socket_ownership_belongs_to_the_listener_process_not_its_name() {
     assert!(!unrelated.unwrap());
 }
 
+#[test]
+fn a_non_utf8_socket_name_does_not_hide_the_listener_that_owns_a_socket() {
+    use std::os::linux::net::SocketAddrExt;
+    use std::os::unix::net::SocketAddr;
+    let mut name = b"ad-owner-\xff\xfe-".to_vec();
+    name.extend_from_slice(std::process::id().to_string().as_bytes());
+    let unrelated =
+        UnixListener::bind_addr(&SocketAddr::from_abstract_name(&name).unwrap()).unwrap();
+    let path = std::env::temp_dir().join(format!("ad-owner-utf8-{}.sock", std::process::id()));
+    let listener = UnixListener::bind(&path).unwrap();
+    let own = owns_socket(std::process::id(), &path);
+    drop(listener);
+    drop(unrelated);
+    std::fs::remove_file(path).unwrap();
+    assert!(own.unwrap());
+}
+
 fn no() -> Result<bool, AdapterError> {
     Ok(false)
 }
