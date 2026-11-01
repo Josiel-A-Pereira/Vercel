@@ -55,8 +55,8 @@ fn source_app_matches(
     title: Option<&str>,
     inventory_names: impl FnOnce() -> Result<Vec<String>, AdapterError>,
 ) -> Result<bool, AdapterError> {
-    if let Some(title) = title.filter(|title| !title.trim().is_empty()) {
-        return Ok(agent_desktop_core::app_name_matches(title, expected));
+    if title.is_some_and(|title| agent_desktop_core::app_name_matches(title, expected)) {
+        return Ok(true);
     }
     Ok(inventory_names()?
         .iter()
@@ -110,15 +110,36 @@ mod tests {
     }
 
     #[test]
-    fn readable_title_never_reads_inventory() {
-        for (title, matches) in [("fIXTURE", true), ("Other", false)] {
-            assert_eq!(
-                source_app_matches("Fixture", Some(title), || {
-                    panic!("readable AXTitle must not read inventory")
-                })
-                .unwrap(),
-                matches
-            );
+    fn matching_title_never_reads_inventory() {
+        assert!(
+            source_app_matches("Fixture", Some("fIXTURE"), || {
+                panic!("matching AXTitle must not read inventory")
+            })
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn different_title_accepts_same_pid_inventory_alias() {
+        let records = [(7, "Google Chrome"), (8, "Other PID")];
+        assert!(
+            source_app_matches("Google Chrome", Some("Chrome"), || {
+                Ok(source_names_for_pid(7, records))
+            })
+            .unwrap()
+        );
+        assert!(
+            !source_app_matches("Other PID", Some("Chrome"), || {
+                Ok(source_names_for_pid(7, records))
+            })
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn different_title_rejects_missing_or_different_inventory_names() {
+        for names in [vec![], vec!["Other".into()]] {
+            assert!(!source_app_matches("Fixture", Some("Alias"), || Ok(names)).unwrap());
         }
     }
 
