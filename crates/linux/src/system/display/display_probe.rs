@@ -49,8 +49,13 @@ fn read_table(table: &Path) -> String {
         .unwrap_or_default()
 }
 
+/// The kernel's table of unix sockets, empty when it cannot be read.
+pub(crate) fn unix_table() -> String {
+    read_table(Path::new(UNIX_TABLE))
+}
+
 fn reach(path: &str) -> Reach {
-    let table = read_table(Path::new(UNIX_TABLE));
+    let table = unix_table();
     let is_socket = std::fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_socket());
     reach_from(&table, path, is_socket)
 }
