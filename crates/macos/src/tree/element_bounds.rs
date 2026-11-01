@@ -159,8 +159,10 @@ fn window_ancestor_bounds(
 
 /// Some controls, such as System Settings popup buttons, answer
 /// `kAXErrorNoValue` for `AXWindow` although an `AXWindow` encloses them. The
-/// parent chain still reaches that window; a chain that ends at the
-/// application without one, as menu content does, has no window.
+/// parent chain still reaches that window. Menu content has no window even
+/// when its chain passes through one, because an open menu draws outside the
+/// window and would be judged offscreen; the search stops at the first menu
+/// role, and a chain that ends at the application has no window either.
 fn first_window_ancestor<E>(
     start: E,
     mut parent: impl FnMut(&E) -> Result<Option<E>, AdapterError>,
@@ -173,7 +175,8 @@ fn first_window_ancestor<E>(
         };
         match role(&ancestor)?.as_deref() {
             Some("AXWindow") => return Ok(Some(ancestor)),
-            Some("AXApplication") | None => return Ok(None),
+            Some("AXApplication" | "AXMenu" | "AXMenuItem" | "AXMenuBarItem" | "AXMenuBar")
+            | None => return Ok(None),
             Some(_) => current = parent(&ancestor)?,
         }
     }
@@ -333,6 +336,24 @@ mod tests {
             "AXMenuBarItem",
             "AXMenuBar",
             "AXApplication",
+        ];
+
+        let window = first_window_ancestor(0, ancestry(&roles), |index| {
+            Ok(Some(roles[*index].to_owned()))
+        })
+        .unwrap();
+
+        assert_eq!(window, None);
+    }
+
+    #[test]
+    fn a_popup_menu_item_inside_a_window_has_no_window_ancestor() {
+        let roles = [
+            "AXMenuItem",
+            "AXMenu",
+            "AXPopUpButton",
+            "AXGroup",
+            "AXWindow",
         ];
 
         let window = first_window_ancestor(0, ancestry(&roles), |index| {
