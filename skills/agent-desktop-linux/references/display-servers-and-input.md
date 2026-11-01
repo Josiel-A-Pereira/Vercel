@@ -22,9 +22,29 @@ A stale `WAYLAND_DISPLAY` from another session falls through to a working
 | Window ops | EWMH on the X11 display | Xwayland clients only; native windows and un-minimize refused |
 | `focus-window`, headed scoped `press` | EWMH activation, then keys for `press` | Refused with `ACTION_NOT_SUPPORTED`, cause `wayland_session`, Xwayland clients included |
 | Headless scoped `press` | Live display and frame focus guards, no activation | Live frame focus guard, no activation |
+| `list-displays` | Works | Mutter `DisplayConfig` first; if it does not answer, `wl_output` plus xdg-output (measured on Hyprland) |
 | `screenshot` | Window or display; primary display by default | Portal consent; primary display by default, `--screen` picks a monitor |
 | Clipboard | Native selection owner | `wl-clipboard` |
 | GNOME Shell ref click, popup opener | `--headed`, receiver proof from the shell's own tree | Ref click refused with `wayland_session`, popup opener refused as unproven; see shell reference |
+
+On Wayland, `list-displays` and `screenshot --screen N` read the same list. GNOME
+answers through `org.gnome.Mutter.DisplayConfig`. When that interface does not
+answer, the CLI reads the core `wl_output` protocol (version 4, for the output
+name) and `zxdg_output_manager_v1` (xdg-output, for logical position and size).
+Only the display listing uses the second source; window control and keyboard
+input on a non-GNOME compositor are unchanged.
+
+- `scale` is the current mode's pixels divided by the logical width on the same
+  axis, so a fractional scale is reported. A 90 or 270 degree transform uses the
+  mode height.
+- `id` is the xdg-output name, else the `wl_output` name, else
+  `wl-output-<global id>`.
+- Wayland has no primary output. The output at logical (0,0) is marked primary;
+  without one, the left-most output, then the top-most, is.
+- An output without a logical position or size, or with an empty size (switched
+  off), is not listed.
+- If neither Mutter nor xdg-output answers, the command fails with
+  `PLATFORM_NOT_SUPPORTED`.
 
 X11 needs no tool beyond the binary and its clipboard helper. `xdotool`,
 `ydotool`, `xclip` and `wmctrl` are not used. `wl-clipboard` is the one outside
