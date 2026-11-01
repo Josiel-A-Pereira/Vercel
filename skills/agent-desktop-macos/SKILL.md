@@ -39,7 +39,7 @@ Read the core skill first (`agent-desktop skills get desktop`) for the observe, 
 
 **Judge delivery by observation.** AX return codes do not prove an effect. Finder returns success from an `AXConfirm` that does nothing. Snapshot again or use `get` and `is` to check the result.
 
-**Surfaces.** Use `--surface menubar` for File, Edit and View menus and for menu bar apps (status items). While a menu, sheet, alert or popover is open, refs from the window tree behind it are the wrong target.
+**Surfaces.** Use `--surface menubar` for File, Edit and View menus and for menu bar apps (status items). While a menu, sheet, alert or popover is open, refs from the window tree behind it are the wrong target. A menubar snapshot carries each bound item's `shortcut` (for example `cmd+shift+p`); press that chord to run the command, including when the app is not focused.
 
 **Menus.** `right-click` headless uses `AXShowMenu`. If the menu opened but the app returned `APP_UNRESPONSIVE` with `retry: unsafe`, do not retry. Inspect the menu with `--surface menu`. For combo boxes and menu buttons, use `select @ref "Option"`. `select` needs a closed-to-open menu transition, so dismiss any open menu first.
 

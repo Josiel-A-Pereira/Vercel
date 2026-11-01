@@ -45,6 +45,10 @@ A cold Chromium or Electron app can take 10 to 25 seconds to expose its web tree
 
 An element gets a ref when its role is interactive or it advertises a primary action. `scrollarea` and `disclosure` get refs because `scroll`, `expand` and `collapse` need them. Static text and inert containers stay in the tree without refs. Web content advertises focus, right-click and scroll-to on almost every node, so those alone do not earn a ref. `find` returns `bounds` for such matches. Drive them with `--xy` (right-click, hover, drag) or scroll the container.
 
+### Menu item shortcuts
+
+A `menuitem` node with a key binding carries it as `shortcut`, in the same `+`-joined form `press` accepts: `"shortcut": "cmd+shift+p"`, `"shortcut": "cmd+return"`. The word order is `ctrl`, `opt`, `shift`, then `cmd`; a binding with no command key omits `cmd`. The value is the provider's own binding, so a shortcut read here always presses back. Snapshot the menu surface once to learn every command an app offers, then drive it with `press` instead of clicking — this also reaches a bound item in an app that has no focus, because `press` runs it through its accessibility action.
+
 ### Surfaces
 
 Surfaces are overlays: `menu`, `menubar`, `sheet`, `popover`, `alert`, `focused`, plus OS shell kinds on some platforms. Read `supported_surfaces` from `status` before you ask for one. An unsupported kind returns `PLATFORM_NOT_SUPPORTED` with the supported list in `details`. A shell surface needs no `--app`. When it is closed you get `WINDOW_NOT_FOUND`; raise it with `open-system-surface`.

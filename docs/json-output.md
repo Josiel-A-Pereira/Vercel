@@ -127,6 +127,10 @@ Earlier output synthesized a display name, falling back to `value` or
 `name` as always present must tolerate its absence and apply their own fallback
 to `role` or `value`.
 
+## Node descriptors
+
+A node may carry optional presentation descriptors, emitted only when the platform supplies them and omitted otherwise: `subrole`, `role_description`, `placeholder`, `dom_classes`, and `shortcut`. `shortcut` is the element's bound key chord in the same `+`-joined vocabulary `press` accepts (`cmd+shift+p`, `cmd+return`); word order is `ctrl`, `opt`, `shift`, then `cmd`, and a binding with no command key omits `cmd`. macOS emits it for menu items from the provider's own command binding, so the value is directly pressable. A node that supplies none of these serializes exactly as before, so the additions are non-breaking.
+
 ## Error codes
 
 | Code | Meaning |
