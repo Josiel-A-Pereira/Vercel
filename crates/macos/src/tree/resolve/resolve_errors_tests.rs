@@ -50,3 +50,26 @@ fn both_unmatched_window_outcomes_still_try_the_saved_surface_fallback() {
         &entry
     )));
 }
+
+#[test]
+fn a_matched_window_is_returned_whatever_the_on_screen_state() {
+    let entry = entry_in_window("w-7");
+
+    for on_screen in [true, false] {
+        assert_eq!(
+            matched_or_unmatched_window(Some(7), &entry, on_screen).unwrap(),
+            Some(7)
+        );
+    }
+}
+
+#[test]
+fn an_unmatched_window_error_follows_the_on_screen_state() {
+    let entry = entry_in_window("w-7");
+
+    let off_screen = matched_or_unmatched_window::<i64>(None, &entry, false).unwrap_err();
+    let on_screen = matched_or_unmatched_window::<i64>(None, &entry, true).unwrap_err();
+
+    assert_eq!(off_screen.code, ErrorCode::StaleRef);
+    assert_eq!(on_screen.code, ErrorCode::AppUnresponsive);
+}

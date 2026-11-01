@@ -135,34 +135,7 @@ fn source_window_scoped_roots(
     context: &mut ResolveReadContext,
 ) -> Result<CandidateRoots, AdapterError> {
     let deadline = context.deadline;
-    let mut source_window_on_screen = true;
-    if let Some(id) = entry.source.source_window_id.as_deref() {
-        if source_window_number(entry).is_none() {
-            return Err(
-                AdapterError::element_not_found("saved source window").with_details(
-                    serde_json::json!({
-                        "kind": "source_window_identity_invalid",
-                        "source_window_id": id,
-                        "complete": true,
-                        "retryable": false,
-                    }),
-                ),
-            );
-        }
-        source_window_on_screen =
-            crate::system::window::window_resolve::verify_window_identity_until(
-                id,
-                crate::system::window::window_resolve::WindowIdentityEvidence {
-                    pid: crate::system::process::process_identity::to_pid_t(entry.process.pid)?,
-                    app: entry.source.source_app.as_deref(),
-                    process_instance: entry.process.process_instance.as_deref(),
-                    title: entry.source.source_window_title.as_deref(),
-                    bounds_hash: entry.source.source_window_bounds_hash,
-                },
-                deadline,
-            )?
-            .visible;
-    }
+    let source_window_on_screen = verified_source_window_on_screen(entry, deadline)?;
     let windows = read_root_array(application, "AXWindows", context)?.unwrap_or_default();
     let window = if entry.source.source_window_id.is_some() {
         window_by_number(&windows, entry, source_window_on_screen, context)?
@@ -179,6 +152,42 @@ fn source_window_scoped_roots(
         scope_verified,
         roots: window.into_iter().collect(),
     })
+}
+
+#[cfg(target_os = "macos")]
+fn verified_source_window_on_screen(
+    entry: &RefEntry,
+    deadline: std::time::Instant,
+) -> Result<bool, AdapterError> {
+    if let Some(id) = entry.source.source_window_id.as_deref() {
+        if source_window_number(entry).is_none() {
+            return Err(
+                AdapterError::element_not_found("saved source window").with_details(
+                    serde_json::json!({
+                        "kind": "source_window_identity_invalid",
+                        "source_window_id": id,
+                        "complete": true,
+                        "retryable": false,
+                    }),
+                ),
+            );
+        }
+        return Ok(
+            crate::system::window::window_resolve::verify_window_identity_until(
+                id,
+                crate::system::window::window_resolve::WindowIdentityEvidence {
+                    pid: crate::system::process::process_identity::to_pid_t(entry.process.pid)?,
+                    app: entry.source.source_app.as_deref(),
+                    process_instance: entry.process.process_instance.as_deref(),
+                    title: entry.source.source_window_title.as_deref(),
+                    bounds_hash: entry.source.source_window_bounds_hash,
+                },
+                deadline,
+            )?
+            .visible,
+        );
+    }
+    Ok(true)
 }
 
 pub(in crate::tree) fn source_scope_verified(
@@ -223,9 +232,7 @@ fn window_by_number(
         return Err(error);
     }
     require_unique_window_number_match(match_count, source_window_number)?;
-    found.map(Some).ok_or_else(|| {
-        super::resolve_errors::unmatched_source_window(entry, source_window_on_screen)
-    })
+    super::resolve_errors::matched_or_unmatched_window(found, entry, source_window_on_screen)
 }
 
 #[cfg(target_os = "macos")]

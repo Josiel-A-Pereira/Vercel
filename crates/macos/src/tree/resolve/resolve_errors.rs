@@ -41,7 +41,8 @@ pub(in crate::tree) fn incomplete_traversal(phase: &str, depth: u8) -> AdapterEr
 /// carries its number. A window that CoreGraphics reports on screen may not
 /// have reached the accessibility tree yet, so that miss stays retryable. An
 /// off-screen record is a window the app closed but kept, as TextEdit does for
-/// a closed document; waiting cannot bring it back, so the ref is stale.
+/// a closed document, or a window on another Space; waiting cannot bring it
+/// into the accessibility tree, so the ref is stale.
 pub(in crate::tree) fn unmatched_source_window(
     entry: &RefEntry,
     source_window_on_screen: bool,
@@ -49,7 +50,7 @@ pub(in crate::tree) fn unmatched_source_window(
     if !source_window_on_screen {
         return AdapterError::new(
             ErrorCode::StaleRef,
-            "The ref's window was closed or is no longer shown",
+            "The ref's window is closed or off screen, for example on another Space",
         )
         .with_suggestion("Run 'snapshot' to refresh, then retry with the updated ref.")
         .with_disposition(DeliverySemantics::not_delivered())
@@ -71,6 +72,16 @@ pub(in crate::tree) fn unmatched_source_window(
         "complete": false,
         "retryable": true,
     }))
+}
+
+pub(in crate::tree) fn matched_or_unmatched_window<T>(
+    found: Option<T>,
+    entry: &RefEntry,
+    source_window_on_screen: bool,
+) -> Result<Option<T>, AdapterError> {
+    found
+        .map(Some)
+        .ok_or_else(|| unmatched_source_window(entry, source_window_on_screen))
 }
 
 pub(in crate::tree) fn is_unmatched_source_window(error: &AdapterError) -> bool {
