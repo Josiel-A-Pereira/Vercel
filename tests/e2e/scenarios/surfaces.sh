@@ -65,6 +65,15 @@ drag_focus="$("$bin" focus-window --app "$app" 2>/dev/null)"
 if [ "$(json_field "$drag_focus" ok)" != "True" ]; then
     abort_suite "drag fixture focus failed: $(json_field "$drag_focus" error.code)"
 fi
+# Showing or hiding the removable row makes SwiftUI lose the centring offset of
+# content narrower than its ScrollView: reported frames and drag hit testing
+# both go wrong until the next layout. A one-point resize forces that layout.
+if [ -n "${fw:-}" ] && [ -n "${fh:-}" ]; then
+    "$bin" resize-window --app "$app" --width "$((fw + 1))" --height "$fh" >/dev/null 2>&1
+    sleep 0.3
+    "$bin" resize-window --app "$app" --width "$fw" --height "$fh" >/dev/null 2>&1
+    sleep 0.3
+fi
 drag_snapshot="$("$bin" snapshot --app "$app" --include-bounds --max-depth 30 2>/dev/null)"
 drag_points="$(printf '%s' "$drag_snapshot" | python3 "$json_tool" tree drag-canvas drag 2>/dev/null)" || drag_points=""
 if [ -z "$drag_points" ]; then

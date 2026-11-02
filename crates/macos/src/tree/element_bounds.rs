@@ -83,6 +83,58 @@ pub(crate) fn intersect_rects(left: Rect, right: Rect) -> Option<Rect> {
     })
 }
 
+/// Widens a scroll area's reported frame along any axis it cannot scroll.
+/// SwiftUI can report a frame sized and offset by its content when the content
+/// is smaller than the viewport, which would mark visible controls offscreen.
+/// Nothing can scroll out of view on an axis with no scroll bar, so that axis
+/// is clipped by the parent alone.
+fn scroll_area_clip(
+    parent: Option<Rect>,
+    bounds: Option<Rect>,
+    scrolls_horizontally: bool,
+    scrolls_vertically: bool,
+) -> Option<Rect> {
+    let mut clip = bounds?;
+    let Some(parent) = parent else {
+        return Some(clip);
+    };
+    if !scrolls_horizontally {
+        clip.x = parent.x;
+        clip.width = parent.width;
+    }
+    if !scrolls_vertically {
+        clip.y = parent.y;
+        clip.height = parent.height;
+    }
+    Some(clip)
+}
+
+/// The rectangle `element` clips its descendants to. An unreadable scroll bar
+/// counts as present, so a failed read keeps the frame the element reported.
+pub(crate) fn clip_bounds(
+    element: &AXElement,
+    role: &str,
+    parent: Option<Rect>,
+    bounds: Option<Rect>,
+    deadline: std::time::Instant,
+) -> Option<Rect> {
+    if role != "AXScrollArea" {
+        return bounds;
+    }
+    let scrolls = |attribute| {
+        !matches!(
+            super::surface_read::element(element, attribute, deadline),
+            Ok(None)
+        )
+    };
+    scroll_area_clip(
+        parent,
+        bounds,
+        scrolls("AXHorizontalScrollBar"),
+        scrolls("AXVerticalScrollBar"),
+    )
+}
+
 pub(crate) fn clipped_viewport(
     parent: Option<Rect>,
     role: &str,
@@ -122,11 +174,9 @@ pub(crate) fn ancestor_viewport(
             return Ok(viewport);
         }
         if clips_descendants(&role) {
-            viewport = clipped_viewport(
-                viewport,
-                &role,
-                read_bounds_with_deadline(&parent, instant)?,
-            );
+            let bounds = read_bounds_with_deadline(&parent, instant)?;
+            let clip = clip_bounds(&parent, &role, viewport, bounds, instant);
+            viewport = clipped_viewport(viewport, &role, clip);
         }
         if role == "AXWindow" {
             return Ok(viewport);
@@ -188,6 +238,61 @@ mod tests {
         assert_eq!(
             clipped_viewport(window, "AXScrollArea", Some(rect(20.0, 100.0))),
             Some(rect(20.0, 100.0))
+        );
+    }
+
+    #[test]
+    fn scroll_area_with_no_scroll_bar_on_an_axis_clips_only_by_its_parent() {
+        let window = Some(Rect {
+            x: 790.0,
+            y: 359.0,
+            width: 1770.0,
+            height: 1080.0,
+        });
+        let misreported = Some(Rect {
+            x: 1676.0,
+            y: 391.0,
+            width: 884.0,
+            height: 1048.0,
+        });
+        let clip = scroll_area_clip(window, misreported, false, true).unwrap();
+        assert_eq!((clip.x, clip.width), (790.0, 1770.0));
+        assert_eq!((clip.y, clip.height), (391.0, 1048.0));
+        let clip = scroll_area_clip(window, misreported, true, false).unwrap();
+        assert_eq!((clip.x, clip.width), (1676.0, 884.0));
+        assert_eq!((clip.y, clip.height), (359.0, 1080.0));
+        let clip = scroll_area_clip(window, misreported, false, true).unwrap();
+        let visible_button = Some(Rect {
+            x: 1253.0,
+            y: 463.5,
+            width: 113.0,
+            height: 24.0,
+        });
+        let viewport = clipped_viewport(window, "AXScrollArea", Some(clip));
+        assert_eq!(
+            crate::tree::state_reader::offscreen(visible_button, viewport),
+            Some(false)
+        );
+    }
+
+    #[test]
+    fn scroll_area_keeps_its_frame_on_an_axis_it_can_scroll() {
+        let window = Some(rect(0.0, 500.0));
+        let frame = Some(rect(20.0, 100.0));
+        let clip = scroll_area_clip(window, frame, true, true).unwrap();
+        assert_eq!((clip.x, clip.width), (20.0, 100.0));
+        let viewport = clipped_viewport(window, "AXScrollArea", Some(clip));
+        assert_eq!(
+            crate::tree::state_reader::offscreen(Some(rect(300.0, 50.0)), viewport),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn scroll_area_with_no_known_frame_stays_unknown() {
+        assert_eq!(
+            scroll_area_clip(Some(rect(0.0, 100.0)), None, false, false),
+            None
         );
     }
 
