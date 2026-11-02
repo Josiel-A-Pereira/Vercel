@@ -6,9 +6,9 @@ fn seed_skeleton_refmap_on_window(window_id: Option<&'static str>) -> RefMap {
         ..source("TestApp")
     };
     let mut map = RefMap::new();
-    let anchor = ref_entry_from_node(&named("group", "Sidebar"), &src, None, &[0]);
+    let anchor = ref_entry_from_node(&drilled("group", "Sidebar"), &src, None, &[0]);
     let _ = map.allocate(anchor);
-    let other = ref_entry_from_node(&named("button", "Toolbar"), &src, None, &[1]);
+    let other = ref_entry_from_node(&drilled("button", "Toolbar"), &src, None, &[1]);
     let _ = map.allocate(other);
     map
 }

@@ -85,7 +85,7 @@ agent-desktop find --app gnome-calculator --role button --name 7 --exact --first
 
 ```json
 {
-  "version": "2.5",
+  "version": "2.6",
   "ok": true,
   "command": "find",
   "data": {
@@ -125,7 +125,7 @@ agent-desktop get <REF> [--property text|value|title|bounds|role|states]
 
 ```json
 {
-  "version": "2.5",
+  "version": "2.6",
   "ok": true,
   "command": "get",
   "data": { "property": "value", "ref": "@s30sxlstqzdq8x:e19", "value": "entry" }
@@ -160,7 +160,7 @@ agent-desktop is @s30sxlstqzdq8x:e45 --property enabled
 
 ```json
 {
-  "version": "2.5",
+  "version": "2.6",
   "ok": true,
   "command": "is",
   "data": { "applicable": true, "property": "enabled", "ref": "@s30sxlstqzdq8x:e45", "result": false }
@@ -195,7 +195,7 @@ agent-desktop screenshot --screen 0 screen.png
 
 ```json
 {
-  "version": "2.5",
+  "version": "2.6",
   "ok": true,
   "command": "screenshot",
   "data": { "format": "png", "height": 900, "path": "/tmp/screen.png", "scale_factor": 1.0, "width": 1440 }
@@ -216,7 +216,7 @@ agent-desktop list-displays
 
 ```json
 {
-  "version": "2.5",
+  "version": "2.6",
   "ok": true,
   "command": "list-displays",
   "data": [
@@ -267,7 +267,7 @@ agent-desktop --headed open-system-surface --surface KIND
 
 ```json
 {
-  "version": "2.5",
+  "version": "2.6",
   "ok": true,
   "command": "open-system-surface",
   "data": {
