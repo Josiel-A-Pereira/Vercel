@@ -19,7 +19,7 @@ pub(crate) fn unproven() -> AdapterError {
         ErrorCode::PlatformNotSupported,
         "The display's place in the Wayland screenshot could not be proven",
     )
-    .with_suggestion("Capture the whole screen with no screen selector")
+    .with_suggestion("Read the app with 'snapshot' instead, or give every display the same scale")
     .with_details(json!({ "reason": "display_mapping" }))
 }
 
@@ -51,6 +51,15 @@ fn whole(value: f64) -> Option<u32> {
         .then_some(rounded as u32)
 }
 
+fn nearest(value: f64) -> Option<u32> {
+    let rounded = value.round();
+    (0.0..=f64::from(u32::MAX))
+        .contains(&rounded)
+        .then_some(rounded as u32)
+}
+
+type Snap = fn(f64) -> Option<u32>;
+
 fn uniform_scale(displays: &[DisplayInfo]) -> Option<f64> {
     let first = displays.first()?.scale;
     displays
@@ -59,45 +68,62 @@ fn uniform_scale(displays: &[DisplayInfo]) -> Option<f64> {
         .then_some(first)
 }
 
+fn largest_scale(displays: &[DisplayInfo]) -> Option<f64> {
+    displays
+        .iter()
+        .map(|display| display.scale)
+        .reduce(f64::max)
+}
+
 fn rect_at(
     display: &DisplayInfo,
     origin: (f64, f64),
     factor: f64,
     image: (u32, u32),
+    snap: Snap,
 ) -> Option<PixelRect> {
+    let x = snap((display.bounds.x - origin.0) * factor)?;
+    let y = snap((display.bounds.y - origin.1) * factor)?;
+    let right = snap((display.bounds.x + display.bounds.width - origin.0) * factor)?;
+    let bottom = snap((display.bounds.y + display.bounds.height - origin.1) * factor)?;
     let rect = PixelRect {
-        x: whole((display.bounds.x - origin.0) * factor)?,
-        y: whole((display.bounds.y - origin.1) * factor)?,
-        width: whole(display.bounds.width * factor)?,
-        height: whole(display.bounds.height * factor)?,
+        x,
+        y,
+        width: right.checked_sub(x)?,
+        height: bottom.checked_sub(y)?,
     };
-    let inside = rect.width > 0
-        && rect.height > 0
-        && rect.x.checked_add(rect.width)? <= image.0
-        && rect.y.checked_add(rect.height)? <= image.1;
+    let inside = rect.width > 0 && rect.height > 0 && right <= image.0 && bottom <= image.1;
     inside.then_some(rect)
 }
 
-/// Where `display` lies in a whole-desktop image of `image` pixels. The
-/// reported rectangles are in image pixels already, or in logical pixels that
-/// every display scales by one common factor; the hypothesis whose union of
-/// rectangles has exactly the image's size is the one that holds, and no
-/// match is an error rather than a guess.
+/// Where `display` lies in a whole-desktop image of `image` pixels, and how
+/// many image pixels that part has per logical pixel. The reported rectangles
+/// are in image pixels already, or in logical pixels that every display scales
+/// by one common factor, or in logical pixels drawn at the largest display
+/// scale and rounded to whole pixels, which is how Mutter's
+/// `clutter_stage_get_capture_final_size` sizes a capture across mixed
+/// scales. The first hypothesis whose union of rectangles has the image's size
+/// is the one that holds, and no match is an error rather than a guess.
 pub(crate) fn pixel_rect(
     display: &DisplayInfo,
     all: &[DisplayInfo],
     image: (u32, u32),
-) -> Result<PixelRect, AdapterError> {
+) -> Result<(PixelRect, f64), AdapterError> {
     let (left, top, right, bottom) = extent(all).ok_or_else(unproven)?;
-    let factors = [Some(1.0), uniform_scale(all)];
-    factors
+    let exact = [Some(1.0), uniform_scale(all)]
         .into_iter()
         .flatten()
-        .find(|factor| {
-            whole((right - left) * factor) == Some(image.0)
-                && whole((bottom - top) * factor) == Some(image.1)
+        .map(|factor| (factor, whole as Snap, display.scale));
+    let drawn = largest_scale(all).map(|factor| (factor, nearest as Snap, factor));
+    exact
+        .chain(drawn)
+        .find(|(factor, snap, _)| {
+            snap((right - left) * factor) == Some(image.0)
+                && snap((bottom - top) * factor) == Some(image.1)
         })
-        .and_then(|factor| rect_at(display, (left, top), factor, image))
+        .and_then(|(factor, snap, scale)| {
+            rect_at(display, (left, top), factor, image, snap).map(|rect| (rect, scale))
+        })
         .ok_or_else(unproven)
 }
 
