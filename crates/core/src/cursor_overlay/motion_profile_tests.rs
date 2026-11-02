@@ -339,3 +339,19 @@ fn rest_is_due_after_the_rest_time_and_never_for_zero() {
     assert!(crate::rest_is_due(6_000, Duration::from_millis(6_000)));
     assert!(!crate::rest_is_due(0, Duration::from_secs(86_400)));
 }
+
+#[test]
+fn rest_wait_ends_when_the_rest_is_due_and_is_capped() {
+    use std::time::Duration;
+    let most = Duration::from_millis(1_500);
+    assert_eq!(
+        crate::rest_wait(500, Duration::from_millis(100), most),
+        Duration::from_millis(400)
+    );
+    assert_eq!(
+        crate::rest_wait(500, Duration::from_millis(900), most),
+        Duration::ZERO
+    );
+    assert_eq!(crate::rest_wait(6_000, Duration::ZERO, most), most);
+    assert_eq!(crate::rest_wait(0, Duration::ZERO, most), most);
+}

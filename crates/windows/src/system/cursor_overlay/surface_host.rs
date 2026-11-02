@@ -61,7 +61,8 @@ impl SurfaceHost {
     }
 
     pub(crate) fn idle_tick(&self) -> Duration {
-        Duration::from_millis(CURSOR_IDLE_REST_MS / 4)
+        self.rest
+            .wait(Duration::from_millis(CURSOR_IDLE_REST_MS / 4))
     }
 
     /// Everything that must be true before the control's sender is

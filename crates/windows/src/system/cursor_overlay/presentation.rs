@@ -114,6 +114,14 @@ mod imp {
             self.after_ms = control.rest_ms_or(self.after_ms);
         }
 
+        /// How long the idle wait may last before the rest has to be checked.
+        pub(crate) fn wait(&self, most: std::time::Duration) -> std::time::Duration {
+            if self.resting {
+                return most;
+            }
+            agent_desktop_core::rest_wait(self.after_ms, self.quiet_since.elapsed(), most)
+        }
+
         pub(crate) fn is_due(&self) -> bool {
             agent_desktop_core::rest_is_due(self.after_ms, self.quiet_since.elapsed())
         }
