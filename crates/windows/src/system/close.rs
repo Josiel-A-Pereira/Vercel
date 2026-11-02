@@ -298,10 +298,10 @@ fn process_observed_gone(pid: ProcessId, instance: &str) -> Result<bool, Adapter
 }
 
 #[cfg(target_os = "windows")]
-fn top_level_windows_for_pid(pid: ProcessId) -> Result<Vec<isize>, AdapterError> {
+pub(crate) fn top_level_windows_for_pid(pid: ProcessId) -> Result<Vec<isize>, AdapterError> {
     let mut handles = Vec::new();
     super::window::window_enum::enumerate_top_level(|window| {
-        if super::window::window_identity::live_window_owner(window.handle) == Some(pid) {
+        if super::window::frame_identity::agent_facing_owner(window.handle) == Some(pid) {
             handles.push(window.handle as isize);
         }
         true
@@ -320,7 +320,7 @@ fn post_wm_close_if_still_owned(
     use windows_sys::Win32::UI::WindowsAndMessaging::{PostMessageW, WM_CLOSE};
 
     let hwnd = hwnd as super::window::window_enum::WindowHandle;
-    if super::window::window_identity::live_window_owner(hwnd) != Some(pid) {
+    if super::window::frame_identity::agent_facing_owner(hwnd) != Some(pid) {
         return Ok(false);
     }
     if !process_identity::matches_instance(pid, instance)? {

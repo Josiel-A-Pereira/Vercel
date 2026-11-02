@@ -188,7 +188,7 @@ fn process_token_of(
 ) -> Option<(ProcessId, Option<String>)> {
     #[cfg(target_os = "windows")]
     {
-        let pid = super::window::window_identity::live_window_owner(handle)?;
+        let pid = super::window::frame_identity::agent_facing_owner(handle)?;
         let token = process_identity::token_for_pid(pid).ok().flatten();
         Some((pid, token))
     }

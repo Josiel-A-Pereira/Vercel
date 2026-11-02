@@ -25,7 +25,7 @@ use crate::system::window::window_ops::{
 use crate::tree::fixture::bootstrap;
 use agent_desktop_core::{Deadline, InteractionLease, ProcessId, WindowFilter};
 
-const HOSTED_APP_IMAGE: &str = "SystemSettings.exe";
+pub(super) const HOSTED_APP_IMAGE: &str = "SystemSettings.exe";
 const FRAME_HOST_IMAGE: &str = "ApplicationFrameHost.exe";
 const VK_TAB: u16 = 0x09;
 
@@ -34,19 +34,19 @@ use crate::system::fixture::test_time::deadline;
 /// One live hosted frame: the frame's own handle, the hosted application's
 /// pid, and the frame host's pid - the three-way handle/pid split between a
 /// hosted window's id and its identity.
-struct HostedFrameLive {
-    handle: isize,
-    hosted_pid: u32,
-    frame_host_pid: u32,
+pub(super) struct HostedFrameLive {
+    pub(super) handle: isize,
+    pub(super) hosted_pid: u32,
+    pub(super) frame_host_pid: u32,
 }
 
 /// A staged `ms-settings:` dispatch with its cleanup: a fresh Settings is
 /// closed on drop (the frame's WM_CLOSE, then a bounded wait for the
 /// process), a pre-existing one is left as found, and the desktop's
 /// foreground is returned to whatever held it before staging.
-struct StagedHosted {
-    frame: Option<HostedFrameLive>,
-    settings_preexisting: bool,
+pub(super) struct StagedHosted {
+    pub(super) frame: Option<HostedFrameLive>,
+    pub(super) settings_preexisting: bool,
     previous_foreground: isize,
 }
 
@@ -155,7 +155,7 @@ fn hunt_hosted_settings_frame() -> Option<(isize, u32, u32)> {
 /// hosting SystemSettings, and brings it to the foreground. The returned
 /// guard always performs its cleanup; `frame` is `None` when the desktop did
 /// not cooperate and the reason is already printed.
-fn stage_hosted_settings() -> StagedHosted {
+pub(super) fn stage_hosted_settings() -> StagedHosted {
     use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
     let previous_foreground = unsafe { GetForegroundWindow() } as isize;
     let settings_preexisting = settings_running();

@@ -19,26 +19,6 @@ pub(crate) fn passes_filter(window: &EnumeratedWindow) -> bool {
     window.visible && !window.is_zero_sized() && !window.cloaked && !window.tool
 }
 
-/// The process facts one window needs: its owner's pid, the process-generation
-/// token and the image name that becomes `app` - all read from the same
-/// handle.
-#[cfg(target_os = "windows")]
-fn process_facts(
-    handle: super::window_enum::WindowHandle,
-) -> Option<(ProcessId, Option<String>, String)> {
-    let pid = super::window_identity::live_window_owner(handle)?;
-    let token = process_identity::token_for_pid(pid).ok().flatten();
-    let name = process_identity::process_image_name(pid).unwrap_or_default();
-    Some((pid, token, name))
-}
-
-#[cfg(not(target_os = "windows"))]
-fn process_facts(
-    _handle: super::window_enum::WindowHandle,
-) -> Option<(ProcessId, Option<String>, String)> {
-    None
-}
-
 /// Reads the window class of a handle, or `None` when the handle addresses
 /// nothing or the read fails - the same unanswerable contract
 /// `live_window_owner` draws for the process read beside which this sits.
@@ -70,19 +50,17 @@ pub(crate) fn window_class_name(_handle: super::window_enum::WindowHandle) -> Op
 fn identity_facts(
     handle: super::window_enum::WindowHandle,
 ) -> Option<(ProcessId, Option<String>, String)> {
-    if let Some(pid) = frame_identity::hosted_application_pid(handle) {
-        let token = process_identity::token_for_pid(pid).ok().flatten();
-        let name = process_identity::process_image_name(pid).unwrap_or_default();
-        return Some((pid, token, name));
-    }
-    process_facts(handle)
+    let pid = frame_identity::agent_facing_owner(handle)?;
+    let token = process_identity::token_for_pid(pid).ok().flatten();
+    let name = process_identity::process_image_name(pid).unwrap_or_default();
+    Some((pid, token, name))
 }
 
 #[cfg(not(target_os = "windows"))]
 fn identity_facts(
-    handle: super::window_enum::WindowHandle,
+    _handle: super::window_enum::WindowHandle,
 ) -> Option<(ProcessId, Option<String>, String)> {
-    process_facts(handle)
+    None
 }
 
 /// Builds one `WindowInfo` from an enumerated window: the frame's handle,
