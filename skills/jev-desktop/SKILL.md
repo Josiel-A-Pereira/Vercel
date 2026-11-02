@@ -146,6 +146,35 @@ node scripts/jev/act.mjs --app TextEdit --execute \
 }
 ```
 
+## Several steps per screen
+
+You know the steps; you want them run without a round trip after each one.
+
+```sh
+node scripts/jev/flow.mjs --app msedge --window-id w-42 --execute \
+  "the search box in the page header" --text "hello" press:return
+```
+
+Each round reads the screen once, asks Jev for the target of every pending
+step in one request, and runs the leading steps it is sure of as one
+`agent-desktop batch`. The first step it is not sure of ends the batch; the
+next round reads the screen again and asks for what is left. `--text` belongs
+to the step written before it, and `press:<combo>` sends a key without asking
+Jev. Without `--execute` the first round is printed and nothing runs.
+
+Measured on a browser page with 120 candidates: one question took about 0.5 s
+and five questions in one request took the same, so a run's time is set by
+how many screens it passes through, not by its steps. Each question repeats
+the candidate list, so elements are described by role, label and up to sixty
+characters of value, and at most 150 visible, labelled elements are offered.
+
+After an action the screen is read until it differs from the one acted on. If
+Jev then finds nothing and the screen never changed, the run stops with
+`no_effect` instead of waiting. The confidence bars are the same as `act.mjs`.
+Text is written with `set-value` and no separate `focus`: on Windows `focus`
+moves the foreground, which headless delivery refuses. Each round prints one
+JSON line with `read_ms`, `ask_ms` and `act_ms`.
+
 ## Calling it
 
 | Flag | Meaning |
@@ -272,6 +301,8 @@ change shape.
 | `scripts/jev/desktop.mjs` | The only code that speaks to agent-desktop. |
 | `scripts/jev/run.mjs` | The loop and its command line. |
 | `scripts/jev/act.mjs` | The single-step resolver. |
+| `scripts/jev/flow.mjs` | Several known steps per screen: one read, one request, one batch. |
+| `scripts/jev/bin.mjs` | Which binary runs and the snapshot flags every read shares. |
 
 ## Checks
 
@@ -283,6 +314,8 @@ After a paste the field is read back. If it does not hold the requested text the
 
 ```sh
 node scripts/jev/act.test.mjs
+node scripts/jev/flow.test.mjs
+node scripts/jev/bin.test.mjs
 node scripts/jev/run.test.mjs
 node scripts/jev/run.integration.test.mjs
 node scripts/jev/evidence.test.mjs
