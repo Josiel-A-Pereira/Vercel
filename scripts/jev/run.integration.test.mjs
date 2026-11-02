@@ -67,7 +67,7 @@ if (command === 'get') {
 }
 console.log(JSON.stringify(result));
 `;
-for (const command of ["snapshot", "click", "set-value", "focus", "clipboard-get", "clipboard-set", "press", "get"]) {
+for (const command of ["snapshot", "click", "set-value", "focus", "clipboard-get", "clipboard-set", "press", "get", "list-windows"]) {
   writeFileSync(join(directory, command), fake);
 }
 writeFileSync(preload, `

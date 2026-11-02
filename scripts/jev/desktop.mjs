@@ -4,19 +4,13 @@
  * never learns what a ref is.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { collect, offerable, outsideWindow, overlayRole } from "./screen.mjs";
 import { ARGV } from "./policy.mjs";
+import { defaultBin, minimizedHint, pasteCombo, snapshotFlags } from "./bin.mjs";
 
-const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-
-export const bin =
-  process.env.AGENT_DESKTOP_BIN ??
-  (existsSync(join(REPO, "target/release/agent-desktop")) ? join(REPO, "target/release/agent-desktop") : "agent-desktop");
+export const bin = process.env.AGENT_DESKTOP_BIN ?? defaultBin();
 
 export const cli = (...argv) => {
   try {
@@ -57,18 +51,23 @@ export const stopCursor = () => cli("cursor-overlay", "disable");
 export const observe = (app, root, windowId = null) => {
   const scope = windowId ? ["--app", app, "--window-id", windowId] : ["--app", app];
   const base = ["snapshot", ...scope, "-i", "--compact", "--include-bounds"];
-  const unreadable = (what, error) => Object.assign(new Error(`${what} could not be read: ${error?.code}`),
-    { code: error?.code ?? null });
-  let snap = root ? cli(...base, "--root", root) : cli(...base, "--skeleton");
+  const deep = [...base, ...snapshotFlags()];
+  const shallow = [...base, ...snapshotFlags({ depth: false })];
+  const unreadable = (what, error) => {
+    const hint = minimizedHint(cli, app, windowId);
+    return Object.assign(new Error(`${what} could not be read: ${error?.code}${hint ? `; ${hint}` : ""}`),
+      { code: error?.code ?? null });
+  };
+  let snap = root ? cli(...deep, "--root", root) : cli(...shallow, "--skeleton");
   if (!snap.ok && root) throw unreadable("that region", snap.error);
   if (snap.ok && root && windowId && outsideWindow(snap.data, windowId)) {
     throw Object.assign(new Error(`that region is not in window ${windowId}`), { code: "ROOT_OUTSIDE_WINDOW" });
   }
-  if (!snap.ok && snap.error?.code !== "WINDOW_NOT_FOUND") snap = cli(...base, "--max-depth", "4");
+  if (!snap.ok && snap.error?.code !== "WINDOW_NOT_FOUND") snap = cli(...shallow, "--max-depth", "4");
   if (!snap.ok) throw unreadable("the screen", snap.error);
   const surface = root ? null : overlayRole(snap.data.tree);
   if (surface) {
-    const scoped = cli("snapshot", ...scope, "--surface", surface, "-i", "--compact", "--include-bounds");
+    const scoped = cli("snapshot", ...scope, "--surface", surface, "-i", "--compact", "--include-bounds", ...snapshotFlags());
     if (scoped.ok && windowId && outsideWindow(scoped.data, windowId)) {
       throw Object.assign(new Error(`the ${surface} is not in window ${windowId}`), { code: "SURFACE_OUTSIDE_WINDOW" });
     }
@@ -156,7 +155,7 @@ export const enterText = async ({ app, windowId = null }, node, text, clipboard)
   clipboard.borrow();
   const copied = cli("clipboard-set", text);
   if (!copied.ok) return { route: "paste", result: copied };
-  const pasted = cli("press", "cmd+v", "--app", app, ...(windowId ? ["--window-id", windowId] : []));
+  const pasted = cli("press", pasteCombo(), "--app", app, ...(windowId ? ["--window-id", windowId] : []));
   if (!pasted.ok) return { route: "paste", result: pasted };
   const { held, observed } = await awaitFieldText(node.ref_id, text);
   if (!held) return { route: "paste", result: { ok: false, error: verificationFailure(observed) } };
