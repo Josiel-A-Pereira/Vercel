@@ -1,5 +1,7 @@
 use agent_desktop_core::{AdapterError, RefEntry, SnapshotSurface};
 
+#[cfg(target_os = "macos")]
+use super::resolve_duplicate_windows::{DuplicateWindows, enforce_duplicate_policy};
 use super::resolve_read_context::ResolveReadContext;
 use crate::tree::AXElement;
 use crate::tree::element_dedupe::push_unique;
@@ -25,11 +27,11 @@ pub(in crate::tree) fn candidate_roots(
         return source_surface_scoped_roots(&application, entry, context);
     }
     if source_window_scope_required(entry) && entry.source.source_window_id.is_some() {
-        return source_window_scoped_roots(&application, entry, context);
+        return source_window_scoped_roots(&application, entry, context, DuplicateWindows::KeepAll);
     }
     super::resolve_source_app::verify_source_application(&application, entry, context)?;
     if source_window_scope_required(entry) {
-        return source_window_scoped_roots(&application, entry, context);
+        return source_window_scoped_roots(&application, entry, context, DuplicateWindows::KeepAll);
     }
 
     let mut roots = Vec::new();
@@ -73,7 +75,12 @@ fn source_surface_scoped_roots(
         SnapshotSurface::Sheet | SnapshotSurface::Popover | SnapshotSurface::Alert
             if entry.source.source_window_id.is_some() =>
         {
-            let scoped = match source_window_scoped_roots(application, entry, context) {
+            let scoped = match source_window_scoped_roots(
+                application,
+                entry,
+                context,
+                DuplicateWindows::Reject,
+            ) {
                 Ok(scoped) => scoped,
                 Err(error)
                     if error
@@ -139,6 +146,7 @@ fn source_window_scoped_roots(
     application: &AXElement,
     entry: &RefEntry,
     context: &mut ResolveReadContext,
+    duplicates: DuplicateWindows,
 ) -> Result<CandidateRoots, AdapterError> {
     let deadline = context.deadline;
     if let Some(id) = entry.source.source_window_id.as_deref() {
@@ -167,20 +175,25 @@ fn source_window_scoped_roots(
         )?;
     }
     let windows = read_root_array(application, "AXWindows", context)?.unwrap_or_default();
-    let window = if entry.source.source_window_id.is_some() {
-        window_by_number(&windows, entry, context)?
-    } else {
-        window_by_title(
+    let roots: Vec<AXElement> = match source_window_number(entry) {
+        Some(number) if entry.source.source_window_id.is_some() => {
+            let matched = windows_by_number(&windows, entry, context)?;
+            enforce_duplicate_policy(matched.len(), number, duplicates)?;
+            matched
+        }
+        _ => window_by_title(
             &windows,
             entry.source.source_window_title.as_deref(),
             context,
         )?
+        .into_iter()
+        .collect(),
     };
     let scope_verified =
-        source_scope_verified(entry.source.source_window_id.as_deref(), window.is_some());
+        source_scope_verified(entry.source.source_window_id.as_deref(), !roots.is_empty());
     Ok(CandidateRoots {
         scope_verified,
-        roots: window.into_iter().collect(),
+        roots,
     })
 }
 
@@ -192,60 +205,28 @@ pub(in crate::tree) fn source_scope_verified(
 }
 
 #[cfg(target_os = "macos")]
-fn window_by_number(
+fn windows_by_number(
     windows: &[AXElement],
     entry: &RefEntry,
     context: &mut ResolveReadContext,
-) -> Result<Option<AXElement>, AdapterError> {
+) -> Result<Vec<AXElement>, AdapterError> {
     let deadline = context.deadline;
     let Some(source_window_number) = source_window_number(entry) else {
-        return Ok(None);
+        return Ok(Vec::new());
     };
-    let mut bridge_unavailable = None;
-    let mut found = None;
-    let mut match_count = 0_usize;
+    let mut matched = Vec::new();
     for window in windows {
         crate::tree::locator_deadline::remaining(deadline)?;
         match crate::system::window::window_resolve::ax_window_id_with_deadline(window, deadline) {
-            Ok(Some(actual)) if actual == source_window_number => {
-                match_count += 1;
-                if found.is_none() {
-                    found = Some(window.clone());
-                }
-            }
+            Ok(Some(actual)) if actual == source_window_number => matched.push(window.clone()),
             Ok(_) => {}
-            Err(error) if crate::system::window::window_bridge::is_unavailable(&error) => {
-                bridge_unavailable = Some(error);
-                break;
-            }
             Err(error) => return Err(error),
         }
     }
-    if let Some(error) = bridge_unavailable {
-        return Err(error);
+    if matched.is_empty() {
+        return Err(window_bridge_miss_error(entry));
     }
-    require_unique_window_number_match(match_count, source_window_number)?;
-    found
-        .map(Some)
-        .ok_or_else(|| window_bridge_miss_error(entry))
-}
-
-#[cfg(target_os = "macos")]
-pub(in crate::tree) fn require_unique_window_number_match(
-    match_count: usize,
-    window_number: i64,
-) -> Result<(), AdapterError> {
-    if match_count > 1 {
-        return Err(AdapterError::ambiguous_target(format!(
-            "Multiple AX windows matched verified CoreGraphics window w-{window_number}"
-        ))
-        .with_details(serde_json::json!({
-            "kind": "source_window_number_ambiguous",
-            "source_window_id": format!("w-{window_number}"),
-            "candidate_count": match_count,
-        })));
-    }
-    Ok(())
+    Ok(matched)
 }
 
 #[cfg(target_os = "macos")]

@@ -298,6 +298,7 @@ fn can_use_broad_search(entry: &RefEntry) -> bool {
 pub(crate) mod resolve_ax_read;
 pub(super) mod resolve_bounds;
 pub(super) mod resolve_classify;
+pub(super) mod resolve_duplicate_windows;
 pub(super) mod resolve_errors;
 pub(super) mod resolve_read_context;
 pub(super) mod resolve_roots;

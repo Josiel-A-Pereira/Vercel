@@ -1,9 +1,9 @@
 use super::*;
 use crate::tree::AXElement;
 use crate::tree::resolve::resolve_classify::classify_candidates;
+use crate::tree::resolve::resolve_duplicate_windows::require_unique_window_number_match;
 use crate::tree::resolve::resolve_roots::{
-    require_unique_window_number_match, source_scope_verified, source_window_number,
-    source_window_scope_required,
+    source_scope_verified, source_window_number, source_window_scope_required,
 };
 use crate::tree::resolve::resolve_search::{
     find_entry_by_path, incomplete_traversal_error, match_native_or_text_identity,
