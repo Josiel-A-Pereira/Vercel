@@ -107,7 +107,7 @@ Every command prints one envelope with `ok` and either `data` or `error`. An err
 
 ## Commands
 
-It ships 60 command names, 56 operational commands. The other four (`key-down`, `key-up`, `mouse-down`, `mouse-up`) refuse to run until a daemon can release a held key or button.
+It ships 61 command names, 57 operational commands. The other four (`key-down`, `key-up`, `mouse-down`, `mouse-up`) refuse to run until a daemon can release a held key or button.
 
 | Group | Commands |
 |---|---|

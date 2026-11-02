@@ -1,15 +1,17 @@
 use agent_desktop_core::{
     AppError, PlatformAdapter,
     commands::{
-        find as find_command, get as get_command, is_check as is_command,
-        screenshot as screenshot_command, snapshot as snapshot_command,
+        element_at as element_at_command, find as find_command, get as get_command,
+        is_check as is_command, screenshot as screenshot_command, snapshot as snapshot_command,
     },
     context::CommandContext,
 };
 use serde_json::Value;
 
-use crate::cli_args::{FindArgs, GetArgs, IsArgs, ScreenshotArgs, SnapshotArgs};
-use crate::dispatch::parse::{parse_get_property, parse_is_property};
+use crate::cli_args::{
+    FindArgs, GetArgs, IsArgs, ScreenshotArgs, SnapshotArgs, element_at::ElementAtArgs,
+};
+use crate::dispatch::parse::{parse_get_property, parse_is_property, parse_xy};
 
 pub(super) fn snapshot(
     args: SnapshotArgs,
@@ -69,6 +71,25 @@ pub(super) fn find(
                 nth: args.selection.nth,
                 limit: args.selection.limit,
             },
+        },
+        adapter,
+        context,
+    )
+}
+
+pub(super) fn element_at(
+    args: ElementAtArgs,
+    adapter: &dyn PlatformAdapter,
+    context: &CommandContext,
+) -> Result<Value, AppError> {
+    let (x, y) = parse_xy(&args.xy)?;
+    element_at_command::execute(
+        element_at_command::ElementAtArgs {
+            app: args.scope.app,
+            window_id: args.scope.window_id,
+            point: agent_desktop_core::Point { x, y },
+            max_depth: args.max_depth,
+            timeout_ms: args.timeout_ms,
         },
         adapter,
         context,

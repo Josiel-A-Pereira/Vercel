@@ -68,6 +68,7 @@ fn dispatch_command(
     let result = match cmd {
         Commands::Snapshot(args) => observation::snapshot(args, adapter, context),
         Commands::Find(args) => observation::find(args, adapter, context),
+        Commands::ElementAt(args) => observation::element_at(args, adapter, context),
         Commands::Screenshot(args) => observation::screenshot(args, adapter),
         Commands::Get(args) => observation::get(args, adapter, context),
         Commands::Is(args) => observation::is(args, adapter, context),

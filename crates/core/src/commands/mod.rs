@@ -13,6 +13,7 @@ pub mod dismiss_all_notifications;
 pub mod dismiss_notification;
 pub mod double_click;
 pub mod drag;
+pub mod element_at;
 pub mod execute_by_ref;
 pub mod expand;
 pub mod find;

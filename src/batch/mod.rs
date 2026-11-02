@@ -43,6 +43,7 @@ pub(crate) fn parse_command(item: BatchCommand) -> Result<Commands, AppError> {
     match command {
         "snapshot" => decode(command, item.args).map(Commands::Snapshot),
         "find" => decode(command, item.args).map(Commands::Find),
+        "element-at" => decode(command, item.args).map(Commands::ElementAt),
         "screenshot" => decode(command, item.args).map(Commands::Screenshot),
         "get" => decode(command, item.args).map(Commands::Get),
         "is" => decode(command, item.args).map(Commands::Is),

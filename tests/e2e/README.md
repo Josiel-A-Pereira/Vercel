@@ -78,7 +78,7 @@ helper that returns a bare `@eN`.
 | `harness.sh` | Exclusivity acknowledgement, isolated `HOME`/`TMPDIR`, immutable binary and FFI staging |
 | `lib.sh` | Fail-closed assertions and exact `{ref_id,snapshot_id}` target helpers |
 | `safe-semantic.sh`, `scenarios/silent-text.sh`, `safe_semantic_guard.py` | Strict headless non-interference gate that runs before the fixture suite |
-| `scenarios/observation.sh` | Snapshots, locators, namespace pinning, strict twins |
+| `scenarios/observation.sh` | Snapshots, locators, namespace pinning, strict twins, `element-at` point-to-ref |
 | `scenarios/interaction.sh` | Headless/headed actions and exact-once effects |
 | `scenarios/acceptance.sh` | Named AE1-AE7 acceptance contract |
 | `scenarios/reliability.sh` | Stale refs, waits, drill-down, sessions |

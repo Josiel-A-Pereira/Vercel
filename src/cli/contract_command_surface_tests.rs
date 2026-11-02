@@ -42,6 +42,7 @@ const NON_COMMAND_MODULES: &[&str] = &[
 
 const COMMAND_SPECIFIC_TESTS: &[&str] = &[
     "cursor-overlay",
+    "element-at",
     "find",
     "focus-window",
     "is",
@@ -156,7 +157,7 @@ fn macos_capability_count_includes_restored_notifications() {
     let commands = cli_command_names();
     assert_eq!(
         commands.len(),
-        60,
+        61,
         "the published CLI command count changed; update capability documentation"
     );
 }

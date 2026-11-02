@@ -52,3 +52,30 @@ else
     assert "indistinguishable twins fail closed" "$([ "$twin_code" = "AMBIGUOUS_TARGET" ] && echo 1 || echo 0)" \
         "before=$twin_before after=$twin_after error=$twin_code"
 fi
+
+note "element-at turns a screen point into the ref under it"
+require_target point_target button primary-button
+point_bounds="$(get_target "$point_target" --property bounds 2>/dev/null)"
+point_xy="$(printf '%s' "$point_bounds" | python3 -c '
+import json, sys
+b = json.load(sys.stdin)["data"]["value"]
+print("%.1f,%.1f" % (b["x"] + b["width"] / 2, b["y"] + b["height"] / 2))
+' 2>/dev/null)"
+point_json="$("$bin" element-at --app "$app" --xy "$point_xy" 2>/dev/null)"
+point_name="$(json_field "$point_json" data.match.name)"
+point_role="$(json_field "$point_json" data.match.role)"
+point_hit="$(json_field "$point_json" data.hit)"
+assert "element-at at a button's center returns that button, reached" \
+    "$([ "$point_name" = "primary-button" ] && [ "$point_role" = "button" ] && [ "$point_hit" = "reaches_target" ] && echo 1 || echo 0)" \
+    "xy=$point_xy name=$point_name role=$point_role hit=$point_hit"
+
+point_found="$(printf '%s' "$point_json" | python3 "$json_tool" target 2>/dev/null)" || point_found=""
+point_get="$(get_target "$point_found" --property role 2>/dev/null)"
+assert "element-at ref resolves through its returned snapshot_id" \
+    "$([ -n "$point_found" ] && [ "$(json_field "$point_get" data.value)" = "button" ] && echo 1 || echo 0)" \
+    "ref='$(target_ref "$point_found")' snapshot='$(target_snapshot "$point_found")'"
+
+outside_json="$("$bin" element-at --app "$app" --xy=-5,-5 2>/dev/null)"
+assert "element-at outside every ref returns a null match" \
+    "$([ "$(json_field "$outside_json" ok)" = "True" ] && [ -z "$(json_field "$outside_json" data.match)" ] && echo 1 || echo 0)" \
+    "candidates=$(json_field "$outside_json" data.candidates)"

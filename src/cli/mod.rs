@@ -15,6 +15,7 @@ use crate::cli_args::{
     batch::BatchArgs,
     cursor_overlay::CursorOverlayArgs,
     drag::DragCliArgs,
+    element_at::ElementAtArgs,
     mouse_wheel::MouseWheelArgs,
     notifications::{
         DismissAllNotificationsCliArgs, DismissNotificationCliArgs, ListNotificationsCliArgs,
@@ -36,6 +37,8 @@ pub(crate) enum Commands {
     Snapshot(SnapshotArgs),
     #[command(about = "Search elements by role, name, value, or text content")]
     Find(FindArgs),
+    #[command(about = "Find the element under a screen point and return its ref")]
+    ElementAt(ElementAtArgs),
     #[command(about = "Take a PNG screenshot of an application window")]
     Screenshot(ScreenshotArgs),
     #[command(about = "Read an element property (text, value, title, bounds, role, states)")]
@@ -188,6 +191,7 @@ impl Commands {
         match self {
             Self::Snapshot(_) => CommandMetadata::new("snapshot", true),
             Self::Find(_) => CommandMetadata::new("find", false),
+            Self::ElementAt(_) => CommandMetadata::new("element-at", false),
             Self::Screenshot(_) => CommandMetadata::new("screenshot", false),
             Self::Get(_) => CommandMetadata::new("get", false),
             Self::Is(_) => CommandMetadata::new("is", false),
@@ -321,6 +325,7 @@ impl Commands {
             }
             Self::Snapshot(_)
             | Self::Find(_)
+            | Self::ElementAt(_)
             | Self::Get(_)
             | Self::Is(_)
             | Self::ListWindows(_)

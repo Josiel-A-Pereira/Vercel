@@ -105,6 +105,45 @@ agent-desktop find --app gnome-calculator --role button --name 7 --exact --first
 
 When a `--role` filter matches nothing, `roles_present` lists the roles in the searched tree, which tells a wrong role name from an empty screen. Errors specific to `find`: `INVALID_ARGS` for conflicting shaping flags, `--root` with `--surface`, or an unknown `--state` token; `TIMEOUT` with `details.kind: "locator_incomplete"` when the traversal ran out of budget, which does not mean the app hangs. Raise `--timeout-ms` or narrow the search.
 
+## element-at
+
+Returns the ref of the element under a screen point, so you can act on it with a ref command instead of physical input at the point.
+
+```bash
+agent-desktop element-at --xy X,Y [--app NAME] [--window-id ID] [--max-depth N] [--timeout-ms MS]
+```
+
+<table>
+  <thead>
+    <tr><th>Flag</th><th>Default</th><th>Meaning</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>--xy X,Y</code></td><td>required</td><td>Screen point, in the space <code>list-windows</code> bounds use. Write a negative value with <code>=</code>: <code>--xy=-100,50</code>.</td></tr>
+    <tr><td><code>--app NAME</code>, <code>--window-id ID</code></td><td>focused window</td><td>Which window to look in, with the same rules as <code>snapshot</code>.</td></tr>
+    <tr><td><code>--max-depth N</code></td><td><code>10</code></td><td>Snapshot depth.</td></tr>
+    <tr><td><code>--timeout-ms MS</code></td><td><code>3000</code></td><td>Deadline for the snapshot and for the hit tests.</td></tr>
+  </tbody>
+</table>
+
+It snapshots the window, takes the refs whose bounds contain the point, and hit-tests them from the smallest up. `match` is the first one the point reaches, or the smallest when none can be proved. `hit` says which:
+
+- `reaches_target`: the point lands on the ref or one of its descendants.
+- `intercepted`: something else is on top at the point, usually another window; `intercepted_by` names it. Ref commands such as `click` still reach the element; physical input at the point would not.
+- `unknown`: the platform could not tell.
+
+`match` is `null` when no ref contains the point, which happens in apps that draw their content themselves. The refs belong to the returned `snapshot_id`.
+
+`complete` says whether the snapshot behind the answer saw the whole window, as in `snapshot`. When it is `false`, the response also carries `truncated: true` and `nodes_observed`, and a `null` match or an ancestor match may only mean the element under the point was not observed. Raise `--timeout-ms` and retry.
+
+```json
+{ "version": "2.5", "ok": true, "command": "element-at",
+  "data": { "snapshot_id": "s3zu2hepg64y4", "app": "TextEdit", "window_id": "w-20011",
+            "point": { "x": 526, "y": 450 }, "candidates": 2, "complete": true, "hit": "reaches_target",
+            "match": { "ref_id": "@s3zu2hepg64y4:e2", "role": "textfield", "name": null,
+                       "bounds": { "x": 233, "y": 258, "width": 586, "height": 382 },
+                       "available_actions": ["RightClick", "SetValue", "SetFocus", "TypeText"] } } }
+```
+
 ## get
 
 Reads one property of a ref.

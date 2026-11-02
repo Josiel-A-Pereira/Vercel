@@ -27,6 +27,7 @@ pub(crate) fn policy_for(cmd: &Commands) -> PermissionNeed {
 
         Commands::Snapshot(_)
         | Commands::Find(_)
+        | Commands::ElementAt(_)
         | Commands::ListSurfaces(_)
         | Commands::Wait(_)
         | Commands::ListNotifications(_) => Accessibility,
@@ -212,6 +213,7 @@ fn validate_args(cmd: &Commands) -> Result<(), AppError> {
             ));
         }
         Commands::Find(_)
+        | Commands::ElementAt(_)
         | Commands::Screenshot(_)
         | Commands::Press(_)
         | Commands::KeyDown(_)
