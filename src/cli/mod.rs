@@ -38,7 +38,7 @@ pub(crate) enum Commands {
     Find(FindArgs),
     #[command(about = "Take a PNG screenshot of an application window")]
     Screenshot(ScreenshotArgs),
-    #[command(about = "Read an element property (text, value, title, bounds, role, states)")]
+    #[command(about = "Read an element property (text, value, title, bounds, role, states, url)")]
     Get(GetArgs),
     #[command(
         about = "Check element state (visible, enabled, checked, focused, expanded, selected)"

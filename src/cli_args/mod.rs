@@ -254,7 +254,7 @@ pub(crate) struct GetArgs {
     #[arg(
         long,
         default_value = "text",
-        help = "Property: text (what a person reads: content for text-bearing roles, otherwise the name), value, title, bounds, role, states"
+        help = "Property: text (what a person reads: content for text-bearing roles, otherwise the name), value, title, bounds, role, states, url"
     )]
     #[serde(default = "default_get_property")]
     pub property: String,
