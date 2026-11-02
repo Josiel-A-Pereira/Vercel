@@ -121,6 +121,12 @@ function main() {
     windowsHide: false,
   });
 
+  if (platform() !== 'win32') {
+    for (const signal of ['SIGINT', 'SIGTERM']) {
+      process.on(signal, () => child.kill(signal));
+    }
+  }
+
   child.on('error', (err) => {
     console.error(`Error executing binary: ${err.message}`);
     process.exit(1);
