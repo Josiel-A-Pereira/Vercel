@@ -14,6 +14,7 @@ pub(crate) mod drag_target;
 pub(crate) mod interaction;
 pub(crate) mod mouse_wheel;
 pub(crate) mod notifications;
+pub(crate) mod policy;
 pub(crate) mod session;
 pub(crate) mod skills;
 mod snapshot;

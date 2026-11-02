@@ -105,6 +105,22 @@ Use `agent-desktop` to see and operate desktop apps. Before the first use, run
 
 Every command prints one envelope with `ok` and either `data` or `error`. An error carries a `code`, a `disposition` and usually a `suggestion`; retry only when `error.disposition.retry` is `safe`. The contract, error codes and exit codes are in [docs/json-output.md](docs/json-output.md).
 
+## Owner policies
+
+You decide what agents may do on your machine. Put a [Dogwood](https://github.com/dogwood-policy/dogwood-local-engine) policy file, written in a superset of Cedar, in `~/.agent-desktop/policies/`, and the CLI checks every command against it before anything reaches the desktop:
+
+```cedar
+@id("allow-all")
+permit (principal, action, resource);
+
+@id("hands-off-the-password-manager")
+forbid (principal, action, resource in Desktop::AppId::"com.1password.1password");
+```
+
+A refused command fails with `POLICY_DENIED` and sends nothing. A rule judges the app the command reaches, whichever name, bundle id, ref or screen coordinate the agent used, and it can depend on what the agent did before, such as allowing input only into an app it snapshotted in the last ten minutes. A harness can add rules for its agent with `--policy`, `--policy-dir` or `AGENT_DESKTOP_POLICY_DIR`. Each source is its own layer, a command runs only if every layer allows it, and no layer lifts another's refusal. `agent-desktop status` lists the layers that apply. With no policy files, nothing changes.
+
+The folder and its files must be owned by you and not writable by group or others. Policies guard against an agent misusing the tool. They are not a sandbox: the agent runs as you, and the C library does not check them. [docs/policies.md](docs/policies.md) covers the vocabulary, rules over history and the refusal envelope.
+
 ## Commands
 
 It ships 60 command names, 56 operational commands. The other four (`key-down`, `key-up`, `mouse-down`, `mouse-up`) refuse to run until a daemon can release a held key or button.
@@ -157,7 +173,7 @@ lib.ad_adapter_destroy(adapter)
 Each platform adapter builds only on its own OS, so scope cargo to the host's packages. On macOS:
 
 ```bash
-HOST_PKGS=(-p agent-desktop-core -p agent-desktop-macos -p agent-desktop -p agent-desktop-ffi)
+HOST_PKGS=(-p agent-desktop-core -p agent-desktop-policy -p agent-desktop-macos -p agent-desktop -p agent-desktop-ffi)
 cargo test "${HOST_PKGS[@]}"
 cargo clippy "${HOST_PKGS[@]}" --all-targets -- -D warnings
 ```
@@ -171,6 +187,7 @@ On Windows, replace `agent-desktop-macos` in that list with `agent-desktop-windo
 |---|---|
 | Fix an install problem, grant permissions, verify a download or build from source | [docs/install.md](docs/install.md) |
 | Parse the JSON envelope, error codes and exit codes | [docs/json-output.md](docs/json-output.md) |
+| Restrict what agents may do with owner policies | [docs/policies.md](docs/policies.md) |
 | Drive the tool as an AI agent | `agent-desktop skills get desktop` ([skills/agent-desktop/](skills/agent-desktop/)) |
 | Learn what differs on one OS | [macOS](skills/agent-desktop-macos/), [Windows](skills/agent-desktop-windows/), [Linux](skills/agent-desktop-linux/) |
 | Call the C library | [skills/agent-desktop-ffi/](skills/agent-desktop-ffi/) |

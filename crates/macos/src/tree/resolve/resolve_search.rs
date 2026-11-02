@@ -219,23 +219,22 @@ fn collect_elements_recursive(
     }
 
     match read.evidence.role.known() {
-        Some(role) => {
-            if role == &context.entry.identity.role {
-                match super::retained::candidate_match(element, context.entry, &read.evidence)? {
-                    IdentityMatch::Match => {
-                        push_unique(context.matches, element.clone());
-                    }
-                    IdentityMatch::Unknown => {
-                        if provisional_geometry_candidate(context.entry) {
-                            push_unique(context.matches, element.clone());
-                        } else {
-                            mark_incomplete(context, identity_unknown_error(context.entry));
-                        }
-                    }
-                    IdentityMatch::NoMatch => {}
+        Some(role) if role == &context.entry.identity.role => {
+            match super::retained::candidate_match(element, context.entry, &read.evidence)? {
+                IdentityMatch::Match => {
+                    push_unique(context.matches, element.clone());
                 }
+                IdentityMatch::Unknown => {
+                    if provisional_geometry_candidate(context.entry) {
+                        push_unique(context.matches, element.clone());
+                    } else {
+                        mark_incomplete(context, identity_unknown_error(context.entry));
+                    }
+                }
+                IdentityMatch::NoMatch => {}
             }
         }
+        Some(_) => {}
         None if read.evidence.role.is_unknown() => {
             mark_incomplete(context, incomplete_traversal_error("role", depth));
         }

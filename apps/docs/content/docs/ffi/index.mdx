@@ -31,6 +31,7 @@ The library and the CLI run the same core and the same platform adapter; the `ag
 
 - `ad_snapshot` always reads the focused window of the app you name. It has no window id, skeleton mode, or `--root` drill-down; use the CLI for those.
 - `ad_wait` does not expose `wait --event` or `--window-id`.
+- The library does not check [owner policies](/desktop/guides/policies). Only the CLI judges commands against `~/.agent-desktop/policies/`, so a program that loads the library is not bound by them.
 - The library carries no skills. Read the FFI guide with `agent-desktop skills get ffi` from the CLI.
 
 ## ABI version

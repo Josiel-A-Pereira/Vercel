@@ -75,6 +75,7 @@ mod imp {
         let mut subrole = None;
         let mut status = NodeAttributeStatus::default();
         let mut deadline_exhausted = false;
+        #[allow(clippy::useless_conversion)]
         for (index, item) in crate::tree::properties::node_attribute_names::requested_indices(mask)
             .zip(attributes.into_iter())
         {

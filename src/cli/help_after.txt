@@ -34,3 +34,5 @@ ENVIRONMENT
                              (1-64 letters, digits, hyphen or underscore)
   AGENT_DESKTOP_HOME         Relocates the state root (absolute path; default
                              ~/.agent-desktop); `status` reports it as state_root
+  AGENT_DESKTOP_POLICY_DIR   Extra Dogwood policy layer (absolute path); it never
+                             lifts the owner's policies folder

@@ -40,6 +40,55 @@ pass() {
     printf 'PASS: %s\n' "$1"
 }
 
+limit_count=0
+
+limited() {
+    limit_count=$((limit_count + 1))
+    printf 'LIMIT (platform): %s\n' "$1"
+}
+
+# macOS 27 changed SwiftUI's single-line TextField: an accessibility write to
+# its value or selection reaches the app's binding only while the field has
+# keyboard focus, which strict headless never takes. The write still changes
+# the field's displayed value, so only the fixture's own readout tells.
+swiftui_text_limit() {
+    local major
+    major="$(sw_vers -productVersion 2>/dev/null | cut -d. -f1)"
+    case "$major" in ''|*[!0-9]*) return 1 ;; esac
+    [ "$major" -ge 27 ]
+}
+
+# One text mutation where the platform may keep it from the binding: the
+# step passes when the readout follows, is recorded as the platform limit
+# when the command refused before sending (no semantic path, or the field
+# needs focus), and fails on anything else, above all a reported success the
+# readout does not show.
+text_step_under_limit() {
+    local action="$1" target="$2" value="$3" label="$4" output status code
+    safety_checkpoint || fail "ownership or frontmost identity changed before $action"
+    output="$(agent_exec 1 "$action" "$(target_ref "$target")" "$value" --timeout-ms 1500)"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        printf '%s' "$output" | python3 "$safety_guard" semantic-action "$action" changed \
+            >/dev/null 2>&1 || fail "$action result did not prove the expected semantic mechanism"
+    fi
+    sleep 0.2
+    safety_checkpoint || fail "ownership or frontmost identity changed after $action"
+    if await_status text_after text-echo equal "$value" 2>/dev/null; then
+        pass "$label"
+        return 0
+    fi
+    code="$(json_field "$output" error.code)"
+    if [ "$status" -ne 0 ] && [ "$code" = "POLICY_DENIED" ] && \
+        [ "$(json_field "$output" error.disposition.delivery)" = "not_delivered" ] && \
+        printf '%s' "$output" | grep -qE 'supported_action|swiftui_text_needs_focus'; then
+        limited "$action into an unfocused SwiftUI text field is refused headless on macOS 27"
+        return 0
+    fi
+    printf '%s\n' "$output" >&2
+    fail "$action neither reached the fixture state nor refused before sending"
+}
+
 json_field() {
     printf '%s' "$1" | python3 "$json_tool" get "$2" 2>/dev/null
 }
@@ -358,14 +407,24 @@ read_status text_before text-echo || fail "text status is unavailable"
 [ -z "$text_before" ] || fail "fresh text fixture state is not clean"
 text_value="safe-semantic-$fixture_pid"
 find_target text_field textfield text-input || fail "text field is not uniquely addressable"
-run_type "$text_field" "$text_value"
-await_status text_after text-echo equal "$text_value" || fail "semantic type did not reach fixture state"
-pass "AXSelectedText type produced the fixture-owned binding change without focus"
+if swiftui_text_limit; then
+    text_step_under_limit type "$text_field" "$text_value" \
+        "AXSelectedText type produced the fixture-owned binding change without focus"
+else
+    run_type "$text_field" "$text_value"
+    await_status text_after text-echo equal "$text_value" || fail "semantic type did not reach fixture state"
+    pass "AXSelectedText type produced the fixture-owned binding change without focus"
+fi
 text_value="safe-semantic-set-$fixture_pid"
 find_target text_field textfield text-input || fail "text field disappeared after semantic type"
-run_set_value "$text_field" "$text_value"
-await_status text_after text-echo equal "$text_value" || fail "semantic set-value did not reach fixture state"
-pass "AX set-value produced the fixture-owned binding change"
+if swiftui_text_limit; then
+    text_step_under_limit set-value "$text_field" "$text_value" \
+        "AX set-value produced the fixture-owned binding change"
+else
+    run_set_value "$text_field" "$text_value"
+    await_status text_after text-echo equal "$text_value" || fail "semantic set-value did not reach fixture state"
+    pass "AX set-value produced the fixture-owned binding change"
+fi
 source "$here/scenarios/silent-text.sh"
 
 read_status toggle_before toggle-status || fail "toggle status is unavailable"
@@ -394,4 +453,5 @@ wait_frontmost || fail "final frontmost identity is missing or ambiguous"
 verify_immutable_binary "$bin" "$bin_sha" || fail "immutable binary copy changed"
 verify_source_binary || fail "reviewed binary changed during the suite"
 pass "owned fixture never became frontmost while unrelated user focus remained unconstrained"
-printf 'SAFE SEMANTIC E2E PASSED: %d assertions; sha256=%s\n' "$pass_count" "$bin_sha"
+printf 'SAFE SEMANTIC E2E PASSED: %d assertions, %d platform limits; sha256=%s\n' \
+    "$pass_count" "$limit_count" "$bin_sha"

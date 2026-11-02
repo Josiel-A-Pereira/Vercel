@@ -196,7 +196,12 @@ fn execute_with_deadline(
                 .or_else(|| std::env::var("AGENT_DESKTOP_AGENT_ID").ok());
             let mut context = context
                 .with_agent_id(agent_id)
-                .map_err(pre_dispatch_error)?;
+                .map_err(pre_dispatch_error)?
+                .with_policy_paths(agent_desktop_core::PolicyPaths {
+                    files: cli.policy.policy.clone(),
+                    dirs: cli.policy.policy_dir.clone(),
+                    env_dir: cli.policy.caller_env_dir().map_err(pre_dispatch_error)?,
+                });
             #[cfg(target_os = "macos")]
             if command_host::is_host_process() {
                 context = context.with_pinned_session_namespace();

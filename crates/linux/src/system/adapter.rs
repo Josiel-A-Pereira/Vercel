@@ -59,6 +59,14 @@ impl SystemOps for LinuxAdapter {
         crate::system::focused_window(self.bus(), deadline)
     }
 
+    fn window_at_point(
+        &self,
+        point: agent_desktop_core::Point,
+        deadline: Deadline,
+    ) -> Result<Option<WindowInfo>, AdapterError> {
+        crate::system::window::window_at_point::window_at_point(self.bus(), &point, deadline)
+    }
+
     fn resolve_window_strict(
         &self,
         win: &WindowInfo,

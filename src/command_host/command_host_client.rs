@@ -45,6 +45,10 @@ pub(super) fn forward_args(
             .agent_id
             .clone()
             .or_else(|| std::env::var("AGENT_DESKTOP_AGENT_ID").ok()),
+        policy_env_dir: cli
+            .policy
+            .caller_env_dir()
+            .map_err(crate::pre_dispatch_error)?,
     };
     let mut payload = serde_json::to_vec(&request)?;
     payload.push(b'\n');

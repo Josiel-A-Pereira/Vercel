@@ -52,7 +52,7 @@ For Automation, open Privacy & Security > Automation and allow the launching app
 
 **Symptom.** A command returns `POLICY_DENIED`.
 
-**Cause.** The semantic path could not finish, and the physical path is blocked because the command ran headless. Hover, drag, double-click, triple-click and cursor-moving mouse commands always need `--headed`. Coordinate `right-click` is also blocked headless.
+**Cause.** If `error.details.kind` starts with `dogwood_`, an owner policy refused the command: see Owner policies in the main skill, and never add `--headed` or retry to get past it. Otherwise the semantic path could not finish, and the physical path is blocked because the command ran headless. Hover, drag, double-click, triple-click and cursor-moving mouse commands always need `--headed`. Coordinate `right-click` is also blocked headless.
 
 **Fix.** Add the global `--headed` flag only if physical input is what you want. Example: `agent-desktop --headed mouse-click --xy 640,400 --button right`. Take coordinates from `get @ref --property bounds`.
 

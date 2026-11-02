@@ -65,6 +65,8 @@ todos/
 
 # docs/ holds local working files; only these paths are tracked
 docs/*
+!docs/dogwood-policies-design.md
+!docs/policies.md
 !docs/faq.md
 !docs/install.md
 !docs/json-output.md
@@ -88,3 +90,6 @@ probes/windows/22-capture-clipboard/bin/
 # probes/windows/NN-*/captures/ commit their twins beside the capture.
 probes/*/captures/**/*.normalized
 npm/bin/.launcher-notice-*
+
+# Desktop-app session artifacts
+.agents/scheduled_tasks.lock

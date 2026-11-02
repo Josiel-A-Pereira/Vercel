@@ -10,6 +10,7 @@ use std::time::Instant;
 
 mod cursor;
 mod options;
+pub(crate) mod policy_paths;
 mod session_scope;
 mod wait_selector;
 

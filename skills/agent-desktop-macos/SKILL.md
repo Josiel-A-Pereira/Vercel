@@ -37,6 +37,8 @@ Read the core skill first (`agent-desktop skills get desktop`) for the observe, 
 
 **Headed is physical first** for `click`, `right-click`, `type`, `clear` and `scroll`. Core focuses the exact window of the ref. The adapter then sends a real click, key or wheel event to the verified point. `expand`, `collapse`, `set-value`, `select`, `toggle`, `check`, `uncheck`, `focus` and `scroll-to` stay semantic under `--headed`. Double-click, triple-click, `hover` and `drag` need `--headed`. Raw `--xy` input never changes focus.
 
+**SwiftUI text fields on macOS 27.** A single-line SwiftUI `TextField` takes text into the app only while it has keyboard focus; an unfocused one would only display the text. Headless `type` and `set-value` into such a field are refused before anything is sent, with `POLICY_DENIED` and `details.kind: "swiftui_text_needs_focus"` (or the `supported_action` check). Under `--headed`, `set-value` focuses the field first and `type` types physically, so both reach the app. AppKit and Chromium text fields, and multi-line text areas, are not affected.
+
 **Judge delivery by observation.** AX return codes do not prove an effect. Finder returns success from an `AXConfirm` that does nothing. Snapshot again or use `get` and `is` to check the result.
 
 **Surfaces.** Use `--surface menubar` for File, Edit and View menus and for menu bar apps (status items). While a menu, sheet, alert or popover is open, refs from the window tree behind it are the wrong target.
@@ -47,7 +49,7 @@ Read the core skill first (`agent-desktop skills get desktop`) for the observe, 
 
 **Chromium and Electron.** agent-desktop switches on the web accessibility of a Chromium renderer automatically when it needs it. For a dense running app, use `snapshot --skeleton -i --compact`, then drill with `--root @ref`.
 
-**Identity.** `launch` accepts a display name (`"System Settings"`) or a bundle ID (`com.apple.systempreferences`). Other commands take the display name through `--app`. Window IDs such as `w-4521` stay valid for the life of the window. Find them with `list-windows`.
+**Identity.** `launch` accepts a display name (`"System Settings"`) or a bundle ID (`com.apple.systempreferences`). Other commands accept either one through `--app`. Window IDs such as `w-4521` stay valid for the life of the window. Find them with `list-windows`.
 
 **Keys.** The primary modifier is `cmd`: `press cmd+c`, `press cmd+s`. Quit shortcuts such as `cmd+q`, `cmd+shift+q`, `cmd+alt+esc`, `ctrl+cmd+q` and `cmd+shift+delete` return `POLICY_DENIED` unless you pass `--force`. To quit an app, use `close-app`. Punctuation keys work in combos, as the symbol (`,` `.` `/` `;` `'` `[` `]` `\` `-` `=` `` ` ``) or by name (`comma`, `period`, `slash`, `semicolon`, `quote`, `leftbracket`, `rightbracket`, `backslash`, `minus`, `equal`, `grave`). Each one is sent with the key that types it in the active keyboard layout, so `press cmd+,` opens Settings on ANSI and JIS keyboards alike.
 

@@ -46,6 +46,8 @@ The same chain in text, from the caller to the app:
 6. The OS accessibility API: the AX API on macOS, UI Automation on Windows, AT-SPI on Linux.
 7. The app, which exposes its UI through that API.
 
+Before the CLI runs a command, it checks the command against any [owner policies](/desktop/guides/policies) on the machine, and a refused command never reaches core.
+
 Core never imports a platform crate, and platform crates never import each other. Only the CLI and the C library connect a platform crate to core, and each picks it at compile time, so a binary drives the OS it was built for.
 
 ## Platform support

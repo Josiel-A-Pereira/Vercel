@@ -12,6 +12,8 @@ pub(super) struct HostRequest {
     pub expires_ns: u64,
     #[serde(default)]
     pub baseline: Option<agent_desktop_core::SignalBaseline>,
+    #[serde(default)]
+    pub policy_env_dir: Option<PathBuf>,
 }
 
 pub(super) fn execute(bytes: &[u8], identity: &str, session: Option<&str>) -> Response {
@@ -53,6 +55,7 @@ fn prepare(
     if cli.identity.agent_id.is_none() {
         cli.identity.agent_id = request.agent_id;
     }
+    cli.policy.env_dir = request.policy_env_dir;
     let deadline =
         agent_desktop_core::Deadline::from_duration(super::budget::remaining(request.expires_ns)?)?;
     std::env::set_current_dir(&request.directory)?;
@@ -77,6 +80,7 @@ mod tests {
                 agent_id: None,
                 expires_ns: u64::MAX,
                 baseline: None,
+                policy_env_dir: None,
             })
             .unwrap();
             let response = execute(&bytes, "owner", Some("mine"));

@@ -38,9 +38,9 @@ interaction_suite() {
     act_target "$text_field" clear >/dev/null 2>&1
     sleep 0.2
     require_target text_field textfield text-input
-    verify "[$mode] type sets field" text-echo "typed-$mode" "$natural_mechanism" "$text_field" type "typed-$mode"
+    verify_text "[$mode] type sets field" text-echo "typed-$mode" "$natural_mechanism" "$text_field" type "typed-$mode"
     require_target text_field textfield text-input
-    verify "[$mode] set-value sets field" text-echo "set-$mode" semantic_api "$text_field" set-value "set-$mode"
+    verify_text "[$mode] set-value sets field" text-echo "set-$mode" semantic_api "$text_field" set-value "set-$mode"
     require_target text_field textfield text-input
     verify "[$mode] clear empties field" text-echo "" "$natural_mechanism" "$text_field" clear
 

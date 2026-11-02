@@ -20,7 +20,7 @@ This project follows the guidelines in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 | Requirement | Notes |
 |---|---|
-| **Rust toolchain** | Pinned to 1.89.0 via `rust-toolchain.toml` (`rust-version` 1.89 is the MSRV). `rustup` picks the correct channel automatically. |
+| **Rust toolchain** | Pinned to 1.95.0 via `rust-toolchain.toml` (`rust-version` 1.95 is the MSRV). `rustup` picks the correct channel automatically. |
 | **macOS 13+** | Required to build and run the macOS adapter (`crates/macos/`), with the Xcode command-line tools. |
 | **Windows** | The Windows adapter (`crates/windows/`) builds on Windows only, with the MSVC build tools. |
 | **Linux** | The Linux adapter (`crates/linux/`) builds on Linux only. Its live tests need an AT-SPI session; see `tests/e2e-linux/README.md`. |
@@ -40,7 +40,7 @@ git config core.hooksPath .githooks
 # Every platform adapter compiles on its own OS only, so unscoped workspace
 # commands fail on every host. Scope cargo to the host package set.
 # macOS:
-HOST_PKGS=(-p agent-desktop-core -p agent-desktop-macos -p agent-desktop -p agent-desktop-ffi)
+HOST_PKGS=(-p agent-desktop-core -p agent-desktop-policy -p agent-desktop-macos -p agent-desktop -p agent-desktop-ffi)
 # Windows: swap agent-desktop-macos for agent-desktop-windows.
 # Linux:   swap agent-desktop-macos for agent-desktop-linux.
 
@@ -87,7 +87,7 @@ CI and the pre-commit hook run `cargo test` through `scripts/cargo-test-isolated
 
 `tests/e2e/run.sh` builds the release CLI, macOS helper and FFI library itself and refuses to run without `AGENT_DESKTOP_E2E_EXCLUSIVE=1`, because headed cases move the real cursor. `tests/e2e/README.md` covers what it asserts and how to add a scenario.
 
-CI also enforces what a local run can miss: the 15 MB limit on each shipped executable, the Rust 1.89 MSRV check, drift of the committed C header `crates/ffi/include/agent_desktop.h` from the Rust ABI declarations (regenerate it with `scripts/update-ffi-header.sh`, which needs cbindgen 0.29.4), the `cargo-deny` dependency policy in `deny.toml`, secret scanning, CodeQL, and workflow linting.
+CI also enforces what a local run can miss: the 15 MB limit on each shipped executable, the Rust 1.95 MSRV check, drift of the committed C header `crates/ffi/include/agent_desktop.h` from the Rust ABI declarations (regenerate it with `scripts/update-ffi-header.sh`, which needs cbindgen 0.29.4), the `cargo-deny` dependency policy in `deny.toml`, secret scanning, CodeQL, and workflow linting.
 
 ## Pre-commit hook
 
