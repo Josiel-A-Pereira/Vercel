@@ -71,7 +71,53 @@ impl<'a> Resolver<'a> {
                     })?;
                 self.window(window).map(|target| vec![target])
             }
+            TargetPlan::AppWindows(query) => self.app_windows(query),
+            TargetPlan::Running => {
+                let running: Vec<TargetFacts> = self.running()?.iter().map(app_target).collect();
+                Ok(if running.is_empty() {
+                    vec![TargetFacts::default()]
+                } else {
+                    running
+                })
+            }
+            TargetPlan::Unnamed(reason) => Err((*reason).to_string()),
         }
+    }
+
+    /// Every listed window of the app `query` names, each with its title,
+    /// since the command may act on any of them. Only that app's windows are
+    /// listed, which spares reading every other app's. An app with no listed
+    /// window, one not running, or a platform that lists none, is judged as
+    /// the app alone.
+    fn app_windows(&mut self, query: &str) -> Result<Vec<TargetFacts>, String> {
+        let apps = self.named(query)?;
+        let mut windows = Vec::new();
+        for app in &apps {
+            let filter = WindowFilter {
+                focused_only: false,
+                app: Some(app.app.clone()),
+            };
+            windows.extend(
+                self.adapter
+                    .list_windows(&filter, lookup_deadline()?)
+                    .or_else(|error| match error.code {
+                        ErrorCode::AppNotFound => Ok(Vec::new()),
+                        _ => unsupported_as_empty(error),
+                    })
+                    .map_err(|error| format!("windows could not be listed: {}", error.message))?,
+            );
+        }
+        let mut targets: Vec<TargetFacts> = Vec::new();
+        for window in windows {
+            let target = self.window(Some(window))?;
+            let owned = apps
+                .iter()
+                .any(|app| app.app == target.app && app.app_id == target.app_id);
+            if owned && !targets.contains(&target) {
+                targets.push(target);
+            }
+        }
+        Ok(if targets.is_empty() { apps } else { targets })
     }
 
     /// Every running application `query` names (name in any letter case,
@@ -268,9 +314,9 @@ fn app_target(app: &AppInfo) -> TargetFacts {
     }
 }
 
-fn unsupported_as_empty(
+fn unsupported_as_empty<T>(
     error: agent_desktop_core::AdapterError,
-) -> Result<Vec<AppInfo>, agent_desktop_core::AdapterError> {
+) -> Result<Vec<T>, agent_desktop_core::AdapterError> {
     match error.code {
         ErrorCode::PlatformNotSupported => Ok(Vec::new()),
         _ => Err(error),

@@ -11,7 +11,7 @@ use dogwood_language::Value;
 use dogwood_local_engine::{DurableTemporalEngine, Outcome};
 
 use crate::catalog;
-use crate::discover::{PolicySources, engine_state_dir};
+use crate::discover::{PolicySources, engine_state_dir_for};
 use crate::store::{OpenStore, StoreSlot, hand_over_on_request, store_wait_error};
 use crate::{CommandFacts, PolicyError, Verdict};
 
@@ -35,7 +35,7 @@ impl PolicyGate {
     /// set of their store. Installing only on content change keeps the log
     /// quiet and preserves the temporal history of unchanged policies.
     pub fn open(sources: &PolicySources) -> Result<Self, PolicyError> {
-        Self::open_at(sources, &engine_state_dir()?)
+        Self::open_at(sources, &engine_state_dir_for(sources.origin)?)
     }
 
     /// [`open`](Self::open) under an explicit state root instead of the

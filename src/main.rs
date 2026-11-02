@@ -142,7 +142,9 @@ fn run() -> ExitCode {
             Err(error) => finish(cmd_name, Err(error)),
         };
     }
-    finish(cmd_name, execute(cli, cmd))
+    let exit_code = finish(cmd_name, execute(cli, cmd));
+    command_policy::dogwood::release_stores();
+    exit_code
 }
 
 fn execute(cli: Cli, cmd: Commands) -> Result<serde_json::Value, AppError> {

@@ -16,6 +16,7 @@ pub const POLICY_DIR_ENV: &str = "AGENT_DESKTOP_POLICY_DIR";
 pub const POLICY_FILE_EXTENSION: &str = "dogwood";
 const STATE_DIR_NAME: &str = ".agent-desktop";
 const POLICIES_DIR_NAME: &str = "policies";
+const ENGINE_STATE_DIR_NAME: &str = "policy-state";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Origin {
@@ -161,7 +162,25 @@ fn sorted(mut files: Vec<PathBuf>) -> Vec<PathBuf> {
 /// the gate. It lives apart from the user-edited `policies/` folder so an
 /// owner can lock that folder without freezing the log.
 pub fn engine_state_dir() -> Result<PathBuf, PolicyError> {
-    Ok(state_root()?.join("policy-state"))
+    Ok(state_root()?.join(ENGINE_STATE_DIR_NAME))
+}
+
+/// Where a layer of `origin` keeps its history. The account's folder keeps
+/// it under the account's own home, found the way the folder itself is, so
+/// relocating the state root never hands the owner's rules an empty
+/// history.
+pub fn engine_state_dir_for(origin: Origin) -> Result<PathBuf, PolicyError> {
+    state_dir_for(origin, crate::account_home::account_home().as_deref())
+}
+
+pub(crate) fn state_dir_for(
+    origin: Origin,
+    account_home: Option<&Path>,
+) -> Result<PathBuf, PolicyError> {
+    match (origin, account_home) {
+        (Origin::Account, Some(home)) => Ok(home.join(STATE_DIR_NAME).join(ENGINE_STATE_DIR_NAME)),
+        _ => engine_state_dir(),
+    }
 }
 
 fn default_policy_dir() -> Result<PathBuf, PolicyError> {

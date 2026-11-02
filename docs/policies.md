@@ -64,17 +64,22 @@ run the gate.
 ## History
 
 Every allowed command records its outcome, and temporal clauses read that
-history. It lives in `~/.agent-desktop/policy-state/` (mode `0700`, written
-only by the gate), apart from the policies folder, so locking the policies
-folder never freezes the history.
+history. It lives in `policy-state/` under the state root (mode `0700`,
+written only by the gate), apart from the policies folder, so locking the
+policies folder never freezes the history. The owner's folder keeps its
+history in the account's own `~/.agent-desktop/policy-state/`, found from the
+account records like the folder itself, so relocating `HOME` or
+`AGENT_DESKTOP_HOME` never hands the owner's rules an empty history.
 
 - Each layer location keeps its own installed set and history, so a temporal
   clause sees only the commands its own layer judged.
 - Editing a file installs only the difference. Every policy whose text did not
   change keeps its history, and so does adding a file to a folder. A policy you
   add or change starts with an empty history.
-- History survives restarts. The log is checkpointed once 64 events have
-  gathered, so it stays bounded even though every CLI call is its own process.
+- History survives restarts. A process that closes a store checkpoints it
+  once 64 events have gathered, and a one-shot CLI process closes its stores
+  before it exits, so the log stays bounded even though every call is its
+  own process.
 - Several sessions and agents can run at once. They share one store per layer,
   and the process holding it hands it over when another asks. A single active
   session pays nothing extra; agents that interleave commands pay roughly one
@@ -134,14 +139,24 @@ not running is judged as the installed app the name would launch.
 - Window-scoped commands (`snapshot`, `find`, `screenshot`, `resize-window`,
   `move-window`, `minimize`, `maximize`, `restore`, `focus-window`,
   `list-surfaces`) are judged as the owner of the window they act on: the
-  `--window-id` window, a window of the `--app` app, the windows
-  `focus-window --title` matches, or the focused window when neither is named.
+  `--window-id` window, the windows `focus-window --title` matches, or the
+  focused window when neither is named. With `--app`, every listed window of
+  that app is judged with its title, since the command may act on any of
+  them, so a rule over `context.input.window` holds without `--window-id`.
 - Keyboard input (`press` without `--app`, `key-down`, `key-up`) is judged as
-  the focused window's app, and `press --window-id` as that window's owner.
+  the focused window's app, `press --window-id` as that window's owner, and
+  `press --app` as every window of that app.
 - Pointer input at coordinates (`mouse-*`, `hover --xy`) is judged as the app
   whose window is on top at that point. On macOS a point on the menu bar is
   judged as the frontmost app.
 - A `drag` is judged at both ends, and both must be allowed.
+- `notification-action` and `dismiss-notification` are judged as the app
+  their `--expected-app` (or, for `dismiss-notification`, `--app`) names;
+  dispatch refuses the notification when it is from another app. With only
+  `--expected-title`, the app is unknown and the command is refused with
+  `dogwood_policy_target_unknown`. `list-notifications` and
+  `dismiss-all-notifications` without `--app` reach the notifications of
+  every app, so they are judged as every running app.
 - Only what lands in no application window (the desktop, the clipboard,
   `list-displays`, a full-screen `screenshot`) acts on `Desktop::App::"system"`.
 

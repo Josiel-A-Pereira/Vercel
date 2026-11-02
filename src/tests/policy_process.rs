@@ -270,3 +270,29 @@ permit (principal, action == Desktop::Action::"list-displays", resource);
 
 #[path = "policy_layers_tests.rs"]
 mod layers;
+
+/// Every command is its own process off macOS, and a gate held in a static
+/// is never dropped, so the binary must close its stores itself before it
+/// exits; otherwise no store ever checkpoints and every open replays the
+/// whole log. 40 commands record 80 events, past the checkpoint interval.
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn one_shot_processes_checkpoint_the_log_they_grow() {
+    let home = PolicyHome::new("checkpoint");
+    home.write_policy("allow.dogwood", "permit (principal, action, resource);");
+    for _ in 0..40 {
+        let displays = home.run(&["list-displays"]);
+        assert_ne!(
+            displays["error"]["code"], "POLICY_DENIED",
+            "the policy permits everything: {displays}"
+        );
+    }
+    let checkpointed = std::fs::read_dir(home.root.join("policy-state"))
+        .expect("the gate keeps its history under the state root")
+        .flatten()
+        .any(|store| store.path().join("checkpoint.offset").is_file());
+    assert!(
+        checkpointed,
+        "a process that grew the log past the interval checkpoints it"
+    );
+}

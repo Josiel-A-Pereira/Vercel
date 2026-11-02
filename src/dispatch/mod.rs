@@ -28,6 +28,9 @@ mod policy_gate_desk;
 mod policy_gate_global_input_tests;
 
 #[cfg(test)]
+mod policy_gate_reach_tests;
+
+#[cfg(test)]
 mod policy_gate_scenario_tests;
 
 #[cfg(test)]

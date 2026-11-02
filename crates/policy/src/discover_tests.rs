@@ -124,3 +124,22 @@ fn one_folder_reached_two_ways_is_one_folder() {
     assert!(!discover::same_folder(dir.path(), &std::env::temp_dir()));
     let _ = std::fs::remove_file(&alias);
 }
+
+/// The owner's history lives under the account's own home, so relocating
+/// the state root cannot hand the owner's rules a fresh, empty history.
+#[test]
+fn the_account_layer_keeps_its_history_under_the_account_home() {
+    let account = tempfile::tempdir().expect("tempdir");
+    assert_eq!(
+        discover::state_dir_for(Origin::Account, Some(account.path())).expect("state dir"),
+        account.path().join(".agent-desktop").join("policy-state")
+    );
+    let state_root_store = discover::engine_state_dir().expect("state root store");
+    for origin in [Origin::Home, Origin::Env, Origin::Cli] {
+        assert_eq!(
+            discover::state_dir_for(origin, Some(account.path())).expect("state dir"),
+            state_root_store,
+            "{origin:?} keeps its history under the state root"
+        );
+    }
+}

@@ -226,7 +226,7 @@ impl SystemOps for DeskAdapter {
 }
 
 pub(super) struct Scenario {
-    _home: HomeGuard,
+    home: HomeGuard,
     dir: std::path::PathBuf,
     policy_file: std::path::PathBuf,
     pub(super) adapter: DeskAdapter,
@@ -245,11 +245,15 @@ impl Scenario {
         let policy_file = dir.join("guardrails.dogwood");
         write_policy(&policy_file, policy);
         Self {
-            _home: home,
+            home,
             dir: dir.clone(),
             policy_file,
             adapter: DeskAdapter::default(),
         }
+    }
+
+    pub(super) fn state_root(&self) -> &std::path::Path {
+        self.home.path()
     }
 
     pub(super) fn rewrite_policy(&self, policy: &str) {

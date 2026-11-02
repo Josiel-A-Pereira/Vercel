@@ -22,7 +22,16 @@ pub(super) enum TargetPlan<'a> {
     },
     /// Pointer input at screen coordinates: whatever window is on top there.
     Point(f64, f64),
+    /// A window of the named app, any of which the command may act on, so
+    /// each is judged with its title.
+    AppWindows(&'a str),
+    /// Whatever any running app shows, such as its notifications.
+    Running,
+    /// The command names nothing the gate can judge it by.
+    Unnamed(&'static str),
 }
+
+const NOTIFICATION_APP_UNNAMED: &str = "the notification's app is not named; pass --expected-app with the app list-notifications reports";
 
 /// The targets a command must be allowed on: none for an exempt command,
 /// two for a drag (it acts where it picks up and where it drops).
@@ -92,7 +101,7 @@ pub(super) fn plan_for(cmd: &Commands) -> Option<Vec<TargetPlan<'_>>> {
         }
 
         Commands::Press(args) => match (&args.app, &args.window_id) {
-            (Some(app), _) => TargetPlan::App(Some(app)),
+            (Some(app), _) => TargetPlan::AppWindows(app),
             (None, Some(window_id)) => TargetPlan::WindowId(window_id),
             (None, None) => TargetPlan::Focused,
         },
@@ -113,7 +122,10 @@ pub(super) fn plan_for(cmd: &Commands) -> Option<Vec<TargetPlan<'_>>> {
                 app: args.app.as_deref(),
                 title,
             },
-            (None, None) => TargetPlan::App(args.app.as_deref()),
+            (None, None) => match &args.app {
+                Some(app) => TargetPlan::AppWindows(app),
+                None => TargetPlan::App(None),
+            },
         },
         Commands::ResizeWindow(args) => window_scope(&args.scope),
         Commands::MoveWindow(args) => window_scope(&args.scope),
@@ -121,17 +133,17 @@ pub(super) fn plan_for(cmd: &Commands) -> Option<Vec<TargetPlan<'_>>> {
             window_scope(&args.scope)
         }
         Commands::ListSurfaces(args) => match &args.app {
-            Some(app) => TargetPlan::App(Some(app)),
+            Some(app) => TargetPlan::AppWindows(app),
             None => TargetPlan::Focused,
         },
         Commands::OpenSystemSurface(_) => TargetPlan::System,
 
-        Commands::ListNotifications(args) => TargetPlan::App(args.app.as_deref()),
+        Commands::ListNotifications(args) => notifications_of(args.app.as_deref()),
         Commands::DismissNotification(args) => {
-            TargetPlan::App(args.expected_app.as_deref().or(args.app.as_deref()))
+            notification_at(args.expected_app.as_deref().or(args.app.as_deref()))
         }
-        Commands::DismissAllNotifications(args) => TargetPlan::App(args.app.as_deref()),
-        Commands::NotificationAction(args) => TargetPlan::App(args.expected_app.as_deref()),
+        Commands::DismissAllNotifications(args) => notifications_of(args.app.as_deref()),
+        Commands::NotificationAction(args) => notification_at(args.expected_app.as_deref()),
 
         Commands::ClipboardGet(_) | Commands::ClipboardSet(_) | Commands::ClipboardClear => {
             TargetPlan::System
@@ -149,8 +161,27 @@ pub(super) fn plan_for(cmd: &Commands) -> Option<Vec<TargetPlan<'_>>> {
 fn window_scope(scope: &WindowScope) -> TargetPlan<'_> {
     match (&scope.window_id, &scope.app) {
         (Some(window_id), _) => TargetPlan::WindowId(window_id),
-        (None, Some(app)) => TargetPlan::App(Some(app)),
+        (None, Some(app)) => TargetPlan::AppWindows(app),
         (None, None) => TargetPlan::Focused,
+    }
+}
+
+/// Without an app filter, the notifications of every running app are in
+/// reach.
+fn notifications_of(app: Option<&str>) -> TargetPlan<'_> {
+    match app {
+        Some(app) => TargetPlan::App(Some(app)),
+        None => TargetPlan::Running,
+    }
+}
+
+/// The notification at an index belongs to the app its expected identity
+/// names; dispatch refuses it when that app does not match. A title alone
+/// says nothing about the app, so the gate cannot judge it.
+fn notification_at(app: Option<&str>) -> TargetPlan<'_> {
+    match app {
+        Some(app) => TargetPlan::App(Some(app)),
+        None => TargetPlan::Unnamed(NOTIFICATION_APP_UNNAMED),
     }
 }
 

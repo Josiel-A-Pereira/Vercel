@@ -107,6 +107,17 @@ pub(crate) fn record(facts: &[CommandFacts], ok: bool) {
     }
 }
 
+/// Close every policy store this process holds, which checkpoints a store
+/// whose log has grown. A one-shot CLI process calls it before it exits:
+/// the gates live in a static, and Rust never drops statics, so without it
+/// no store would ever checkpoint and every open would replay the whole log.
+pub(crate) fn release_stores() {
+    GATES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clear();
+}
+
 fn target_unknown(command: &str, reason: &str) -> AppError {
     AdapterError::new(
         ErrorCode::PolicyDenied,
