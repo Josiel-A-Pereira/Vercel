@@ -146,11 +146,16 @@ impl LocatorTraversal {
         } else {
             self.usage.claim_edges(loaded_child_count);
             let original_viewport = self.context.window_bounds;
-            self.context.window_bounds = crate::tree::element_bounds::clipped_viewport(
+            let role = read.attrs.role.as_deref().unwrap_or("");
+            let clip = crate::tree::element_bounds::clip_bounds(
+                &element,
+                role,
                 original_viewport,
-                read.attrs.role.as_deref().unwrap_or(""),
                 read.attrs.bounds,
+                self.deadline,
             );
+            self.context.window_bounds =
+                crate::tree::element_bounds::clipped_viewport(original_viewport, role, clip);
             let result = self.visit_children(read.child_read, (child_logical_depth, raw_depth));
             self.context.window_bounds = original_viewport;
             let (children, complete) = result?;

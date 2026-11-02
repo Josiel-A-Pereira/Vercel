@@ -270,7 +270,14 @@ mod imp {
                 return Ok(Some(visible));
             }
             if role.as_deref().is_some_and(clips_descendants) {
-                let Some(bounds) = read_bounds_with_deadline(&current, deadline)? else {
+                let reported = read_bounds_with_deadline(&current, deadline)?;
+                let Some(bounds) = clip_bounds(
+                    &current,
+                    role.as_deref().unwrap_or(""),
+                    Some(visible),
+                    reported,
+                    deadline,
+                ) else {
                     return Ok(None);
                 };
                 let Some(intersection) = intersect_rects(visible, bounds) else {
@@ -289,8 +296,8 @@ mod imp {
         Ok(None)
     }
 
-    use crate::tree::element_bounds::clips_descendants;
     pub(super) use crate::tree::element_bounds::intersect_rects;
+    use crate::tree::element_bounds::{clip_bounds, clips_descendants};
 
     pub(super) fn remember_ancestor(visited: &mut Vec<AXElement>, current: &AXElement) -> bool {
         if visited
