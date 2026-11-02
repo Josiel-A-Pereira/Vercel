@@ -1,12 +1,36 @@
-use agent_desktop_core::{Point, Rect};
+use agent_desktop_core::{AdapterError, ErrorCode, Point, Rect};
 
 use super::super::cg_window::{
     bool_field, int_field, int_or_float_field, rect_field, string_field,
 };
 use super::{MAIN_MENU_LAYER, contains, stacked_window_dictionaries, window_at_point_until};
 
+const ANOTHER_USER: &str = "<another user's window>";
+
 fn deadline() -> std::time::Instant {
     std::time::Instant::now() + std::time::Duration::from_secs(5)
+}
+
+/// WindowServer and other system processes run as their own users and can
+/// put a window on screen. Signalling such a process is refused with
+/// `EPERM`, which tells another user's process apart without the identity
+/// read the hit test itself uses.
+fn owned_by_another_user(pid: i64) -> bool {
+    let Ok(pid) = libc::pid_t::try_from(pid) else {
+        return false;
+    };
+    let signalled = unsafe { libc::kill(pid, 0) };
+    signalled == -1 && std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
+}
+
+/// The hit test fails closed on a window whose owner it cannot read.
+fn refused_as_another_users(error: &AdapterError) -> bool {
+    error.code == ErrorCode::PermDenied
+        && error
+            .details
+            .as_ref()
+            .and_then(|details| details["kind"].as_str())
+            == Some("process_identity_permission")
 }
 
 #[test]
@@ -38,12 +62,13 @@ fn a_point_beyond_every_display_has_no_receiving_window() {
 }
 
 /// The frontmost visible window owns the centre of its own frame, so a hit
-/// test there must answer with that window's application. The menu bar is
-/// judged as the frontmost app instead, which the grid test covers.
+/// test there must answer with that window's application, or refuse when
+/// that application runs as another user. The menu bar is judged as the
+/// frontmost app instead, which the grid test covers.
 #[test]
 fn the_frontmost_window_receives_its_own_centre() {
     let own = std::process::id() as i64;
-    let Some((owner, centre)) = stacked_window_dictionaries()
+    let Some((owner, pid, centre)) = stacked_window_dictionaries()
         .expect("window inventory")
         .into_iter()
         .find_map(|dictionary| {
@@ -62,6 +87,7 @@ fn the_frontmost_window_receives_its_own_centre() {
                 .then(|| {
                     (
                         owner,
+                        pid,
                         Point {
                             x: bounds.x + bounds.width / 2.0,
                             y: bounds.y + bounds.height / 2.0,
@@ -72,10 +98,13 @@ fn the_frontmost_window_receives_its_own_centre() {
     else {
         return;
     };
-    let receiver = window_at_point_until(&centre, deadline())
-        .expect("hit test")
-        .expect("a window owns the centre");
-    assert_eq!(receiver.app, owner);
+    match window_at_point_until(&centre, deadline()) {
+        Ok(receiver) => assert_eq!(receiver.expect("a window owns the centre").app, owner),
+        Err(error) => assert!(
+            refused_as_another_users(&error) && owned_by_another_user(pid),
+            "only another user's window is refused: {owner} ({pid}): {error:?}"
+        ),
+    }
 }
 
 /// Windows overlap, so the receiver at a point is the frontmost window
@@ -109,6 +138,11 @@ fn first_mismatch_on_the_grid() -> Option<String> {
             let pid = int_field(&dictionary, "kCGWindowOwnerPID")?;
             let see_through = int_or_float_field(&dictionary, "kCGWindowAlpha") == Some(0.0);
             let menu_bar = int_field(&dictionary, "kCGWindowLayer") == Some(MAIN_MENU_LAYER);
+            let owner = if owned_by_another_user(pid) {
+                ANOTHER_USER.to_string()
+            } else {
+                owner
+            };
             (!see_through && pid > 0 && pid != own).then_some((owner, bounds, menu_bar))
         })
         .collect();
@@ -131,9 +165,11 @@ fn first_mismatch_on_the_grid() -> Option<String> {
                         Some(owner.clone())
                     }
                 });
-            let actual = window_at_point_until(&point, deadline())
-                .expect("hit test")
-                .map(|window| window.app);
+            let actual = match window_at_point_until(&point, deadline()) {
+                Ok(window) => window.map(|window| window.app),
+                Err(error) if refused_as_another_users(&error) => Some(ANOTHER_USER.to_string()),
+                Err(error) => panic!("hit test at ({x}, {y}): {error:?}"),
+            };
             if actual != expected {
                 return Some(format!("at ({x}, {y}): {actual:?} != {expected:?}"));
             }
