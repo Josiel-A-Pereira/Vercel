@@ -163,19 +163,20 @@ fn confirm_landed(
     }
 }
 
-/// The window the ref was captured from, never any other window of the
-/// process: resolution re-searches the scope the capture proved unique.
-///
-/// The surface lookup owns shell surfaces and the focused-window case, and it
-/// already resolves a recorded window id by that id; `belongs_to_entry` checks
-/// the process and its generation on that answer. Only an entry that records no
-/// window id falls back to enumerating the process's windows, where the
-/// generation alone still says which one it was.
+/// The window the ref was captured from, never another window of the process;
+/// a process-owned ref's owner is its live process, whatever windows it opens.
+/// The surface lookup resolves shell surfaces, the focused window and a recorded
+/// window id; an entry with no window id falls back to the process's windows,
+/// where the generation says which one it was.
 pub(crate) fn recorded_window(
     adapter: &dyn PlatformAdapter,
     entry: &RefEntry,
     deadline: Deadline,
 ) -> Result<WindowInfo, AdapterError> {
+    if entry.source.is_process_owned() {
+        return crate::system::app_lookup::live_process_owner(adapter, entry, deadline)
+            .map_err(adapter_error);
+    }
     let resolved = crate::snapshot::resolve_window_for_surface(
         adapter,
         entry.source.source_app.as_deref(),
@@ -209,12 +210,12 @@ fn gone() -> AdapterError {
     AdapterError::stale_ref_because("The window the ref was captured from is gone")
 }
 
-/// Whether a live window is the one the entry was captured from. Pid and a
-/// recorded window id must agree. Process generations must agree when both
-/// sides carry one; a window listing that cannot read the generation leaves
-/// the pid and window id to decide, since some macOS window records omit it.
+/// Whether a live window is the one the entry was captured from: the owner kind,
+/// pid and a recorded window id must agree, and process generations must agree
+/// when both sides carry one, since some macOS window records omit it.
 fn belongs_to_entry(window: &WindowInfo, entry: &RefEntry) -> bool {
-    window.pid == entry.process.pid
+    window.is_process_owner() == entry.source.is_process_owned()
+        && window.pid == entry.process.pid
         && entry
             .source
             .source_window_id

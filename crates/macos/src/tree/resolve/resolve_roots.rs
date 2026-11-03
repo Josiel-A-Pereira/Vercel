@@ -1,9 +1,9 @@
 use agent_desktop_core::{AdapterError, RefEntry, SnapshotSurface};
 
 use super::resolve_read_context::ResolveReadContext;
-use crate::tree::AXElement;
 use crate::tree::element_dedupe::push_unique;
 use crate::tree::properties::element::element_for_pid;
+use crate::tree::{AXElement, shell_surface::extras_menu_bar};
 
 #[cfg(target_os = "macos")]
 pub(in crate::tree) fn candidate_roots(
@@ -24,6 +24,9 @@ pub(in crate::tree) fn candidate_roots(
     super::resolve_source_app::verify_source_application(&application, entry, context)?;
     if source_window_scope_required(entry) {
         return source_window_scoped_roots(&application, entry, context);
+    }
+    if entry.source.is_process_rooted() {
+        return Ok(vec![application]);
     }
 
     let mut roots = Vec::new();
@@ -101,7 +104,8 @@ fn source_surface_scoped_roots(
         SnapshotSurface::Sheet => crate::tree::surfaces::sheet_for_pid(pid, deadline)?,
         SnapshotSurface::Popover => crate::tree::surfaces::popover_for_pid(pid, deadline)?,
         SnapshotSurface::Alert => crate::tree::surfaces::alert_for_pid(pid, deadline)?,
-        SnapshotSurface::Window => None,
+        SnapshotSurface::Dock => Some(application.clone()),
+        SnapshotSurface::MenuBarExtras => extras_menu_bar(pid, deadline)?,
         _ => None,
     };
     let Some(root) = root else {

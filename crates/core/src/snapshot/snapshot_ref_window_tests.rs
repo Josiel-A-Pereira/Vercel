@@ -56,3 +56,27 @@ fn test_run_from_ref_does_not_persist_refs_when_source_window_is_gone() {
         "seed refs only; a failed drill must not persist refs"
     );
 }
+
+#[test]
+fn test_run_from_ref_drills_a_ref_captured_from_a_windowless_app() {
+    for surface in [
+        crate::SnapshotSurface::Window,
+        crate::SnapshotSurface::Menubar,
+    ] {
+        let _guard = HomeGuard::new();
+        let opts = TreeOptions {
+            surface,
+            ..drill_opts()
+        };
+        let windowless = StubAdapter::with_windows(named("button", "Dock"), vec![]);
+        let deadline = crate::Deadline::after(1000).unwrap();
+        let captured =
+            crate::snapshot::build(&windowless, &opts, Some("TestApp"), None, deadline).unwrap();
+        assert!(captured.window.is_process_owner(), "{surface:?}");
+        let snapshot_id = save_latest(captured.refmap);
+        let adapter =
+            StubAdapter::with_windows(named("button", "Dock"), vec![window_info("w-9", true)]);
+        let result = run_from_ref(&adapter, &drill_opts(), "@e1", Some(&snapshot_id)).unwrap();
+        assert!(result.window.is_process_owner(), "{surface:?}");
+    }
+}

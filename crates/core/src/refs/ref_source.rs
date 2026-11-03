@@ -16,3 +16,17 @@ pub struct RefSource {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub renderer_accessibility_forced: bool,
 }
+
+impl RefSource {
+    /// Whether the ref was captured through a process owner (see
+    /// [`crate::WindowInfo::for_process`]) rather than a window, on any surface.
+    pub fn is_process_owned(&self) -> bool {
+        self.source_window_id.is_none() && self.source_window_title.as_deref() == Some("")
+    }
+
+    /// Whether the ref was observed from a process owner's application root,
+    /// so its path starts there.
+    pub fn is_process_rooted(&self) -> bool {
+        self.source_surface == crate::SnapshotSurface::Window && self.is_process_owned()
+    }
+}

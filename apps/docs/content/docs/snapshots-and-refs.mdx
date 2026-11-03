@@ -52,7 +52,7 @@ The tree above is trimmed to one button. The real tree nests it under several un
     <tr><th>Field</th><th>Meaning</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>data.app</code>, <code>data.window</code></td><td>The application and the window that was read (<code>id</code>, <code>title</code>).</td></tr>
+    <tr><td><code>data.app</code>, <code>data.window</code></td><td>The application and the window that was read (<code>id</code>, <code>title</code>). <code>data.window</code> is omitted when macOS reads a background app with no window through its process; see <a href="/desktop/surfaces">Surfaces</a>.</td></tr>
     <tr><td><code>data.snapshot_id</code></td><td>The id of the saved snapshot. It is part of every ref.</td></tr>
     <tr><td><code>data.ref_count</code></td><td>The number of refs the snapshot holds. After a <code>--root</code> drill it counts the whole snapshot, not only the drilled region.</td></tr>
     <tr><td><code>data.complete</code></td><td>Present on every snapshot. <code>false</code> means the observation ran out of budget. See <a href="/desktop/skeleton-and-drill-down#partial-observations">Partial observations</a>.</td></tr>

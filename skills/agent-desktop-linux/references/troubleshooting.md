@@ -184,7 +184,7 @@ D-Bus or X11 error.
   modifiers and `drag`.
 - `cursor-overlay` on Wayland: succeeds as a setting only. `enable` returns
   `data.rendered: false` and no overlay is drawn, so do not wait for one.
-- `open-system-surface --surface taskbar`: `PLATFORM_NOT_SUPPORTED`. Use the
+- `open-system-surface --surface taskbar`: `INVALID_ARGS`. Use the
   advertised GNOME surfaces; see `references/shell-tray-and-notifications.md`.
 - Ordinary app pointer commands and window screenshots on Wayland. Shell ref
   clicks also refuse on Wayland, and on X11 unless the shell's own tree proves the

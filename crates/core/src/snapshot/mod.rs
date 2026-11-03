@@ -58,7 +58,7 @@ pub fn build(
         source: RefAllocSource {
             pid: window.pid,
             app: Some(window.app.as_str()),
-            window_id: Some(window.id.as_str()),
+            window_id: (!window.is_process_owner()).then_some(window.id.as_str()),
             window_title: Some(window.title.as_str()),
             window_bounds_hash: window.bounds.as_ref().and_then(crate::Rect::bounds_hash),
             process_instance: window.process_instance.as_deref(),
@@ -98,6 +98,9 @@ pub fn build(
 /// other answer - a missing surface, a build refusal, a timeout - is returned
 /// as the adapter supplied it, and a surface that answers with another window
 /// leaves the id to the application path.
+///
+/// `menu-bar-extras` with an app name is that app's own status item and takes the
+/// application path, where a background app that lists no window is read through its process.
 pub(crate) fn resolve_window_for_surface(
     adapter: &dyn PlatformAdapter,
     app_name: Option<&str>,
@@ -105,7 +108,8 @@ pub(crate) fn resolve_window_for_surface(
     surface: crate::SnapshotSurface,
     deadline: crate::Deadline,
 ) -> Result<WindowInfo, AppError> {
-    if is_shell_surface(surface) {
+    let app_status_item = app_name.is_some() && surface == crate::SnapshotSurface::MenuBarExtras;
+    if is_shell_surface(surface) && !app_status_item {
         match adapter.resolve_shell_surface(surface, deadline) {
             Ok(window) if window_id.is_none_or(|id| window.id == id) => return Ok(window),
             Ok(_) => {}
@@ -118,11 +122,18 @@ pub(crate) fn resolve_window_for_surface(
             Err(_) => {}
         }
     }
-    if window_id.is_some() || matches!(surface, crate::SnapshotSurface::Window) {
+    if window_id.is_some() || (surface == crate::SnapshotSurface::Window && app_name.is_none()) {
         return resolve_window(adapter, app_name, window_id, deadline);
     }
+    let windows = windows_for_app(adapter, app_name, deadline)?;
+    if let (true, Some(app)) = (windows.is_empty() && is_process_surface(surface), app_name) {
+        return crate::system::app_lookup::windowless_app_owner(adapter, app, deadline);
+    }
+    if let (crate::SnapshotSurface::Window, Some(app)) = (surface, app_name) {
+        return select_app_window(windows, app);
+    }
     crate::system::window_lookup::select_surface_owner(
-        windows_for_app(adapter, app_name, deadline)?,
+        windows,
         crate::AdapterError::new(
             crate::ErrorCode::WindowNotFound,
             format!(
@@ -146,6 +157,27 @@ fn is_shell_surface(surface: crate::SnapshotSurface) -> bool {
             | crate::SnapshotSurface::SystemTrayOverflow
             | crate::SnapshotSurface::ActionCenter
             | crate::SnapshotSurface::QuickSettings
+            | crate::SnapshotSurface::Dock
+            | crate::SnapshotSurface::MenuBarExtras
+    )
+}
+
+/// Surfaces a background app with no window still presents, read from its
+/// process; the owner then carries an empty window id.
+fn is_process_surface(surface: crate::SnapshotSurface) -> bool {
+    matches!(
+        surface,
+        crate::SnapshotSurface::Window
+            | crate::SnapshotSurface::Menubar
+            | crate::SnapshotSurface::MenuBarExtras
+    )
+}
+
+fn select_app_window(windows: Vec<WindowInfo>, app: &str) -> Result<WindowInfo, AppError> {
+    crate::system::window_lookup::select_window(
+        windows,
+        crate::AdapterError::app_has_no_window(app),
+        "More than one window matches the target",
     )
 }
 
@@ -252,15 +284,7 @@ pub(crate) fn resolve_window(
                 }
             }
         }
-        crate::system::window_lookup::select_window(
-            windows,
-            crate::AdapterError::new(
-                crate::ErrorCode::WindowNotFound,
-                format!("Application '{app}' is running but has no matching window"),
-            )
-            .with_suggestion("Wait for the app to present a window, or run 'list-windows --app'."),
-            "More than one window matches the target",
-        )
+        select_app_window(windows, app)
     } else {
         crate::system::window_lookup::select_window(
             windows,

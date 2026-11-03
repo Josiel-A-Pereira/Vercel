@@ -148,7 +148,7 @@ It ships 60 command names, 56 operational commands. The other four (`key-down`, 
 | Clipboard | Yes | Yes | Yes; Wayland needs `wl-clipboard` |
 | App & window management | Yes | Yes | Launch/list; X11 window control |
 | Notifications | Yes | Yes | GNOME Shell |
-| Shell surfaces (`open-system-surface`) | Planned | Yes | GNOME tray, Action Center |
+| Shell surfaces (`open-system-surface`) | Dock, menu bar extras | Yes | GNOME tray, Action Center |
 
 The Windows surface and `launch` notes and the Linux X11 and Wayland notes are in [docs/install.md](docs/install.md#platform-notes).
 

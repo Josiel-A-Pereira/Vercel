@@ -79,6 +79,27 @@ fn a_shell_surface_ref_reaches_its_container_without_the_window_inventory() {
     assert_eq!(adapter.windows_listed.load(Ordering::SeqCst), 0);
 }
 
+/// A windowless app's ref resolves from its live process even after the app
+/// opens a window, and a relaunched process makes it stale.
+#[test]
+fn a_process_owned_ref_follows_its_process_not_a_window() {
+    let _guard = HomeGuard::new();
+    let adapter = RuleAdapter::new(tree_with(vec![node("button", "Run")]));
+    let mut entry = entry();
+    entry.source.source_window_id = None;
+    entry.source.source_window_title = Some(String::new());
+    entry.process.process_instance = Some("test-instance".into());
+
+    assert!(resolve(&adapter, &entry).is_ok());
+    assert_eq!(adapter.windows_listed.load(Ordering::SeqCst), 0);
+
+    entry.process.process_instance = Some("relaunched".into());
+    let Err(error) = resolve(&adapter, &entry) else {
+        panic!("a replaced process cannot answer for the ref");
+    };
+    assert_eq!(error.code, ErrorCode::StaleRef);
+}
+
 #[test]
 fn a_removed_target_is_stale() {
     let _guard = HomeGuard::new();

@@ -53,6 +53,21 @@ impl RuleAdapter {
 }
 
 impl ObservationOps for RuleAdapter {
+    fn list_apps_scoped(
+        &self,
+        _name: &str,
+        _bundle_id: Option<&str>,
+        _deadline: Deadline,
+    ) -> Result<Vec<crate::AppInfo>, AdapterError> {
+        Ok(vec![crate::AppInfo {
+            name: "Fixture".into(),
+            pid: crate::ProcessId::new(1),
+            bundle_id: None,
+            process_instance: Some("test-instance".into()),
+            presentation: None,
+        }])
+    }
+
     fn list_windows(
         &self,
         _filter: &crate::adapter::WindowFilter,

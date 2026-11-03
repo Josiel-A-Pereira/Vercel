@@ -7,7 +7,8 @@ description: >
   macOS platform guide for the agent-desktop CLI. Use for desktop automation
   on macOS: granting Accessibility and Screen Recording permission (TCC),
   what headed mode does on macOS (physical-first click, type and scroll),
-  surfaces (menu, menubar, sheet, popover, alert), Notification Center,
+  surfaces (menu, menubar, sheet, popover, alert, dock, menu-bar-extras),
+  menu bar apps and system panels with no window, Notification Center,
   Chromium and Electron apps including launch --cdp, and fixing PERM_DENIED,
   empty accessibility trees, ACTION_FAILED and APP_UNRESPONSIVE.
 ---
@@ -35,13 +36,13 @@ Read the core skill first (`agent-desktop skills get desktop`) for the observe, 
 
 ## What differs on macOS
 
-**Headed is physical first** for `click`, `right-click`, `type`, `clear` and `scroll`. Core focuses the exact window of the ref. The adapter then sends a real click, key or wheel event to the verified point. `expand`, `collapse`, `set-value`, `select`, `toggle`, `check`, `uncheck`, `focus` and `scroll-to` stay semantic under `--headed`. Double-click, triple-click, `hover` and `drag` need `--headed`. Raw `--xy` input never changes focus.
+**Headed is physical first** for `click`, `right-click`, `type`, `clear` and `scroll`. Core focuses the exact window of the ref; a ref from a background app (menu bar app, Dock, system panel) or a status item has no window and is not focused. The adapter then sends a real click, key or wheel event to the verified point. `expand`, `collapse`, `set-value`, `select`, `toggle`, `check`, `uncheck`, `focus` and `scroll-to` stay semantic under `--headed`. Double-click, triple-click, `hover` and `drag` need `--headed`. Raw `--xy` input never changes focus.
 
 **SwiftUI text fields on macOS 27.** A single-line SwiftUI `TextField` takes text into the app only while it has keyboard focus; an unfocused one would only display the text. Headless `type` and `set-value` into such a field are refused before anything is sent, with `POLICY_DENIED` and `details.kind: "swiftui_text_needs_focus"` (or the `supported_action` check). Under `--headed`, `set-value` focuses the field first and `type` types physically, so both reach the app. AppKit and Chromium text fields, and multi-line text areas, are not affected.
 
 **Judge delivery by observation.** AX return codes do not prove an effect. Finder returns success from an `AXConfirm` that does nothing. Snapshot again or use `get` and `is` to check the result.
 
-**Surfaces.** Use `--surface menubar` for File, Edit and View menus and for menu bar apps (status items). While a menu, sheet, alert or popover is open, refs from the window tree behind it are the wrong target.
+**Surfaces.** Use `--surface menubar` for an app's File, Edit and View menus. Use `--surface menu-bar-extras` for status items: with no `--app` it reads the system items (Wi-Fi, Battery, Clock), and with `--app` it reads that app's own item. Both work for menu bar apps with no window. Use `--surface dock` for the Dock. Both are always on screen, so `open-system-surface` returns them at once, headless, with no `--headed`; `action-center` and `start-menu` are Windows kinds. A background app with no ordinary window (menu bar apps, the Dock, the Control Center and Notification Center panels) is observed through its process: `snapshot --app "Control Center"` after clicking its status item. This applies to `window`, `menubar` and `menu-bar-extras`, not to `focused`, and not to a regular app that has not shown its window yet, which returns `WINDOW_NOT_FOUND`: wait for the window. Control Center rebuilds its tree right after a tile is clicked, so drill in with `snapshot --app "Control Center" --wait-for "<role>:<name>"` rather than an immediate snapshot. Its refs work headless and `--headed`. While a menu, sheet, alert or popover is open, refs from the window tree behind it are the wrong target.
 
 **Menus.** `right-click` headless uses `AXShowMenu`. If the menu opened but the app returned `APP_UNRESPONSIVE` with `retry: unsafe`, do not retry. Inspect the menu with `--surface menu`. For combo boxes and menu buttons, use `select @ref "Option"`. `select` needs a closed-to-open menu transition, so dismiss any open menu first.
 
@@ -49,7 +50,7 @@ Read the core skill first (`agent-desktop skills get desktop`) for the observe, 
 
 **Chromium and Electron.** agent-desktop switches on the web accessibility of a Chromium renderer automatically when it needs it. For a dense running app, use `snapshot --skeleton -i --compact`, then drill with `--root @ref`.
 
-**Identity.** `launch` accepts a display name (`"System Settings"`) or a bundle ID (`com.apple.systempreferences`). Other commands accept either one through `--app`. Window IDs such as `w-4521` stay valid for the life of the window. Find them with `list-windows`.
+**Identity.** `launch` accepts a display name (`"System Settings"`) or a bundle ID (`com.apple.systempreferences`). Other commands take the display name through `--app`, or the bundle ID or executable name (`ControlCenter`) when no running app has that display name. Window IDs such as `w-4521` stay valid for the life of the window. Find them with `list-windows`.
 
 **Refs carry each element's own address.** A ref turns back into the exact element it was captured from, so identical twins, such as several identical `Delete` buttons, each act on their own row. If the element was removed or the app restarted, the ref is `STALE_REF`, `details.kind: retained_object_stale`, and it never falls back to a search for a look-alike. When an app yields no address for an element, that ref follows the cross-platform rule instead and must have been the only element in its window with its role, native id, name and description. Take a fresh snapshot after a list changes.
 

@@ -129,7 +129,7 @@ pub(crate) enum Commands {
     #[command(about = "List accessibility surfaces for an app (window, menu, sheet ...)")]
     ListSurfaces(ListSurfacesArgs),
     #[command(
-        about = "Open a shell surface (start-menu, taskbar, action-center ...) and return the window it presents"
+        about = "Open a shell surface (start-menu, taskbar, dock, menu-bar-extras ...) and return the window it presents, if any"
     )]
     OpenSystemSurface(OpenSystemSurfaceArgs),
     #[command(about = "List notifications from Notification Center")]

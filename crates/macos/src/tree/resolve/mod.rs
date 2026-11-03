@@ -251,7 +251,7 @@ fn is_retryable_resolution_error(error: &AdapterError) -> bool {
 #[cfg(target_os = "macos")]
 fn can_use_locator_anchor_path(entry: &RefEntry) -> bool {
     let source_scoped = if entry.source.source_surface == SnapshotSurface::Window {
-        source_window_scope_required(entry)
+        source_window_scope_required(entry) || entry.source.is_process_rooted()
     } else {
         true
     };

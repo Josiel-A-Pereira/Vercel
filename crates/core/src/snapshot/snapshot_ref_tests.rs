@@ -116,6 +116,16 @@ impl ObservationOps for StubAdapter {
         crate::adapter::observed_tree(&root, window)
     }
 
+    fn list_apps(&self, _deadline: crate::Deadline) -> Result<Vec<crate::AppInfo>, AdapterError> {
+        Ok(vec![crate::AppInfo {
+            name: "TestApp".into(),
+            pid: crate::ProcessId::new(42),
+            bundle_id: None,
+            process_instance: Some("test-instance".into()),
+            presentation: Some(crate::AppPresentation::Background),
+        }])
+    }
+
     fn list_windows(
         &self,
         filter: &crate::adapter::WindowFilter,

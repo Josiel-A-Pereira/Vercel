@@ -260,31 +260,23 @@ fn test_root_with_window_surface_does_not_short_circuit_validation() {
 
 #[test]
 fn unsupported_surface_fails_before_adapter_traversal() {
-    let args = SnapshotArgs {
+    let sheet = || SnapshotArgs {
         surface: SnapshotSurface::Sheet,
         ..base_args()
     };
-
-    let err = execute(args, &DefaultSurfaceAdapter, &CommandContext::default()).unwrap_err();
+    assert!(matches!(
+        execute(sheet(), &NoopAdapter, &CommandContext::default()),
+        Err(AppError::Adapter(error)) if error.code == ErrorCode::InvalidArgs
+    ));
+    let err = execute(sheet(), &DefaultSurfaceAdapter, &CommandContext::default()).unwrap_err();
     let AppError::Adapter(adapter_error) = err else {
         panic!("expected adapter error")
     };
 
     assert_eq!(adapter_error.code, ErrorCode::PlatformNotSupported);
     assert_eq!(
-        adapter_error
-            .details
-            .as_ref()
-            .and_then(|details| details.get("requested_surface")),
-        Some(&serde_json::json!("sheet"))
-    );
-    assert!(
-        adapter_error
-            .details
-            .as_ref()
-            .and_then(|details| details.get("supported_surfaces"))
-            .and_then(serde_json::Value::as_array)
-            .is_some_and(Vec::is_empty)
+        adapter_error.details,
+        Some(serde_json::json!({ "requested_surface": "sheet", "supported_surfaces": [] }))
     );
 }
 
@@ -383,6 +375,14 @@ fn an_unproven_capture_is_flagged_in_the_payload() {
     };
     let proven = format_snapshot_fields(&result, None, None).unwrap();
     assert!(proven.get("identity_unproven").is_none());
+    assert_eq!(proven["window"]["id"], "w-1");
+    result.window.id.clear();
+    assert!(
+        format_snapshot_fields(&result, None, None)
+            .unwrap()
+            .get("window")
+            .is_none()
+    );
 
     result.identity_unproven = Some("the whole-window read was cut short".into());
     let unproven = format_snapshot_fields(&result, None, None).unwrap();

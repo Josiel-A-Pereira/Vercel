@@ -89,6 +89,7 @@ helper that returns a bare `@eN`.
 | `scenarios/trace_performance.sh` | Trace artifacts, redaction, timings, cleanup |
 | `scenarios/ref_churn.sh` | `STALE_REF` after the UI really changes, on a dedicated fixture process (`AGENT_DESKTOP_FIXTURE_REF_CHURN=1`) |
 | `scenarios/notifications.sh` | Real Notification Center lifecycle |
+| `scenarios/os_surfaces.sh` | Dock launch, Control Center panel and volume slider, `--app` by executable name |
 | `permission-contract.sh` | Deterministic AE5 mapping tests without mutating TCC |
 | `electron-live.sh`, `electron_metrics*.py` | Opt-in installed Electron/Chromium app measurement |
 | `json_tool.py`, `bounded_process.py`, `guard-command.sh` | JSON field extraction and the timeout/output-capped, process-group-isolated command runner |

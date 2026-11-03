@@ -101,6 +101,17 @@ impl ObservationOps for MacOSAdapter {
         )
     }
 
+    fn resolve_shell_surface(
+        &self,
+        surface: agent_desktop_core::SnapshotSurface,
+        deadline: Deadline,
+    ) -> Result<WindowInfo, AdapterError> {
+        crate::tree::shell_surface::resolve_surface(
+            surface,
+            crate::tree::locator_deadline::from_operation(deadline)?,
+        )
+    }
+
     fn list_surfaces(
         &self,
         process: agent_desktop_core::ProcessIdentity,

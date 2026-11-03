@@ -24,6 +24,8 @@ Output shape:
       { "ref_id": "@s8f3k2p9:e1", "role": "button", "name": "About", "states": ["focused"] } ] } } }
 ```
 
+`data.window` is left out when macOS reads a windowless app through its process. On Windows and Linux the same app returns `WINDOW_NOT_FOUND`.
+
 Each ref names the snapshot that owns it, so a ref keeps resolving against its own snapshot when you interleave several apps or windows.
 
 Choose the scope:
@@ -60,7 +62,7 @@ Off macOS, identical twins have no ref path: only `--headed mouse-click --xy X,Y
 
 ### Surfaces
 
-Surfaces are overlays: `menu`, `menubar`, `sheet`, `popover`, `alert`, `focused`, plus OS shell kinds on some platforms. Read `supported_surfaces` from `status` before you ask for one. An unsupported kind returns `PLATFORM_NOT_SUPPORTED` with the supported list in `details`. A shell surface needs no `--app`. When it is closed you get `WINDOW_NOT_FOUND`; raise it with `open-system-surface`.
+Surfaces are overlays: `menu`, `menubar`, `sheet`, `popover`, `alert`, `focused`, plus OS shell kinds on some platforms. Read `supported_surfaces` from `status` before you ask for one. A kind this OS does not have returns `INVALID_ARGS` with the supported list in `details`. A shell surface needs no `--app`; on macOS, `menu-bar-extras` with `--app` reads that app's own status item. When it is closed you get `WINDOW_NOT_FOUND`; raise it with `open-system-surface`.
 
 Use a surface snapshot for dialogs and menus, not a window snapshot. To reach one item inside an overlay, use `find --surface` instead of a full dump.
 
@@ -132,7 +134,7 @@ Lists the overlay surfaces an app presents now, the values `snapshot --surface` 
 agent-desktop --headed open-system-surface --surface action-center
 ```
 
-Raises an OS shell surface and returns the window it presents, in the `w-<id>` form that `list-windows` uses. It takes the foreground, so strict headless is refused with `POLICY_DENIED`; pass `--headed`. An already-present surface returns without being raised again. A kind the OS does not expose returns `PLATFORM_NOT_SUPPORTED` with a `platform_detail` that names the alternative. See the platform skill for the kinds.
+Raises an OS shell surface. On Windows and Linux it returns the window it presents, in the `w-<id>` form that `list-windows` uses; on macOS `data` is only `{"surface": "dock"}` and `window` is left out, because no window owns these surfaces. It takes the foreground, so on Windows and Linux strict headless is refused with `POLICY_DENIED`; pass `--headed`. On macOS, `dock` and `menu-bar-extras` are always on screen, so they return headless with no `--headed`. An already-present surface returns without being raised again. A kind the OS does not expose returns `INVALID_ARGS` naming the kinds to use instead. `start-menu` is a Windows kind and `action-center` exists on Windows and Linux (GNOME); neither is a macOS kind. On macOS use `dock` or `menu-bar-extras`, and open Control Center or Notification Center by clicking its `menu-bar-extras` item. See the platform skill for the kinds.
 
 ## Chromium and Electron apps
 
