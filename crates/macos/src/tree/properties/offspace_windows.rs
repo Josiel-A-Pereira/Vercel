@@ -10,10 +10,11 @@
 mod imp {
     use crate::tree::AXElement;
     use crate::tree::properties::ax_ipc::{self, AxDeadline};
+    use crate::tree::properties::offspace_probe::{TOKEN_ID_RANGE, probe, timeout_until};
     use accessibility_sys::{
         AXUIElementCopyAttributeValue, AXUIElementGetPid, AXUIElementRef,
-        AXUIElementSetMessagingTimeout, kAXErrorAttributeUnsupported, kAXErrorIllegalArgument,
-        kAXErrorInvalidUIElement, kAXErrorNoValue, kAXErrorSuccess,
+        kAXErrorAttributeUnsupported, kAXErrorIllegalArgument, kAXErrorInvalidUIElement,
+        kAXErrorNoValue, kAXErrorSuccess,
     };
     use core_foundation::base::TCFType;
     use core_foundation::string::CFString;
@@ -25,35 +26,23 @@ mod imp {
     use core_foundation_sys::base::{
         CFEqual, CFGetTypeID, CFRelease, CFRetain, CFTypeRef, kCFAllocatorDefault,
     };
-    use core_foundation_sys::data::{CFDataCreate, CFDataRef};
     use core_foundation_sys::string::{CFStringGetLength, CFStringRef};
     use std::sync::Mutex;
     use std::time::{Duration, Instant};
 
-    unsafe extern "C" {
-        fn _AXUIElementCreateWithRemoteToken(data: CFDataRef) -> AXUIElementRef;
-    }
-
-    /// Element ids are small sequential integers per process; windows sit low
-    /// in the range because they are created early.
-    const TOKEN_ID_RANGE: u64 = 3000;
-    const PROBE_TIMEOUT: Duration = Duration::from_millis(50);
     /// Upper bound on one probe, so an application that answers slowly or
     /// not at all costs at most this much. A probe also takes at most half of
     /// the remaining deadline, so the native read it extends still completes.
     const PROBE_BUDGET: Duration = Duration::from_millis(750);
     const CACHE_TTL: Duration = Duration::from_secs(3);
-    const WINDOW_SUBROLES: &[&str] = &[
-        "AXStandardWindow",
-        "AXDialog",
-        "AXFloatingWindow",
-        "AXSystemDialog",
-    ];
 
+    /// `next` is the first id not probed yet, or `None` once the whole range
+    /// is covered.
     struct Entry {
         pid: i32,
         at: Instant,
         windows: Vec<usize>,
+        next: Option<u64>,
     }
 
     static CACHE: Mutex<Vec<Entry>> = Mutex::new(Vec::new());
@@ -66,29 +55,6 @@ mod imp {
         }
         let name = unsafe { CFString::wrap_under_get_rule(attribute) };
         name == "AXWindows"
-    }
-
-    fn string_attr(element: AXUIElementRef, attribute: &str) -> Option<String> {
-        let name = CFString::new(attribute);
-        let mut value: CFTypeRef = std::ptr::null();
-        let error = unsafe {
-            AXUIElementCopyAttributeValue(element, name.as_concrete_TypeRef(), &mut value)
-        };
-        if error != kAXErrorSuccess || value.is_null() {
-            return None;
-        }
-        let value = unsafe { core_foundation::base::CFType::wrap_under_create_rule(value) };
-        value.downcast::<CFString>().map(|s| s.to_string())
-    }
-
-    /// The remote token layout: pid, 4 zero bytes, the `coco` magic, then the
-    /// 64-bit element id.
-    pub(super) fn token_bytes(pid: i32, id: u64) -> [u8; 20] {
-        let mut token = [0_u8; 20];
-        token[0..4].copy_from_slice(&pid.to_ne_bytes());
-        token[8..12].copy_from_slice(&0x636f_636f_i32.to_ne_bytes());
-        token[12..20].copy_from_slice(&id.to_ne_bytes());
-        token
     }
 
     /// Only an absent or empty window list is extended. An error such as
@@ -135,48 +101,6 @@ mod imp {
         }
     }
 
-    fn timeout_until(element: AXUIElementRef, until: Instant) -> bool {
-        let remaining = until.saturating_duration_since(Instant::now());
-        if remaining.is_zero() {
-            return false;
-        }
-        let timeout = remaining.min(PROBE_TIMEOUT).as_secs_f32();
-        unsafe { AXUIElementSetMessagingTimeout(element, timeout) };
-        true
-    }
-
-    /// Window elements found for `pid`, each retained, and whether the probe
-    /// covered the whole id range before `until`.
-    fn probe(pid: i32, until: Instant) -> (Vec<usize>, bool) {
-        let mut found = Vec::new();
-        for id in 0..TOKEN_ID_RANGE {
-            if Instant::now() >= until {
-                return (found, false);
-            }
-            let token = token_bytes(pid, id);
-            let data = unsafe { CFDataCreate(kCFAllocatorDefault, token.as_ptr(), 20) };
-            if data.is_null() {
-                continue;
-            }
-            let element = unsafe { _AXUIElementCreateWithRemoteToken(data) };
-            unsafe { CFRelease(data as CFTypeRef) };
-            if element.is_null() {
-                continue;
-            }
-            let is_window = timeout_until(element, until)
-                && string_attr(element, "AXRole").as_deref() == Some("AXWindow")
-                && timeout_until(element, until)
-                && string_attr(element, "AXSubrole")
-                    .is_some_and(|subrole| WINDOW_SUBROLES.contains(&subrole.as_str()));
-            if is_window {
-                found.push(element as usize);
-            } else {
-                unsafe { CFRelease(element as CFTypeRef) };
-            }
-        }
-        (found, true)
-    }
-
     fn release_all(windows: &[usize]) {
         for &window in windows {
             unsafe { CFRelease(window as CFTypeRef) };
@@ -189,7 +113,7 @@ mod imp {
         }
     }
 
-    fn cached(pid: i32) -> Option<Vec<usize>> {
+    fn cached(pid: i32) -> Option<(Vec<usize>, Option<u64>, Instant)> {
         let mut cache = CACHE.lock().unwrap_or_else(|poison| poison.into_inner());
         cache.retain(|entry| {
             let fresh = entry.at.elapsed() < CACHE_TTL;
@@ -198,34 +122,59 @@ mod imp {
             }
             fresh
         });
-        let windows = cache.iter().find(|entry| entry.pid == pid)?.windows.clone();
-        retain_all(&windows);
-        Some(windows)
+        let entry = cache.iter().find(|entry| entry.pid == pid)?;
+        retain_all(&entry.windows);
+        Some((entry.windows.clone(), entry.next, entry.at))
+    }
+
+    /// Whether a probe that reached `reach` replaces the saved entry
+    /// `current` (its start and reach). A probe resumed from the entry that
+    /// started at `base` saves only into that same entry, so it never brings
+    /// back an expired or evicted entry or overwrites a newer one.
+    pub(super) fn publishes(
+        base: Option<Instant>,
+        current: Option<(Instant, u64)>,
+        reach: u64,
+    ) -> bool {
+        match (base, current) {
+            (_, None) => base.is_none(),
+            (Some(base), Some((at, saved))) => base == at && reach > saved,
+            (None, Some((_, saved))) => reach > saved,
+        }
     }
 
     /// Retained window elements for `pid`, owned by the caller. The probe runs
     /// without the cache lock, so a slow application never delays a read of
-    /// another one, and only a probe that covered the whole range is cached.
+    /// another one. A probe that runs out of time saves its position, so the
+    /// next read continues from there instead of starting again.
     fn windows_for_pid(pid: i32, deadline: Instant) -> Vec<usize> {
-        if let Some(windows) = cached(pid) {
-            return windows;
-        }
         let now = Instant::now();
+        let (mut windows, from, base) = match cached(pid) {
+            Some((windows, None, _)) => return windows,
+            Some((windows, Some(next), at)) => (windows, next, Some(at)),
+            None => (Vec::new(), 0, None),
+        };
         let share = deadline.saturating_duration_since(now) / 2;
         let until = now + share.min(PROBE_BUDGET);
-        let (windows, complete) = probe(pid, until);
-        if complete {
-            retain_all(&windows);
-            let mut cache = CACHE.lock().unwrap_or_else(|poison| poison.into_inner());
-            if let Some(index) = cache.iter().position(|entry| entry.pid == pid) {
-                release_all(&cache.swap_remove(index).windows);
-            }
-            cache.push(Entry {
-                pid,
-                at: Instant::now(),
-                windows: windows.clone(),
-            });
+        let (found, next) = probe(pid, from, until);
+        windows.extend(found);
+        let reach = |next: Option<u64>| next.unwrap_or(TOKEN_ID_RANGE);
+        let mut cache = CACHE.lock().unwrap_or_else(|poison| poison.into_inner());
+        let index = cache.iter().position(|entry| entry.pid == pid);
+        let current = index.map(|index| (cache[index].at, reach(cache[index].next)));
+        if !publishes(base, current, reach(next)) {
+            return windows;
         }
+        if let Some(index) = index {
+            release_all(&cache.swap_remove(index).windows);
+        }
+        retain_all(&windows);
+        cache.push(Entry {
+            pid,
+            at: base.unwrap_or(now),
+            windows: windows.clone(),
+            next,
+        });
         windows
     }
 

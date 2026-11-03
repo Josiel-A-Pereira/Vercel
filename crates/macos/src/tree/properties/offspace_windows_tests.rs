@@ -1,6 +1,7 @@
 use super::imp::{
-    is_array, is_mergeable, is_ranged_mergeable, is_windows_attribute, slice, token_bytes,
+    is_array, is_mergeable, is_ranged_mergeable, is_windows_attribute, publishes, slice,
 };
+use crate::tree::properties::offspace_probe::token_bytes;
 use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
 
@@ -68,4 +69,18 @@ fn only_arrays_reach_the_array_api() {
     assert!(is_array(empty.as_CFTypeRef()));
     assert!(!is_array(text.as_CFTypeRef()));
     assert!(!is_array(std::ptr::null()));
+}
+
+#[test]
+fn a_probe_saves_only_progress_on_its_own_entry() {
+    use std::time::{Duration, Instant};
+    let first = Instant::now();
+    let newer = first + Duration::from_millis(5);
+    assert!(publishes(None, None, 40));
+    assert!(publishes(Some(first), Some((first, 40)), 90));
+    assert!(!publishes(Some(first), Some((first, 90)), 40));
+    assert!(!publishes(Some(first), None, 90));
+    assert!(!publishes(Some(first), Some((newer, 10)), 90));
+    assert!(publishes(None, Some((newer, 10)), 90));
+    assert!(!publishes(None, Some((newer, 90)), 90));
 }
