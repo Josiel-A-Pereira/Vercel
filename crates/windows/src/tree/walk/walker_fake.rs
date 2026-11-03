@@ -237,17 +237,29 @@ pub(crate) fn window() -> WindowInfo {
 
 pub(crate) fn walk(fake: &FakeTree, budget: WalkBudget) -> WalkOutcome {
     let window = window();
-    walk_from_root(fake, &1, &ObservationRoot::Window(&window), budget)
-        .expect("the walk assembles an observation")
+    walk_from_root(
+        fake,
+        &1,
+        &ObservationRoot::Window(&window),
+        agent_desktop_core::SnapshotSurface::Window,
+        budget,
+    )
+    .expect("the walk assembles an observation")
 }
 
 /// Runs a walk that is expected not to assemble an observation at all, so the
 /// error the caller receives can be asserted.
 pub(crate) fn walk_expecting_failure(fake: &FakeTree, budget: WalkBudget) -> AdapterError {
     let window = window();
-    walk_from_root(fake, &1, &ObservationRoot::Window(&window), budget)
-        .err()
-        .expect("the walk was expected to fail")
+    walk_from_root(
+        fake,
+        &1,
+        &ObservationRoot::Window(&window),
+        agent_desktop_core::SnapshotSurface::Window,
+        budget,
+    )
+    .err()
+    .expect("the walk was expected to fail")
 }
 
 #[cfg(target_os = "windows")]

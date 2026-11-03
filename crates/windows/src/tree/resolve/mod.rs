@@ -165,3 +165,7 @@ pub(crate) mod resolve_search;
 #[cfg(all(test, target_os = "windows"))]
 #[path = "resolve_tests.rs"]
 mod windows_only;
+
+#[cfg(all(test, target_os = "windows"))]
+#[path = "resolve_popover_tests.rs"]
+mod popover_tests;
