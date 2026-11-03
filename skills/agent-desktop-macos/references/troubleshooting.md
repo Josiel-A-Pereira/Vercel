@@ -72,6 +72,18 @@ For Automation, open Privacy & Security > Automation and allow the launching app
 
 **Fix.** Dismiss the open menu with `press escape`, then run `select` again.
 
+## A value write lands in Chromium window chrome but the app does not act on it
+
+**Symptom.** `set-value` or `type` on a Chromium browser control, such as Chrome's address bar, reports `delivered_verified` with `verification_scope: "element_value"` and `details.application_commit: "not_verified"`. The field reads back the new text in `post_state`, but the browser does not act on it: `press return` does not navigate, or navigates to the previous address, and the window title does not change.
+
+**Cause.** The accessibility value path writes the element's `AXValue`. Chromium mirrors that value into the browser-chrome widget without running its own input pipeline, so the navigation model still holds the previous text. The write is verified at element level precisely because the application commit is outside that contract; read the `application_commit` and `verification_scope` fields instead of assuming a verified value reached the app.
+
+**Fix.**
+
+1. For browser chrome, type with `--headed`: physical keystrokes run the app's input pipeline.
+2. Or keep navigation out of the app: `open "<url>"` (default browser) or `open -a "App" "<url>"`. Confirm with `list-windows` (the title changes), then `snapshot --window-id`.
+3. Web content inside the `webarea` is unaffected: refs, `click` and `set-value` on page elements work headless.
+
 ## APP_NOT_FOUND or WINDOW_NOT_FOUND
 
 **Fix.** Run `agent-desktop launch "App Name"` (display name or bundle ID). Then run `list-windows --app "App"`. A full-screen app still appears in `list-windows`, but its bounds equal the screen and its state can lag behind animations, so use `wait`.
