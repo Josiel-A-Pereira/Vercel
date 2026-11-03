@@ -367,6 +367,8 @@ pub(crate) mod fixture_overlay;
 #[cfg(all(test, target_os = "windows"))]
 pub(crate) mod fixture_pattern;
 #[cfg(all(test, target_os = "windows"))]
+pub(crate) mod fixture_popover;
+#[cfg(all(test, target_os = "windows"))]
 pub(crate) mod fixture_spawn;
 #[cfg(all(test, target_os = "windows"))]
 pub(crate) mod fixture_window;
