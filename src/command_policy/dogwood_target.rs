@@ -7,8 +7,8 @@
 //! `system`.
 
 use agent_desktop_core::{
-    AppInfo, Deadline, ErrorCode, PlatformAdapter, Point, ProcessId, WindowFilter, WindowInfo,
-    context::CommandContext, refs::refs_store::RefStore,
+    AppInfo, Deadline, ErrorCode, PlatformAdapter, Point, ProcessId, SnapshotSurface, WindowFilter,
+    WindowInfo, context::CommandContext, refs::refs_store::RefStore,
 };
 use agent_desktop_policy::TargetFacts;
 
@@ -81,6 +81,34 @@ impl<'a> Resolver<'a> {
                 })
             }
             TargetPlan::Unnamed(reason) => Err((*reason).to_string()),
+            TargetPlan::Shell { surface, app } => self.shell(*surface, *app),
+        }
+    }
+
+    /// The shell process hosting `surface`, which is what the command reads.
+    /// A platform that resolves no shell surface reads the app's windows, or
+    /// the focused window, as the command itself does.
+    fn shell(
+        &mut self,
+        surface: SnapshotSurface,
+        app: Option<&str>,
+    ) -> Result<Vec<TargetFacts>, String> {
+        match self
+            .adapter
+            .resolve_shell_surface(surface, lookup_deadline()?)
+        {
+            Ok(window) => self.window(Some(window)).map(|target| vec![target]),
+            Err(error) if error.is_default_not_supported("resolve_shell_surface") => {
+                self.resolve(&match app {
+                    Some(app) => TargetPlan::AppWindows(app),
+                    None => TargetPlan::Focused,
+                })
+            }
+            Err(error) => Err(format!(
+                "the {} surface could not be read: {}",
+                surface.as_str(),
+                error.message
+            )),
         }
     }
 

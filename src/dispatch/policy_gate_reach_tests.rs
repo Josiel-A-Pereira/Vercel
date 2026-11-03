@@ -1,6 +1,6 @@
 //! What a command can reach beyond the app it names: the titles of the
-//! app's windows, the notifications of apps it does not name, and the
-//! history a one-shot process leaves behind.
+//! app's windows, the shell surfaces of the OS, the notifications of apps
+//! it does not name, and the history a one-shot process leaves behind.
 
 use super::policy_gate_desk::{Scenario, Screen, error_code};
 
@@ -85,6 +85,74 @@ fn naming_the_app_judges_every_window_it_may_act_on() {
         error_code(&scenario.run(&["snapshot", "--window-id", "w-news", "-i"])),
         "POLICY_DENIED",
         "naming the one window keeps the judgment to that window"
+    );
+}
+
+const HANDS_OFF_THE_DOCK: &str = r#"@id("allow-all")
+permit (principal, action, resource);
+
+@id("hands-off-the-dock")
+forbid (principal, action, resource in Desktop::AppId::"com.apple.dock");
+"#;
+
+#[test]
+fn a_shell_surface_is_judged_as_the_shell_process_that_hosts_it() {
+    let scenario = Scenario::new(HANDS_OFF_THE_DOCK);
+    let mut screen = scenario.adapter.screen.lock().unwrap();
+    screen.apps = vec![
+        Screen::app("Dock", "com.apple.dock"),
+        Screen::app("TextEdit", "com.apple.TextEdit"),
+    ];
+    screen.windows = vec![Screen::window(
+        "w-notes",
+        "TextEdit",
+        "Notes",
+        (0.0, 0.0, 400.0, 400.0),
+    )];
+    screen.focused = Some("w-notes".to_string());
+    screen.shell = Some(Screen::window(
+        "w-dock",
+        "Dock",
+        "Dock",
+        (0.0, 900.0, 1440.0, 80.0),
+    ));
+    drop(screen);
+    for args in [
+        &["snapshot", "--surface", "dock", "-i"][..],
+        &["snapshot", "--surface", "dock", "--app", "TextEdit"],
+        &["find", "--surface", "dock", "--role", "button"],
+    ] {
+        let result = scenario.run(args);
+        assert_eq!(
+            kind_of(&result).as_deref(),
+            Some("dogwood_policy"),
+            "{args:?}: {result:?}"
+        );
+    }
+    assert!(
+        policies_allowed(&scenario.run(&["snapshot", "-i"])),
+        "the focused TextEdit window stays readable"
+    );
+}
+
+#[test]
+fn a_platform_without_shell_surfaces_judges_the_window_it_falls_back_to() {
+    let scenario = Scenario::new(HANDS_OFF_THE_DOCK);
+    let mut screen = scenario.adapter.screen.lock().unwrap();
+    screen.apps = vec![Screen::app("Dock", "com.apple.dock")];
+    screen.windows = vec![Screen::window(
+        "w-dock",
+        "Dock",
+        "Dock",
+        (0.0, 900.0, 1440.0, 80.0),
+    )];
+    screen.focused = Some("w-dock".to_string());
+    drop(screen);
+    let result = scenario.run(&["snapshot", "--surface", "taskbar", "-i"]);
+    assert_eq!(
+        kind_of(&result).as_deref(),
+        Some("dogwood_policy"),
+        "{result:?}"
     );
 }
 

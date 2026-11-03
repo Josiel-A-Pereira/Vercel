@@ -143,6 +143,13 @@ not running is judged as the installed app the name would launch.
   focused window when neither is named. With `--app`, every listed window of
   that app is judged with its title, since the command may act on any of
   them, so a rule over `context.input.window` holds without `--window-id`.
+- `snapshot` and `find` on a shell surface (`--surface dock`,
+  `menu-bar-extras`, `taskbar`, `start-menu` and the other OS chrome kinds)
+  are judged as the shell process that hosts it, such as the Dock, whatever
+  `--app` names. `menu-bar-extras --app <name>` reads that app's own status
+  item and is judged as that app. `open-system-surface` is judged as
+  `system`: it answers with the surface's window id, not what the surface
+  shows.
 - Keyboard input (`press` without `--app`, `key-down`, `key-up`) is judged as
   the focused window's app, `press --window-id` as that window's owner, and
   `press --app` as every window of that app.

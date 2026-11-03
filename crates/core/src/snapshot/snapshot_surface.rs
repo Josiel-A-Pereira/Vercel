@@ -55,6 +55,24 @@ impl SnapshotSurface {
         matches!(surface, Self::Window)
     }
 
+    /// Whether the surface names OS chrome rather than a window's own
+    /// sub-surface: the kinds an adapter may resolve directly, with no owning
+    /// application and no window in the inventory. Derived from the variant
+    /// alone, never from a platform check, so the seam stays platform-neutral.
+    pub fn is_shell(self) -> bool {
+        matches!(
+            self,
+            Self::StartMenu
+                | Self::Taskbar
+                | Self::SystemTray
+                | Self::SystemTrayOverflow
+                | Self::ActionCenter
+                | Self::QuickSettings
+                | Self::Dock
+                | Self::MenuBarExtras
+        )
+    }
+
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Window => "window",

@@ -3,6 +3,8 @@
 //! ref store or ask the platform adapter, so the gate resolves plans only
 //! once policy discovery has found policies.
 
+use agent_desktop_core::SnapshotSurface;
+
 use crate::cli::Commands;
 use crate::cli_args::WindowScope;
 use crate::dispatch::parse::parse_xy;
@@ -29,6 +31,13 @@ pub(super) enum TargetPlan<'a> {
     Running,
     /// The command names nothing the gate can judge it by.
     Unnamed(&'static str),
+    /// OS chrome such as the Dock or the taskbar, observed through the shell
+    /// process that hosts it; where the platform resolves no shell surface,
+    /// the command falls back to the app's windows, or the focused window.
+    Shell {
+        surface: SnapshotSurface,
+        app: Option<&'a str>,
+    },
 }
 
 const NOTIFICATION_APP_UNNAMED: &str = "the notification's app is not named; pass --expected-app with the app list-notifications reports";
@@ -51,11 +60,11 @@ pub(super) fn plan_for(cmd: &Commands) -> Option<Vec<TargetPlan<'_>>> {
 
         Commands::Snapshot(args) => match &args.root {
             Some(root) => TargetPlan::Ref(root),
-            None => window_scope(&args.scope),
+            None => surface_scope(&args.scope, args.surface.to_core()),
         },
         Commands::Find(args) => match &args.root {
             Some(root) => TargetPlan::Ref(root),
-            None => window_scope(&args.scope),
+            None => surface_scope(&args.scope, args.surface.to_core()),
         },
         Commands::Screenshot(args) => {
             let names_a_window = args.scope.app.is_some() || args.scope.window_id.is_some();
@@ -164,6 +173,20 @@ fn window_scope(scope: &WindowScope) -> TargetPlan<'_> {
         (None, Some(app)) => TargetPlan::AppWindows(app),
         (None, None) => TargetPlan::Focused,
     }
+}
+
+/// A shell surface is read from the shell process, whatever app is named,
+/// unless a window id names the window or `--app` names the app whose own
+/// status item `menu-bar-extras` reads.
+fn surface_scope(scope: &WindowScope, surface: SnapshotSurface) -> TargetPlan<'_> {
+    let app_status_item = scope.app.is_some() && surface == SnapshotSurface::MenuBarExtras;
+    if surface.is_shell() && !app_status_item && scope.window_id.is_none() {
+        return TargetPlan::Shell {
+            surface,
+            app: scope.app.as_deref(),
+        };
+    }
+    window_scope(scope)
 }
 
 /// Without an app filter, the notifications of every running app are in

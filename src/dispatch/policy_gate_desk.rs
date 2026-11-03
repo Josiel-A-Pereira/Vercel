@@ -10,8 +10,8 @@ use agent_desktop_core::{
     ActionOps, AdapterError, AppInfo, ClipboardContent, ClipboardFormat, Deadline, ErrorCode,
     InputOps, InstalledApp, InteractionLease, NativeHandle, ObservationOps, ObservationRequest,
     ObservationRoot, ObservedTree, OperationReport, OperationTarget, PermissionReport, Point,
-    PolicyPaths, ProcessId, Rect, RefEntry, SystemOps, WindowFilter, WindowInfo, WindowState,
-    context::CommandContext,
+    PolicyPaths, ProcessId, Rect, RefEntry, SnapshotSurface, SystemOps, WindowFilter, WindowInfo,
+    WindowState, context::CommandContext,
 };
 use clap::Parser;
 
@@ -37,6 +37,8 @@ pub(super) struct Screen {
     pub(super) apps: Vec<AppInfo>,
     pub(super) installed: Vec<InstalledApp>,
     pub(super) inventory_broken: bool,
+    /// The window the platform's shell surface resolves to, when it has one.
+    pub(super) shell: Option<WindowInfo>,
 }
 
 /// Each scenario app runs as its own process, so a window or ref is owned
@@ -125,6 +127,19 @@ impl ObservationOps for DeskAdapter {
     ) -> Result<Vec<WindowInfo>, AdapterError> {
         self.target_queries.fetch_add(1, Ordering::SeqCst);
         Ok(self.screen.lock().unwrap().windows.clone())
+    }
+
+    fn resolve_shell_surface(
+        &self,
+        _surface: SnapshotSurface,
+        _deadline: Deadline,
+    ) -> Result<WindowInfo, AdapterError> {
+        self.screen
+            .lock()
+            .unwrap()
+            .shell
+            .clone()
+            .ok_or_else(|| AdapterError::not_supported("resolve_shell_surface"))
     }
 
     fn observe_tree(
