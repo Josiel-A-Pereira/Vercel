@@ -25,10 +25,41 @@ export const outsideWindow = (data, windowId) => {
   return ids.length === 0 || ids.some((id) => id !== windowId);
 };
 
+/** Windows reports the menu bar with the `menu` role too; it never owns the screen. */
+export const isMenuBar = (n) => n.role === "menu" && /menu ?bar/i.test(n.role_description ?? "");
+
+/**
+ * XAML announces an open popup in its owner's tree as a `window` child named
+ * exactly "Pop-up", one per open popup, carrying no geometry. A parent menu
+ * announces its open submenu the same way inside its own popup.
+ */
+export const isPopupHint = (n) => n.role === "window" && /^pop-?up$/i.test(n.name ?? "");
+
+export const popupHints = (tree) => {
+  const found = [];
+  const walk = (n, depth) => {
+    if (depth > 0 && isPopupHint(n)) found.push(n);
+    for (const c of n.children ?? []) walk(c, depth + 1);
+  };
+  walk(tree, 0);
+  return found;
+};
+
+export const hasState = (tree, state) => {
+  let found = false;
+  const walk = (n) => {
+    if (found) return;
+    if ((n.states ?? []).includes(state)) found = true;
+    for (const c of n.children ?? []) walk(c);
+  };
+  walk(tree);
+  return found;
+};
+
 export const overlayRole = (tree) => {
   let found = null;
   const walk = (n) => {
-    if (!found && ["sheet", "alert", "menu", "popover"].includes(n.role)) found = n.role;
+    if (!found && ["sheet", "alert", "menu", "popover"].includes(n.role) && !isMenuBar(n)) found = n.role;
     for (const c of n.children ?? []) walk(c);
   };
   walk(tree);
