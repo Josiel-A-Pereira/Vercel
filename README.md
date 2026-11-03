@@ -182,6 +182,11 @@ On Windows, replace `agent-desktop-macos` in that list with `agent-desktop-windo
 | Report a vulnerability | [SECURITY.md](SECURITY.md) |
 | Get help | [SUPPORT.md](SUPPORT.md) |
 
+## Requirements
+
+- A stable Rust toolchain (install with rustup)
+- A local `.env` created from `.env.example`
+
 ## License
 
 Apache-2.0
