@@ -172,6 +172,7 @@ fn handle(control: &CursorOverlayControl, state: &mut OverlayState) -> Result<bo
         owned = CursorOverlayInstruction::new(bridge::initial_point()?, &config, false)?;
         &owned
     };
+    bridge::anchor(instruction);
     render(instruction, state)?;
     apply_landing_memory(control, state, Some(instruction));
     advance_moves(control, state);

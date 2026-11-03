@@ -1,6 +1,7 @@
 #import "cursor_overlay_chrome.h"
 
 const CGFloat ADRippleSize = 108.0;
+static const NSWindowLevel ADCursorLevel = NSPopUpMenuWindowLevel + 2;
 static const NSWindowLevel ADEffectLevel = NSPopUpMenuWindowLevel + 1;
 static const NSUInteger ADRippleRings = 2;
 // Room around the highlight for its glow and the pop it starts with, both of
@@ -14,6 +15,12 @@ static AgentDesktopCursorStyle ADCurrentStyle = {
     .size = 1.0,
 };
 
+static NSInteger ADAnchorWindow = 0;
+static pid_t ADAnchorPid = 0;
+static __weak NSWindow *ADStackCursor = nil;
+static __weak NSWindow *ADStackBubble = nil;
+static __weak NSWindow *ADStackRipple = nil;
+static CGPoint ADAnchorPoint = {0.0, 0.0};
 static __strong NSWindow *ADHighlightWindow = nil;
 static __strong CALayer *ADHighlightBorder = nil;
 static __strong NSWindow *ADTrailWindow = nil;
@@ -32,7 +39,6 @@ static void ADTrailRender(void) {
     }
     if (ADTrailWindow == nil) {
         ADTrailWindow = ADWindow(frame);
-        ADTrailWindow.level = ADEffectLevel;
         ADTrailLayer = [CAShapeLayer layer];
         ADTrailLayer.fillColor = ADColor(ADCurrentStyle.accent, 0.9);
         ADTrailLayer.strokeColor = ADColor(ADCurrentStyle.accent, 0.9);
@@ -53,7 +59,9 @@ static void ADTrailRender(void) {
     CGPathRef localPath = CGPathCreateCopyByTransformingPath(ADTrailPath, &translation);
     ADTrailLayer.path = localPath;
     CGPathRelease(localPath);
-    [ADTrailWindow orderFrontRegardless];
+    if (!ADTrailWindow.isVisible) {
+        ADPlace(ADTrailWindow);
+    }
 }
 
 CGColorRef ADColor(const double *rgb, CGFloat alpha) {
@@ -92,9 +100,11 @@ NSWindow *ADWindow(NSRect frame) {
     window.ignoresMouseEvents = YES;
     window.releasedWhenClosed = NO;
     window.hidesOnDeactivate = NO;
-    window.level = NSPopUpMenuWindowLevel + 2;
+    window.level = ADCursorLevel;
     window.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
-                                NSWindowCollectionBehaviorFullScreenAuxiliary;
+                                NSWindowCollectionBehaviorFullScreenAuxiliary |
+                                NSWindowCollectionBehaviorTransient |
+                                NSWindowCollectionBehaviorIgnoresCycle;
     NSView *view = [[NSView alloc]
         initWithFrame:NSMakeRect(0.0, 0.0, frame.size.width, frame.size.height)];
     view.wantsLayer = YES;
@@ -135,7 +145,6 @@ static CAShapeLayer *ADRing(CGFloat radius, BOOL filled) {
 
 NSWindow *ADRippleWindow(void) {
     NSWindow *window = ADWindow(NSMakeRect(0.0, 0.0, ADRippleSize, ADRippleSize));
-    window.level = ADEffectLevel;
     [window.contentView.layer addSublayer:ADRing(19.0, YES)];
     for (NSUInteger index = 0; index < ADRippleRings; index += 1) {
         [window.contentView.layer addSublayer:ADRing(ADRippleSize * 0.5 - 4.0, NO)];
@@ -145,7 +154,7 @@ NSWindow *ADRippleWindow(void) {
 
 void ADRipplePlay(NSWindow *window) {
     NSArray<CALayer *> *layers = window.contentView.layer.sublayers;
-    [window orderFrontRegardless];
+    ADPlace(window);
     for (NSUInteger index = 0; index < layers.count; index += 1) {
         CAShapeLayer *layer = (CAShapeLayer *)layers[index];
         [layer removeAllAnimations];
@@ -187,7 +196,6 @@ static CAKeyframeAnimation *ADHold(NSString *path,
 void ADHighlightShow(NSRect frame, double seconds) {
     if (ADHighlightWindow == nil) {
         ADHighlightWindow = ADWindow(frame);
-        ADHighlightWindow.level = ADEffectLevel;
         ADHighlightBorder = [CALayer layer];
         ADHighlightBorder.borderWidth = 2.5;
         ADHighlightBorder.cornerRadius = 8.0;
@@ -216,7 +224,7 @@ void ADHighlightShow(NSRect frame, double seconds) {
                                            @[ @0.0, @0.12, @0.22, @1.0 ],
                                            seconds)
                              forKey:@"agent-highlight-pop"];
-    [ADHighlightWindow orderFrontRegardless];
+    ADPlace(ADHighlightWindow);
 }
 
 static __strong NSWindow *ADCaretWindow = nil;
@@ -225,7 +233,6 @@ static __strong CALayer *ADCaretBar = nil;
 void ADCaretShow(NSRect frame) {
     if (ADCaretWindow == nil) {
         ADCaretWindow = ADWindow(frame);
-        ADCaretWindow.level = ADEffectLevel;
         ADCaretBar = [CALayer layer];
         ADCaretBar.cornerRadius = 1.0;
         ADFreezeLayer(ADCaretBar);
@@ -234,7 +241,7 @@ void ADCaretShow(NSRect frame) {
     ADCaretBar.backgroundColor = ADColor(ADCurrentStyle.accent, 1.0);
     [ADCaretWindow setFrame:frame display:NO];
     ADCaretBar.frame = CGRectMake(0.0, 0.0, frame.size.width, frame.size.height);
-    [ADCaretWindow orderFrontRegardless];
+    ADPlace(ADCaretWindow);
     [CATransaction flush];
 }
 
@@ -342,5 +349,129 @@ void ADShowBubble(NSTextField *text, NSRect frame, bool changed) {
         [surface addAnimation:fade forKey:@"agent-bubble-fade"];
         [surface addAnimation:pop forKey:@"agent-bubble-pop"];
     }
-    [bubble orderFrontRegardless];
+    ADPlace(bubble);
+}
+
+/// Names the cursor, label and ripple windows, which the cursor bridge owns,
+/// so `ADPlaceAll` can stack them with the effect windows this file owns.
+void ADStackWindows(NSWindow *cursor, NSWindow *bubble, NSWindow *ripple) {
+    ADStackCursor = cursor;
+    ADStackBubble = bubble;
+    ADStackRipple = ripple;
+}
+
+/// The overlay windows that exist, bottom to top: the effects, then the cursor
+/// and its label.
+static NSArray<NSWindow *> *ADStacked(void) {
+    NSWindow *stack[] = {ADStackRipple, ADHighlightWindow, ADCaretWindow,
+                         ADTrailWindow, ADStackCursor, ADStackBubble};
+    NSMutableArray<NSWindow *> *windows = [NSMutableArray array];
+    for (size_t index = 0; index < sizeof stack / sizeof *stack; index += 1) {
+        if (stack[index] != nil) {
+            [windows addObject:stack[index]];
+        }
+    }
+    return windows;
+}
+
+/// Without an anchor, shows `window` in front at its own level, above every
+/// app window, menu and system panel. With one, shows it at the normal level
+/// directly above the window numbered `below`, so windows in front of the
+/// target also cover the overlay.
+static void ADOrder(NSWindow *window, NSInteger below) {
+    bool cursor = window == ADStackCursor || window == ADStackBubble;
+    NSWindowLevel level = ADAnchorWindow != 0 ? NSNormalWindowLevel
+                          : cursor            ? ADCursorLevel
+                                              : ADEffectLevel;
+    if (window.level != level) {
+        window.level = level;
+    }
+    if (ADAnchorWindow == 0) {
+        [window orderFrontRegardless];
+    } else {
+        [window orderWindow:NSWindowAbove relativeTo:below];
+    }
+}
+
+/// Shows `window` in its slot of the overlay stack: above the nearest shown
+/// window below that slot, or above the anchor when there is none.
+void ADPlace(NSWindow *window) {
+    NSInteger below = ADAnchorWindow;
+    for (NSWindow *stacked in ADStacked()) {
+        if (stacked == window) {
+            break;
+        }
+        if (stacked.isVisible) {
+            below = stacked.windowNumber;
+        }
+    }
+    ADOrder(window, below);
+}
+
+/// Shows every visible overlay window again in stack order, for a new anchor
+/// or after the user raised the target over the overlay.
+static void ADPlaceAll(void) {
+    for (NSWindow *window in ADStacked()) {
+        if (window.isVisible) {
+            ADPlace(window);
+        }
+    }
+}
+
+/// The frontmost on-screen window of `pid` that contains `point`, in global
+/// top-left coordinates, or 0. Only a normal-layer window can anchor the
+/// overlay: a menu, popover or panel at a higher layer returns 0, so the
+/// overlay stays above it the way it does without an owner. `stacked` says
+/// whether this process's windows still sit directly in front of it.
+static NSInteger ADOwnerWindowAt(pid_t pid, CGPoint point, bool *stacked) {
+    CFArrayRef windows = CGWindowListCopyWindowInfo(
+        kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
+    if (windows == NULL) {
+        return 0;
+    }
+    NSInteger anchor = 0;
+    pid_t previous = 0;
+    for (NSDictionary *info in (__bridge NSArray *)windows) {
+        pid_t owner = [info[(id)kCGWindowOwnerPID] intValue];
+        CGRect bounds = CGRectZero;
+        if (owner != pid || [info[(id)kCGWindowAlpha] doubleValue] <= 0.0 ||
+            !CGRectMakeWithDictionaryRepresentation(
+                (__bridge CFDictionaryRef)info[(id)kCGWindowBounds], &bounds) ||
+            !CGRectContainsPoint(bounds, point)) {
+            previous = owner;
+            continue;
+        }
+        if ([info[(id)kCGWindowLayer] integerValue] == 0) {
+            anchor = [info[(id)kCGWindowNumber] integerValue];
+            *stacked = previous == getpid();
+        }
+        break;
+    }
+    CFRelease(windows);
+    return anchor;
+}
+
+/// Looks the anchor window up again from the remembered owner and point,
+/// because an action can close the target window or open a sheet or dialog
+/// over it, and stacks the overlay again when the anchor changed or the user
+/// raised the target over it.
+void agent_desktop_cursor_overlay_reanchor(void) {
+    @autoreleasepool {
+        NSInteger previous = ADAnchorWindow;
+        bool stacked = true;
+        ADAnchorWindow =
+            ADAnchorPid == 0 ? 0 : ADOwnerWindowAt(ADAnchorPid, ADAnchorPoint, &stacked);
+        if (ADAnchorWindow != previous || !stacked) {
+            ADPlaceAll();
+        }
+    }
+}
+
+/// Remembers the process that owns the target and the point the cursor moves
+/// to, and anchors to that process's window there. A pid of 0 draws the
+/// overlay above every window.
+void agent_desktop_cursor_overlay_anchor(uint32_t pid, double x, double y) {
+    ADAnchorPid = (pid_t)pid;
+    ADAnchorPoint = CGPointMake(x, y);
+    agent_desktop_cursor_overlay_reanchor();
 }

@@ -1,6 +1,7 @@
 use agent_desktop_core::{
     AdapterError, CURSOR_HIGHLIGHT_HOLD_MS, CursorImage, CursorOverlayInstruction,
-    CursorOverlayStyle, CursorPhase, CursorPose, ErrorCode, LabelPill, Point, Rect, place_label,
+    CursorOverlayStyle, CursorPhase, CursorPose, ErrorCode, LabelPill, Point, ProcessId, Rect,
+    place_label,
 };
 use std::ffi::{CString, c_char};
 
@@ -56,6 +57,8 @@ unsafe extern "C" {
         hotspot_y: f64,
     ) -> bool;
     fn agent_desktop_cursor_overlay_idle();
+    fn agent_desktop_cursor_overlay_anchor(pid: u32, x: f64, y: f64);
+    fn agent_desktop_cursor_overlay_reanchor();
     fn agent_desktop_cursor_overlay_label_width(label: *const c_char) -> f64;
     fn agent_desktop_cursor_overlay_caret(x: f64, y: f64, width: f64, height: f64);
     fn agent_desktop_cursor_overlay_caret_clear();
@@ -107,6 +110,23 @@ pub(super) fn apply_caret(instruction: &CursorOverlayInstruction, at: Option<&Po
         unsafe { agent_desktop_cursor_overlay_caret_clear() }
     }
     false
+}
+
+/// Anchors the overlay to the window of the process that owns the target. A
+/// travel names the owner, and a drag or a travel to raw coordinates clears
+/// it. A key press goes to the frontmost app, so the caret that follows one
+/// clears it too. An effect or caret keeps the owner and looks its window up
+/// again, because the action may have closed it or opened a sheet over it.
+pub(super) fn anchor(instruction: &CursorOverlayInstruction) {
+    let at = instruction.destination();
+    if instruction.moves_cursor() {
+        let pid = instruction.owner().map_or(0, ProcessId::get);
+        unsafe { agent_desktop_cursor_overlay_anchor(pid, at.x, at.y) }
+    } else if instruction.phase() == CursorPhase::CaretFollow {
+        unsafe { agent_desktop_cursor_overlay_anchor(0, at.x, at.y) }
+    } else {
+        unsafe { agent_desktop_cursor_overlay_reanchor() }
+    }
 }
 
 pub(super) fn begin_drag(from: &Point, trail: bool) {

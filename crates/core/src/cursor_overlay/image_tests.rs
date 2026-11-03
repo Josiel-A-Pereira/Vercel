@@ -233,7 +233,7 @@ fn worst_case_image_present_fits_the_renderer_transport_limit() {
             width: 98_765.432_1,
             height: 98_765.432_1,
         }))
-        .with_pointer(true);
+        .with_arrival(crate::CursorArrival::new(true, None));
     let control = CursorOverlayControl::present_with_style("s".repeat(64), instruction, style)
         .with_motion({
             let mut motion = CursorMotionProfile::default();

@@ -32,3 +32,36 @@ fn only_travels_and_drags_depart() {
         "a drag sets off from its origin, where the cursor already is"
     );
 }
+
+#[test]
+fn the_owner_travels_only_when_named() {
+    let unowned = instruction(10.0, CursorPhase::Travel);
+    let wire = serde_json::to_value(&unowned).expect("encodes");
+    assert!(
+        wire.get("arrival").is_none(),
+        "an unowned arrow travel omits the field"
+    );
+
+    let owned = unowned.with_arrival(crate::CursorArrival::new(
+        false,
+        Some(crate::ProcessId::new(4242)),
+    ));
+    let wire = serde_json::to_value(&owned).expect("encodes");
+    assert_eq!(wire["arrival"], serde_json::json!({ "owner": 4242 }));
+    let decoded: CursorOverlayInstruction = serde_json::from_value(wire).expect("decodes");
+    assert_eq!(decoded.owner(), Some(crate::ProcessId::new(4242)));
+}
+
+#[test]
+fn only_travels_and_drags_move_the_cursor() {
+    for phase in [CursorPhase::Travel, CursorPhase::Drag] {
+        assert!(instruction(10.0, phase).moves_cursor(), "{phase:?}");
+    }
+    for phase in [
+        CursorPhase::Effect,
+        CursorPhase::Caret,
+        CursorPhase::CaretFollow,
+    ] {
+        assert!(!instruction(10.0, phase).moves_cursor(), "{phase:?}");
+    }
+}

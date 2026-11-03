@@ -172,6 +172,7 @@ fn enabled_cursor_moves_before_dispatch_then_clicks_after_it() {
         !travel.is_pointer(),
         "clicking into a text field keeps the arrow"
     );
+    assert_eq!(travel.owner(), Some(entry().process.pid));
     assert_eq!(click.destination(), &center);
     assert!(
         click.is_click(),

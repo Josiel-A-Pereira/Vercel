@@ -216,7 +216,7 @@ fn the_pointer_flag_is_omitted_from_json_unless_set() {
     let config = CursorOverlayConfig::enabled(None, 6).expect("valid config");
     let arrow = CursorOverlayInstruction::new(Point { x: 1.0, y: 2.0 }, &config, false).unwrap();
     assert!(!serde_json::to_string(&arrow).unwrap().contains("pointer"));
-    let pointer = arrow.with_pointer(true);
+    let pointer = arrow.with_arrival(crate::CursorArrival::new(true, None));
     let json = serde_json::to_string(&pointer).unwrap();
     assert!(json.contains(r#""pointer":true"#));
     let parsed: CursorOverlayInstruction = serde_json::from_str(&json).unwrap();

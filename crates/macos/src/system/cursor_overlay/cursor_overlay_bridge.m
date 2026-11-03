@@ -38,6 +38,7 @@ static const float ADLabelShadowOpacity = 0.31f;
 static const CGFloat ADLabelShadowOffset = 2.0;
 static const CGFloat ADLabelShadowBlur = 2.5;
 static const CGFloat ADHighlightPad = 5.0;
+static const CFTimeInterval ADRestackSeconds = 0.15;
 
 static __strong NSWindow *ADCursorWindow = nil;
 static __strong CALayer *ADPointer = nil;
@@ -51,6 +52,7 @@ static bool ADDragTrail = false;
 static CGPoint ADDragLast = {0.0, 0.0};
 static CFTimeInterval ADDragArmDeadline = 0.0;
 static CFTimeInterval ADDragDeadline = 0.0;
+static CFTimeInterval ADRestackedAt = 0.0;
 
 static void ADMoveCursor(const AgentDesktopCursorFrame *frame, double mainHeight);
 
@@ -231,6 +233,11 @@ double agent_desktop_cursor_overlay_label_width(const char *label) {
 void agent_desktop_cursor_overlay_idle(void) {
     @autoreleasepool {
         ADDragPoll();
+        CFTimeInterval now = CACurrentMediaTime();
+        if (ADCursorWindow.isVisible && now - ADRestackedAt >= ADRestackSeconds) {
+            ADRestackedAt = now;
+            agent_desktop_cursor_overlay_reanchor();
+        }
         ADPump(NSApplication.sharedApplication);
     }
 }
@@ -243,6 +250,7 @@ void agent_desktop_cursor_overlay_stop(void) {
     ADHighlightStop();
     ADCaretStop();
     ADTrailStop();
+    ADStackWindows(nil, nil, nil);
     ADCursorWindow = nil;
     ADPointer = nil;
     ADRipple = nil;
@@ -360,9 +368,10 @@ bool agent_desktop_cursor_overlay_drag_active(void) {
 }
 
 void agent_desktop_cursor_overlay_show(void) {
-    [ADCursorWindow orderFrontRegardless];
+    agent_desktop_cursor_overlay_reanchor();
+    ADPlace(ADCursorWindow);
     if (ADBubbleText.stringValue.length > 0) {
-        [ADBubbleWindow orderFrontRegardless];
+        ADPlace(ADBubbleWindow);
     }
 }
 
@@ -396,6 +405,7 @@ bool agent_desktop_cursor_overlay_run(const AgentDesktopCursorFrame *frames,
                 [ADCursorWindow.contentView.layer addSublayer:ADPointer];
                 ADBubbleWindow = ADBubble();
                 ADRipple = ADRippleWindow();
+                ADStackWindows(ADCursorWindow, ADBubbleWindow, ADRipple);
             }
             ADTintPointer();
             if ((config->flags & ADArrowOnDeparture) != 0) {
@@ -403,7 +413,7 @@ bool agent_desktop_cursor_overlay_run(const AgentDesktopCursorFrame *frames,
             }
             ADPointerImageApply(ADCursorWindow, ADPointer);
             bool pointsOnArrival = (config->flags & ADPointOnArrival) != 0;
-            [ADCursorWindow orderFrontRegardless];
+            ADPlace(ADCursorWindow);
 
             bool showsBubble =
                 config->label != NULL && config->label[0] != '\0' && config->bubble[2] > 0.0;

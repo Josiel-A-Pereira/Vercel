@@ -31,7 +31,7 @@ pub(super) fn before_dispatch(
         target.context,
         destination,
         lease,
-        pointer,
+        crate::CursorArrival::new(pointer, Some(target.entry.process.pid)),
     );
 }
 
@@ -62,7 +62,7 @@ pub(super) fn before_lease(
         context.context,
         destination.clone(),
         deadline,
-        pointer,
+        crate::CursorArrival::new(pointer, Some(context.entry.process.pid)),
     ) {
         TRAVELLED_BEFORE_LEASE.set(Some((destination.x, destination.y)));
     }

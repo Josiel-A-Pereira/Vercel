@@ -190,9 +190,8 @@ impl CursorOverlayControl {
 
     /// A pre-dispatch control must be acknowledged before its action dispatches.
     pub fn is_travel(&self) -> bool {
-        self.instruction().is_some_and(|instruction| {
-            matches!(instruction.phase(), CursorPhase::Travel | CursorPhase::Drag)
-        })
+        self.instruction()
+            .is_some_and(CursorOverlayInstruction::moves_cursor)
     }
 
     /// A caret-follow after a key press. A renderer that has rested has

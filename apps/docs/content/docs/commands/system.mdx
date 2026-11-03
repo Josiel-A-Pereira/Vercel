@@ -163,6 +163,8 @@ agent-desktop --session "$AGENT_DESKTOP_SESSION" cursor-overlay disable
 
 `rendered: false` means the setting was saved but nothing was drawn, as on Linux Wayland. With `--agent-id`, `enable` saves the style as that agent's profile. `disable` stops every cursor in the session; if teardown cannot be confirmed, the setting is still saved and the error's disposition is `delivery_uncertain`. How headed actions and the overlay interact is in [Headed mode](/desktop/guides/headed-mode#see-where-actions-land).
 
+On macOS, the overlay of a ref action sits directly above the target's window, so a window in front of the target also covers the cursor, its label and its effects. It follows the target when the target is raised again, and moves above a sheet or dialog the action opens. A target in a menu, popover or other panel above the normal window layer, and physical pointer input such as coordinate clicks, `hover` and `drag`, draw the overlay above every window.
+
 ## trace
 
 Reads the merged trace timeline of the active session. Both actions need an active session and no OS permission. Recording and privacy are in [Traces](/desktop/guides/traces).
