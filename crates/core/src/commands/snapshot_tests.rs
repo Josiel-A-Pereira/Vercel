@@ -361,3 +361,31 @@ fn root_and_wait_for_are_mutually_exclusive() {
         other => panic!("expected InvalidArgs, got {other:?}"),
     }
 }
+
+#[test]
+fn an_unproven_capture_is_flagged_in_the_payload() {
+    let mut result = crate::snapshot::SnapshotResult {
+        tree: crate::adapter::minimal_accessibility_node("window", "Fixture"),
+        refmap: crate::RefMap::new(),
+        window: WindowInfo {
+            id: "w-1".into(),
+            title: "Fixture".into(),
+            app: "Fixture".into(),
+            pid: crate::ProcessId::new(1),
+            process_instance: None,
+            bounds: None,
+            state: crate::WindowState::default(),
+        },
+        snapshot_id: None,
+        complete: true,
+        nodes_observed: 1,
+        identity_unproven: None,
+    };
+    let proven = format_snapshot_fields(&result, None, None).unwrap();
+    assert!(proven.get("identity_unproven").is_none());
+
+    result.identity_unproven = Some("the whole-window read was cut short".into());
+    let unproven = format_snapshot_fields(&result, None, None).unwrap();
+    assert_eq!(unproven["identity_unproven"], true);
+    assert_eq!(unproven["complete"], true);
+}

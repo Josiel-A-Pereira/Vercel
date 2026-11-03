@@ -2,8 +2,8 @@
 //! processes.
 //!
 //! The durable store takes a single-process lock, and several agent-desktop
-//! processes share one store: a command host per session, plus commands
-//! that bypass the host. Opening the store costs tens of milliseconds
+//! processes share one store, one per command and session running at the
+//! same time. Opening the store costs tens of milliseconds
 //! (recovery plus reloading the installed policies), so a process keeps it
 //! open across commands while nobody else needs it. A process that wants
 //! the store keeps a `wanted` marker fresh while it waits for the

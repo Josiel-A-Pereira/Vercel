@@ -97,8 +97,7 @@ forbid (principal, action == Desktop::Action::"list-displays", resource);
     let after = home.run(&["list-displays"]);
     assert_eq!(
         after["ok"], true,
-        "a layer applies only to the calls that carry it, even through a shared command host: \
-         {after}"
+        "a layer applies only to the calls that carry it: {after}"
     );
 }
 

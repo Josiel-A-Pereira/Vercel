@@ -313,6 +313,7 @@ fn source_entry() -> RefEntry {
             value: None,
             description: None,
             native_id: None,
+            unique_at_capture: true,
         },
         geometry: crate::RefGeometry {
             bounds_space: None,
@@ -329,6 +330,7 @@ fn source_entry() -> RefEntry {
             source_window_title: Some("Fixture".into()),
             source_window_bounds_hash: None,
             source_surface: SnapshotSurface::Menu,
+            renderer_accessibility_forced: false,
         },
         scope: crate::RefScope {
             root_ref: None,

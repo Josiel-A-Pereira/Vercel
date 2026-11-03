@@ -35,6 +35,10 @@ impl ObservationOps for MacOSAdapter {
         crate::tree::resolve::resolve_element_with_deadline(entry, deadline)
     }
 
+    fn retains_element_tokens(&self) -> bool {
+        crate::tree::resolve::retained::tokens_available()
+    }
+
     fn resolve_locator_anchor(
         &self,
         entry: &RefEntry,

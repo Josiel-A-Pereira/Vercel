@@ -110,10 +110,12 @@ The fail-closed process of re-identifying a ref from stored identity evidence be
 
 Strict ref resolution rejects missing, stale, and ambiguous matches instead of guessing. It is the boundary between an old observation and a live desktop mutation.
 
-### Graded Resolution
-The order a resolver follows to re-identify a ref, on the evidence the ref carries: it walks the stored positional path first, then falls back to a bounded broad search. A candidate is confirmed by identifier first, then by role-conditional stable text; only a ref with no meaningful identity can resolve by unique geometry, as a last resort. Each tier is a locator, never an identity by itself: a path or a bounds match is always verified against the stored identity evidence before it resolves.
+### Ref Re-identification
+The rule a stored ref resolves by, which either lands it on the element it was captured from or refuses.
 
-The geometry promotion is deliberately narrow: it fires only when the ref has no meaningful identity and stored bounds, and it resolves only on a unique live match. On Windows and Linux the stored bounds must also be a positive-area rectangle: a zero-extent stored hash never promotes, because offscreen and virtualized elements collapse to shared degenerate rectangles that are structurally non-unique (A17-7). macOS has no such check.
+On macOS the entry carries the element's own accessibility address in `retained_object`, so a later command turns the ref back into that element without searching. The address is accepted only while the element is alive and its process, role and recorded identifier still match, so a removed element or an app that restarted is a stale ref rather than a look-alike, and identical twins each keep their own ref. Where an app yields no address, macOS follows the rule below.
+
+Every other ref resolves from a capture proof. A ref is usable only when the capture saw its whole window completely and exactly one observed element matched its full predicate: role plus every recorded stable field, that is native id, stable name and description. Resolution re-counts that predicate over the live window and accepts exactly one match. Evidence and presentation are separate: a skeleton, a depth-limited snapshot and a `--root` drill are shallow presentations of one complete window observation, so their refs are counted against that whole window and each presented cut container keeps the count of what it hides. A window that cannot be read completely proves nothing, and its refs are refused rather than counted against a narrower tree. Zero matches is a stale ref, two or more is ambiguous, and a field the live read could not answer stays unknown rather than becoming a match, so incomplete evidence never resolves. Values and bounds are never identity. A ref that was not unique at capture is refused before anything is read from the application, because no search can pick one of two identical elements.
 
 ## Read Outcomes
 

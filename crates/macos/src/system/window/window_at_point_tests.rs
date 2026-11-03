@@ -127,6 +127,8 @@ fn every_point_is_judged_by_the_frontmost_window_over_it() {
 
 /// One round against a fresh listing; a window that moves during the round
 /// can disagree once, a hit test in the wrong order disagrees every round.
+/// Over another user's window the hit test may name the owner, when it can
+/// read the owner's identity (root's `loginwindow`), or refuse.
 fn first_mismatch_on_the_grid() -> Option<String> {
     let own = std::process::id() as i64;
     let stacked: Vec<_> = stacked_window_dictionaries()
@@ -138,12 +140,13 @@ fn first_mismatch_on_the_grid() -> Option<String> {
             let pid = int_field(&dictionary, "kCGWindowOwnerPID")?;
             let see_through = int_or_float_field(&dictionary, "kCGWindowAlpha") == Some(0.0);
             let menu_bar = int_field(&dictionary, "kCGWindowLayer") == Some(MAIN_MENU_LAYER);
-            let owner = if owned_by_another_user(pid) {
-                ANOTHER_USER.to_string()
-            } else {
-                owner
-            };
-            (!see_through && pid > 0 && pid != own).then_some((owner, bounds, menu_bar))
+            let another_user = owned_by_another_user(pid);
+            (!see_through && pid > 0 && pid != own).then_some((
+                owner,
+                bounds,
+                menu_bar,
+                another_user,
+            ))
         })
         .collect();
     let frontmost = super::super::window_inventory::focused_window_until(deadline())
@@ -155,22 +158,25 @@ fn first_mismatch_on_the_grid() -> Option<String> {
                 x: f64::from(x),
                 y: f64::from(y),
             };
-            let expected = stacked
+            let over = stacked
                 .iter()
-                .find(|(_, bounds, _)| contains(bounds, &point))
-                .and_then(|(owner, _, menu_bar)| {
-                    if *menu_bar {
-                        frontmost.clone()
-                    } else {
-                        Some(owner.clone())
-                    }
-                });
+                .find(|(_, bounds, _, _)| contains(bounds, &point));
+            let expected = over.and_then(|(owner, _, menu_bar, _)| {
+                if *menu_bar {
+                    frontmost.clone()
+                } else {
+                    Some(owner.clone())
+                }
+            });
+            let refusal_allowed =
+                over.is_some_and(|(_, _, menu_bar, another_user)| *another_user && !*menu_bar);
             let actual = match window_at_point_until(&point, deadline()) {
                 Ok(window) => window.map(|window| window.app),
                 Err(error) if refused_as_another_users(&error) => Some(ANOTHER_USER.to_string()),
                 Err(error) => panic!("hit test at ({x}, {y}): {error:?}"),
             };
-            if actual != expected {
+            let refused = actual.as_deref() == Some(ANOTHER_USER);
+            if actual != expected && !(refused && refusal_allowed) {
                 return Some(format!("at ({x}, {y}): {actual:?} != {expected:?}"));
             }
         }

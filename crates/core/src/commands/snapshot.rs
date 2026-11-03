@@ -148,6 +148,9 @@ pub(crate) fn format_snapshot_fields(
         body["truncated"] = json!(true);
         body["nodes_observed"] = json!(result.nodes_observed);
     }
+    if result.identity_unproven.is_some() {
+        body["identity_unproven"] = json!(true);
+    }
     if let Some(ms) = elapsed_ms {
         body["elapsed_ms"] = json!(ms);
     }

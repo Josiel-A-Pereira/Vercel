@@ -24,7 +24,7 @@ pub struct PolicyGate {
     text: String,
     content_stamp: String,
     /// Identity of the loaded source files (path, mtime, len), so a cached
-    /// gate in a long-lived host notices edits and reloads.
+    /// gate notices edits between the entries of a `batch` and reloads.
     source_stamp: u64,
     files: Vec<PathBuf>,
     store: StoreSlot,

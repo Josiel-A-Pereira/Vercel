@@ -260,5 +260,5 @@ owned by root fails the ownership check on purpose, so locking files in place
 is the way to keep them out of the agent's reach. Keep your own audit log if
 you need one: the engine's log is pruned and does not record verdicts.
 
-An edit to a policy file applies on the next command; the long-lived macOS
-command host re-checks file stamps on every call.
+An edit to a policy file applies on the next command, including the next
+entry of a running `batch`.

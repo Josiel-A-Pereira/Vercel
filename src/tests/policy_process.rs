@@ -230,7 +230,7 @@ fn a_world_writable_policy_source_is_refused() {
     );
 }
 
-/// Two sessions run side by side; on macOS each gets its own command host.
+/// Two sessions run side by side and share one policy store.
 /// Both must reach real verdicts: neither may find the policy store held by
 /// the other and fall back to "policies could not be enforced".
 #[test]
@@ -271,11 +271,10 @@ permit (principal, action == Desktop::Action::"list-displays", resource);
 #[path = "policy_layers_tests.rs"]
 mod layers;
 
-/// Every command is its own process off macOS, and a gate held in a static
-/// is never dropped, so the binary must close its stores itself before it
-/// exits; otherwise no store ever checkpoints and every open replays the
-/// whole log. 40 commands record 80 events, past the checkpoint interval.
-#[cfg(not(target_os = "macos"))]
+/// Every command is its own process, and a gate held in a static is never
+/// dropped, so the binary must close its stores itself before it exits;
+/// otherwise no store ever checkpoints and every open replays the whole
+/// log. 40 commands record 80 events, past the checkpoint interval.
 #[test]
 fn one_shot_processes_checkpoint_the_log_they_grow() {
     let home = PolicyHome::new("checkpoint");

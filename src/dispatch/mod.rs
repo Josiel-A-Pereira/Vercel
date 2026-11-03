@@ -25,6 +25,9 @@ mod policy_gate_app_identity_tests;
 mod policy_gate_desk;
 
 #[cfg(test)]
+mod policy_gate_desk_seed;
+
+#[cfg(test)]
 mod policy_gate_global_input_tests;
 
 #[cfg(test)]

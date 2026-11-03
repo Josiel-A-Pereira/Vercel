@@ -16,6 +16,7 @@ pub(crate) struct ResolvedPoint {
     pub focused: bool,
     pub source_entry: Option<crate::RefEntry>,
     pub bounds_hash: Option<u64>,
+    pub handle: Option<crate::NativeHandle>,
 }
 
 pub(crate) fn require_cursor_policy(
@@ -64,6 +65,7 @@ pub(crate) fn resolve_point_from_ref_or_xy_with_context(
             focused: false,
             source_entry: Some(entry),
             bounds_hash: bounds.bounds_hash(),
+            handle: Some(handle),
         });
     }
     if let Some((x, y)) = args.xy {
@@ -72,6 +74,7 @@ pub(crate) fn resolve_point_from_ref_or_xy_with_context(
             focused: false,
             source_entry: None,
             bounds_hash: None,
+            handle: None,
         });
     }
     Err(AppError::invalid_input(args.missing_input_message))

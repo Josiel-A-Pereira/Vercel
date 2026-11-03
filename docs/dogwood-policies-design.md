@@ -50,19 +50,11 @@ parse → permission preflight → context preflight → [dogwood request event 
 - **Response event, post-dispatch.** Submit a `"response"` event carrying the
   outcome (`ok`, error code, target app). Temporal clauses evaluate against these.
 
-### Engine placement on macOS
+### Engine placement
 
-On macOS nearly all commands are forwarded to the persistent command host
-(`command_host::forward`), which lives ~15 idle minutes per snapshot namespace.
-The engine should live there: one `DurableTemporalEngine` behind the host's
-existing serialization, opened once per host lifetime. That gives the temporal
-log a single writer and makes the "rolling limits can be exceeded by in-flight
-concurrent requests" caveat moot, because the host already processes requests
-one at a time. Commands that bypass the host (`needs_caller_process`), and
-Windows/Linux where there is no host, open the same durable store directly.
-
-redb takes a single-process lock, and one host per session plus host-bypassing
-commands all share the store. Opening it is not cheap: measured on an M-series
+Every command runs in its own process and opens the durable store directly.
+redb takes a single-process lock, and concurrent commands and sessions all
+share the store. Opening it is not cheap: measured on an M-series
 release build, about 4 ms for redb, 12 ms for engine recovery, 35 ms to reload
 the installed policies, and 16 ms for redb to close. So a process keeps the
 store open while nobody else needs it, guarded by a cross-process file lock; a
@@ -130,8 +122,7 @@ rules; layers that only ever add close both.
    under the home directory the system's account records name, never
    `HOME`, `USERPROFILE` or `AGENT_DESKTOP_HOME`, which the caller sets.
    A relocated state root's `policies/` folder is a further layer.
-2. `AGENT_DESKTOP_POLICY_DIR` environment variable. The caller resolves it
-   and forwards it to the command host, which never reads its own.
+2. `AGENT_DESKTOP_POLICY_DIR` environment variable.
 3. `--policy <file>` (repeatable) and `--policy-dir <dir>` CLI flags.
 
 ```
@@ -228,8 +219,7 @@ owners who want more:
    the only mapping that needs per-command care; generate the action table from
    the same match that `policy_for` uses so new commands can't skip the gate
    (compile error on a missing arm).
-3. Wire into `execute_with_adapter` after `preflight_context`, and into the
-   command host so the engine is opened once per host process.
+3. Wire into `execute_with_adapter` after `preflight_context`.
 4. New `POLICY_DENIED` error code in `docs/json-output.md`, exit code non-zero,
    `retry: never`, `error.details.policy_id`.
 5. `agent-desktop policy` subcommand: `status` (files loaded, policy ids),

@@ -21,28 +21,13 @@ pub(crate) struct PolicyArgs {
         help = "Also enforce the .dogwood policies in this directory (repeatable; adds a layer, never lifts the owner's policies folder)"
     )]
     pub policy_dir: Vec<PathBuf>,
-    /// The caller's `AGENT_DESKTOP_POLICY_DIR`, carried to a command host
-    /// that does not share the caller's environment.
-    #[arg(skip)]
-    pub env_dir: Option<PathBuf>,
 }
 
 impl PolicyArgs {
     /// The `AGENT_DESKTOP_POLICY_DIR` of the agent that issued the command.
-    /// A command host serves many callers and inherited only the
-    /// environment of the one that started it, so it uses the value each
-    /// request carries and never its own.
-    ///
     /// An empty or relative value is refused like `AGENT_DESKTOP_HOME`: it
     /// would name a different folder from each working directory.
-    pub(crate) fn caller_env_dir(&self) -> Result<Option<PathBuf>, AppError> {
-        if self.env_dir.is_some() {
-            return Ok(self.env_dir.clone());
-        }
-        #[cfg(target_os = "macos")]
-        if crate::command_host::is_host_process() {
-            return Ok(None);
-        }
+    pub(crate) fn env_dir(&self) -> Result<Option<PathBuf>, AppError> {
         let Some(value) = std::env::var_os(agent_desktop_policy::POLICY_DIR_ENV) else {
             return Ok(None);
         };

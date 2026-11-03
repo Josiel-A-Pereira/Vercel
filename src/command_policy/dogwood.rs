@@ -20,9 +20,8 @@ use super::dogwood_target::Resolver;
 use crate::cli::Commands;
 use agent_desktop_policy::TargetFacts;
 
-/// One gate per policy layer per process: the command host keeps the
-/// loaded layers across forwarded commands; a one-shot CLI process uses
-/// them once. A gate hands its store over whenever another process asks.
+/// One gate per policy layer per process, kept across the entries of a
+/// `batch`. A gate hands its store over whenever another process asks.
 static GATES: Mutex<Vec<(PolicySources, PolicyGate)>> = Mutex::new(Vec::new());
 
 /// Decide `cmd` against every configured policy layer. `Ok(None)` means

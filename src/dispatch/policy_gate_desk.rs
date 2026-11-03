@@ -1,5 +1,5 @@
-//! The desk the policy-gate scenarios play out on: ref resolution is
-//! counted and then stopped (the security question is whether the adapter
+//! The desk the policy-gate scenarios play out on: reading a ref's
+//! element is counted and then stopped (the security question is whether the adapter
 //! was reached at all), while the clipboard genuinely works so temporal
 //! policies see real successes and failures.
 
@@ -8,10 +8,10 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use agent_desktop_core::{
     ActionOps, AdapterError, AppInfo, ClipboardContent, ClipboardFormat, Deadline, ErrorCode,
-    InputOps, InstalledApp, InteractionLease, NativeHandle, ObservationOps, OperationReport,
-    OperationTarget, PermissionReport, Point, PolicyPaths, ProcessId, Rect, RefCapabilities,
-    RefEntry, RefEntryIdentity, RefGeometry, RefProcess, RefScope, RefSource, SystemOps,
-    WindowFilter, WindowInfo, WindowState, context::CommandContext, refs::refs_store::RefStore,
+    InputOps, InstalledApp, InteractionLease, NativeHandle, ObservationOps, ObservationRequest,
+    ObservationRoot, ObservedTree, OperationReport, OperationTarget, PermissionReport, Point,
+    PolicyPaths, ProcessId, Rect, RefEntry, SystemOps, WindowFilter, WindowInfo, WindowState,
+    context::CommandContext,
 };
 use clap::Parser;
 
@@ -125,6 +125,18 @@ impl ObservationOps for DeskAdapter {
     ) -> Result<Vec<WindowInfo>, AdapterError> {
         self.target_queries.fetch_add(1, Ordering::SeqCst);
         Ok(self.screen.lock().unwrap().windows.clone())
+    }
+
+    fn observe_tree(
+        &self,
+        _root: ObservationRoot<'_>,
+        _request: &ObservationRequest,
+    ) -> Result<ObservedTree, AdapterError> {
+        self.resolve_calls.fetch_add(1, Ordering::SeqCst);
+        Err(AdapterError::new(
+            ErrorCode::StaleRef,
+            "scenario desk stops at resolution",
+        ))
     }
 
     fn resolve_element_strict(
@@ -288,66 +300,6 @@ impl Scenario {
 
     pub(super) fn resolve_calls(&self) -> u32 {
         self.adapter.resolve_calls.load(Ordering::SeqCst)
-    }
-
-    /// Seed one snapshotted element the way a real snapshot would have, and
-    /// hand back the qualified ref an agent would act on.
-    pub(super) fn seed_ref(
-        &self,
-        app: &str,
-        window: &str,
-        role: &str,
-        name: &str,
-        secure: bool,
-    ) -> String {
-        let mut refmap = agent_desktop_core::RefMap::new();
-        let states = if secure {
-            vec!["secure".to_string()]
-        } else {
-            Vec::new()
-        };
-        let local = refmap
-            .try_allocate(RefEntry {
-                process: RefProcess {
-                    pid: pid_of(app),
-                    process_instance: Some("scenario-proc-1".to_string()),
-                },
-                identity: RefEntryIdentity {
-                    retained_object: None,
-                    role: role.to_string(),
-                    name: Some(name.to_string()),
-                    value: None,
-                    description: None,
-                    native_id: None,
-                },
-                geometry: RefGeometry {
-                    bounds: None,
-                    bounds_hash: None,
-                    bounds_space: None,
-                },
-                capabilities: RefCapabilities {
-                    states,
-                    available_actions: vec!["Click".to_string()],
-                },
-                source: RefSource {
-                    source_app: Some(app.to_string()),
-                    source_window_id: None,
-                    source_window_title: Some(window.to_string()),
-                    source_window_bounds_hash: None,
-                    source_surface: Default::default(),
-                },
-                scope: RefScope {
-                    root_ref: None,
-                    path_is_absolute: false,
-                    path: Default::default(),
-                },
-            })
-            .expect("ref allocates");
-        let snapshot_id = RefStore::new()
-            .expect("ref store opens")
-            .save_new_snapshot(&refmap)
-            .expect("snapshot saves");
-        format!("@{snapshot_id}:{}", local.trim_start_matches('@'))
     }
 }
 
