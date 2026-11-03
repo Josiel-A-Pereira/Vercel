@@ -25,6 +25,18 @@ projects, separately from our npm and GitHub release workflow.
 If an older installation shadows the command, uninstall it through its original package manager. Check resolution
 with `command -v agent-desktop` on macOS/Linux or `Get-Command agent-desktop` on Windows.
 
+## MacPorts
+
+macOS users who need a local or universal build of `agent-deskop` CLI can use [MacPorts](https://macports.org) to install `agent-desktop`.
+
+```sh
+# Installation
+sudo port install agent-desktop
+
+# Build with universal archs
+sudo port install agent-desktop +universal
+```
+
 ## Blocked install scripts
 
 The npm package includes the native binaries and helpers. Its `postinstall` script replaces the Node launcher with a
