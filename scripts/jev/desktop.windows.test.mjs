@@ -106,9 +106,12 @@ test("the bar stays when its read answers for another window, fails, or holds to
   assert.equal(big.calls.length, 0);
 });
 
-test("a trace never carries the text handed to a command", () => {
+test("a trace never carries the text handed to a command, whatever it begins with", () => {
   assert.deepEqual(traced(["set-value", "@s1:e1", "private words"]), ["set-value", "@s1:e1", "[redacted]"]);
+  assert.deepEqual(traced(["set-value", "@s1:e1", "@handle"]), ["set-value", "@s1:e1", "[redacted]"]);
+  assert.deepEqual(traced(["type", "@s1:e1", "--looks like a flag"]), ["type", "@s1:e1", "[redacted]"]);
   assert.deepEqual(traced(["clipboard-set", "private words"]), ["clipboard-set", "[redacted]"]);
+  assert.deepEqual(traced(["clipboard-set", "@restored", "--text"]), ["clipboard-set", "[redacted]", "[redacted]"]);
   assert.deepEqual(traced(["click", "@s1:e1"]), ["click", "@s1:e1"]);
 });
 

@@ -21,17 +21,19 @@ export const bin =
 
 /**
  * JEV_TRACE=1 writes one line per binary call to stderr: the argv, the outcome
- * and how many refs came back. Text handed to a command is replaced, so a trace
- * never holds what was typed or copied.
+ * and how many refs came back. For a command that carries text, everything
+ * after the command name and its ref is replaced by position, so a trace never
+ * holds what was typed, copied or put back on the clipboard, whatever the text
+ * begins with.
  */
-const TEXT_COMMANDS = new Set(["set-value", "type", "clipboard-set"]);
+const TEXT_COMMANDS = new Map([["set-value", 2], ["type", 2], ["clipboard-set", 1]]);
 
 const countRefs = (node) => (node ? (node.ref_id ? 1 : 0) + (node.children ?? []).reduce((n, c) => n + countRefs(c), 0) : 0);
 
-export const traced = (argv) =>
-  TEXT_COMMANDS.has(argv[0])
-    ? argv.map((a, i) => (i > 0 && !a.startsWith("@") && !a.startsWith("--") ? "[redacted]" : a))
-    : argv;
+export const traced = (argv) => {
+  const keep = TEXT_COMMANDS.get(argv[0]);
+  return keep === undefined ? argv : argv.map((a, i) => (i < keep ? a : "[redacted]"));
+};
 
 const trace = (argv, result) => {
   if (process.env.JEV_TRACE !== "1") return result;
