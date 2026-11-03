@@ -44,6 +44,40 @@ function Invoke-PressLegs {
             } catch { Add-Fail -Leg 'press-shift-tab-moves-focus' -Reason $_.Exception.Message }
 
             try {
+                $textInput = Require-Target -Target (Find-Target -App $App -NativeId 'text-input' -TimeoutSeconds 10) -Description 'text-input'
+                Invoke-Target -Target $textInput -Action 'set-value' -ActionArgs @('x') -RequireOk -Description 'text-input (seed)' | Out-Null
+                Invoke-Target -Target $textInput -Action 'focus' -Headed -RequireOk -Description 'text-input (keyboard focus)' | Out-Null
+                Assert-Envelope -Envelope (Invoke-AgentDesktop -Arguments @('--headed', 'press', 'end', '--app', $App)) -Ok
+                Assert-Envelope -Envelope (Invoke-AgentDesktop -Arguments @('--headed', 'press', 'shift+;', '--app', $App)) -Ok
+                Assert-Envelope -Envelope (Invoke-AgentDesktop -Arguments @('--headed', 'press', 'semicolon', '--app', $App)) -Ok
+                $clock = [System.Diagnostics.Stopwatch]::StartNew()
+                $observed = Get-Target -Target $textInput -Property 'value'
+                while ($observed -ne 'x:;' -and $clock.Elapsed.TotalSeconds -lt 5) {
+                    Start-Sleep -Milliseconds 150
+                    $observed = Get-Target -Target $textInput -Property 'value'
+                }
+                if ($observed -ne 'x:;') { throw "shift+; then semicolon left text-input at '$observed'; expected 'x:;' (a refused symbol leaves 'x', a dropped shift types ';;')" }
+                Add-Pass -Leg 'press-punctuation-by-symbol-and-name'
+            } catch { Add-Fail -Leg 'press-punctuation-by-symbol-and-name' -Reason $_.Exception.Message }
+
+            try {
+                $textInput = Require-Target -Target (Find-Target -App $App -NativeId 'text-input' -TimeoutSeconds 10) -Description 'text-input'
+                $keyReport = Require-Target -Target (Find-Target -App $App -NativeId 'key-report' -TimeoutSeconds 10) -Description 'key-report'
+                Invoke-Target -Target $textInput -Action 'focus' -Headed -RequireOk -Description 'text-input (keyboard focus)' | Out-Null
+                foreach ($step in @(@{ Combo = 'home'; Expected = 'home extended' }, @{ Combo = 'down'; Expected = 'down extended' }, @{ Combo = 'shift+end'; Expected = 'end extended' })) {
+                    Assert-Envelope -Envelope (Invoke-AgentDesktop -Arguments @('--headed', 'press', $step.Combo, '--app', $App)) -Ok
+                    $clock = [System.Diagnostics.Stopwatch]::StartNew()
+                    $observed = Get-Target -Target $keyReport -Property 'value'
+                    while ($observed -ne $step.Expected -and $clock.Elapsed.TotalSeconds -lt 5) {
+                        Start-Sleep -Milliseconds 150
+                        $observed = Get-Target -Target $keyReport -Property 'value'
+                    }
+                    if ($observed -ne $step.Expected) { throw "press $($step.Combo) left key-report at '$observed'; expected '$($step.Expected)' (a keypad report means the key went out without KEYEVENTF_EXTENDEDKEY)" }
+                }
+                Add-Pass -Leg 'press-navigation-keys-arrive-extended'
+            } catch { Add-Fail -Leg 'press-navigation-keys-arrive-extended' -Reason $_.Exception.Message }
+
+            try {
                 $button = Require-Target -Target (Find-Target -App $App -NativeId 'primary-button' -TimeoutSeconds 10) -Description 'primary-button'
                 Invoke-Target -Target $button -Action 'scroll-to' -RequireOk -Description 'primary-button (scroll into view)' | Out-Null
                 Invoke-Target -Target $button -Action 'focus' -Headed -RequireOk -Description 'primary-button (keyboard focus)' | Out-Null
