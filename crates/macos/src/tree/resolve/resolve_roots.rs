@@ -151,7 +151,11 @@ fn source_window_scoped_roots(
             deadline,
         )?;
     }
-    let windows = read_root_array(application, "AXWindows", context)?.unwrap_or_default();
+    let windows = crate::tree::application_windows::read_with_array_reader(
+        application,
+        deadline,
+        |attribute| Ok(read_root_array(application, attribute, context)?.unwrap_or_default()),
+    )?;
     let window = if entry.source.source_window_id.is_some() {
         window_by_number(&windows, entry, context)?
     } else {

@@ -210,3 +210,50 @@ fn a_window_without_an_accessibility_element_is_not_reported_as_missing() {
     assert!(error.message.contains("exists"));
     assert_ne!(error.code, agent_desktop_core::ErrorCode::WindowNotFound);
 }
+
+#[test]
+fn exact_window_rejects_another_native_id_with_the_same_title() {
+    let candidates = [(Some(4321), "Window Fixture")];
+    let result = select_window_for_number(&candidates, 4320, |candidate| Ok(candidate.0)).unwrap();
+
+    assert_eq!(result, None);
+}
+
+#[test]
+fn exact_window_rejects_unproven_id_even_with_a_unique_title() {
+    let candidates = [(None, "Window Fixture")];
+    let result = select_window_for_number(&candidates, 4320, |candidate| Ok(candidate.0)).unwrap();
+
+    assert_eq!(result, None);
+}
+
+#[test]
+fn exact_window_retains_a_proven_id_despite_a_changed_title() {
+    let candidates = [(Some(4321), "Same"), (Some(4320), "Renamed")];
+    let result = select_window_for_number(&candidates, 4320, |candidate| Ok(candidate.0)).unwrap();
+
+    assert_eq!(result, Some((Some(4320), "Renamed")));
+}
+
+#[test]
+fn exact_window_rejects_multiple_distinct_candidates_with_the_same_native_id() {
+    let candidates = [(Some(4320), "First"), (Some(4320), "Second")];
+    let error =
+        select_window_for_number(&candidates, 4320, |candidate| Ok(candidate.0)).unwrap_err();
+
+    assert_eq!(error.code, ErrorCode::AmbiguousTarget);
+}
+
+#[test]
+fn exact_window_preserves_native_permission_errors() {
+    let candidates = [(Some(4320), "Same")];
+    let error =
+        select_window_for_number(
+            &candidates,
+            4320,
+            |_| Err(AdapterError::permission_denied()),
+        )
+        .unwrap_err();
+
+    assert_eq!(error.code, ErrorCode::PermDenied);
+}

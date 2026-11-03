@@ -62,7 +62,7 @@ fn for_each_window(
     mut visit: impl FnMut(&crate::tree::AXElement, i64) -> Result<(), AdapterError>,
 ) -> Result<(), AdapterError> {
     let app = crate::tree::element_for_pid(pid);
-    for window in crate::tree::surface_read::elements(&app, "AXWindows", deadline)? {
+    for window in crate::tree::application_windows::read(&app, deadline)? {
         match crate::system::window::window_resolve::ax_window_id_with_deadline(&window, deadline) {
             Ok(Some(id)) => visit(&window, id)?,
             Ok(None) => {}

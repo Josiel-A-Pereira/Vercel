@@ -131,10 +131,10 @@ fn resolve_window_element_strict(
     deadline: std::time::Instant,
 ) -> Result<AXElement, AdapterError> {
     crate::tree::locator_deadline::remaining(deadline)?;
-    let (window_number, record) = locate_verified_record_until(win, deadline)?;
+    let (window_number, _) = locate_verified_record_until(win, deadline)?;
     crate::tree::locator_deadline::remaining(deadline)?;
     let pid = crate::system::process::process_identity::to_pid_t(win.pid)?;
-    ax_window_element_for_number(pid, window_number, record.title.as_deref(), deadline)?
+    ax_window_element_for_number(pid, window_number, deadline)?
         .ok_or_else(|| window_not_accessible(&win.id))
 }
 
@@ -197,68 +197,46 @@ fn window_info_from_record(
 fn ax_window_element_for_number(
     pid: i32,
     window_number: i64,
-    fallback_title: Option<&str>,
     deadline: std::time::Instant,
 ) -> Result<Option<AXElement>, AdapterError> {
-    let windows = windows_for_pid(pid, deadline)?;
-    let mut unavailable_bridge = None;
-    for window in &windows {
-        prepare_for_read(window, deadline)?;
-        if crate::tree::resolve::resolve_ax_read::read_string(window, "AXRole", deadline)?
-            .as_deref()
-            != Some("AXWindow")
-        {
-            continue;
-        }
-        match ax_window_id_with_deadline(window, deadline) {
-            Ok(Some(actual)) if actual == window_number => return Ok(Some(window.clone())),
-            Ok(_) => {}
-            Err(error) if crate::system::window::window_bridge::is_unavailable(&error) => {
-                unavailable_bridge = Some(error);
-                break;
-            }
-            Err(error) => return Err(error),
-        }
-    }
-    let Some(title) = fallback_title else {
-        return match unavailable_bridge {
-            Some(error) => Err(error),
-            None => Ok(None),
-        };
-    };
-    let mut single_match = None;
-    for window in windows {
+    let mut windows = Vec::new();
+    for window in windows_for_pid(pid, deadline)? {
         prepare_for_read(&window, deadline)?;
         if crate::tree::resolve::resolve_ax_read::read_string(&window, "AXRole", deadline)?
             .as_deref()
-            != Some("AXWindow")
+            == Some("AXWindow")
         {
+            windows.push(window);
+        }
+    }
+    select_window_for_number(&windows, window_number, |window| {
+        ax_window_id_with_deadline(window, deadline)
+    })
+}
+
+fn select_window_for_number<T: Clone>(
+    windows: &[T],
+    window_number: i64,
+    mut read_number: impl FnMut(&T) -> Result<Option<i64>, AdapterError>,
+) -> Result<Option<T>, AdapterError> {
+    let mut matched = None;
+    for window in windows {
+        if read_number(window)? != Some(window_number) {
             continue;
         }
-        if crate::tree::resolve::resolve_ax_read::read_string(&window, "AXTitle", deadline)?
-            .as_deref()
-            != Some(title)
-        {
-            continue;
-        }
-        if single_match.is_some() {
+        if matched.is_some() {
             return Err(AdapterError::ambiguous_target(format!(
-                "Multiple AX windows matched the verified CoreGraphics title '{title}'"
+                "Multiple AX windows matched verified CoreGraphics window w-{window_number}"
             ))
             .with_details(serde_json::json!({
-                "kind": "verified_window_title_ambiguous",
-                "title": title,
+                "kind": "source_window_number_ambiguous",
+                "source_window_id": format!("w-{window_number}"),
+                "candidate_count_at_least": 2,
             })));
         }
-        single_match = Some(window);
+        matched = Some(window.clone());
     }
-    match single_match {
-        Some(window) => Ok(Some(window)),
-        None => match unavailable_bridge {
-            Some(error) => Err(error),
-            None => Ok(None),
-        },
-    }
+    Ok(matched)
 }
 
 fn window_element_by_title(
@@ -308,10 +286,7 @@ fn windows_for_pid(pid: i32, deadline: std::time::Instant) -> Result<Vec<AXEleme
     let app = element_for_pid(pid);
     #[cfg(target_os = "macos")]
     {
-        Ok(
-            crate::tree::resolve::resolve_ax_read::read_array(&app, "AXWindows", deadline)?
-                .unwrap_or_default(),
-        )
+        crate::tree::application_windows::read(&app, deadline)
     }
     #[cfg(not(target_os = "macos"))]
     {

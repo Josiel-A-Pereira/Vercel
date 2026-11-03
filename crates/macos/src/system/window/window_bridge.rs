@@ -108,7 +108,7 @@ fn bridge_unavailable() -> AdapterError {
         ErrorCode::ActionNotSupported,
         "The optional AX-to-CG window bridge is unavailable on this macOS version",
     )
-    .with_suggestion("Target the uniquely titled verified window, or refresh the window inventory")
+    .with_suggestion("Use a screenshot of the window; exact accessibility targeting requires the native window bridge")
     .with_details(serde_json::json!({
         "kind": "resolution_window_bridge_unavailable",
         "symbol": "_AXUIElementGetWindow",
