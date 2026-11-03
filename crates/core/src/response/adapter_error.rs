@@ -146,7 +146,9 @@ impl AdapterError {
         Self::new(ErrorCode::AmbiguousTarget, message)
             .with_suggestion(format!(
                 "{} running instances match (pids {numeric:?}); this command selects a \
-                 process by name and has no pid or instance flag to disambiguate",
+                 process by name and has no pid or instance flag to disambiguate. \
+                 Run 'list-windows --app <name>' to find the candidate window and target it \
+                 with '--window-id w-XXXX' or 'focus-window --window-id w-XXXX' instead of using app name alone",
                 pids.len()
             ))
             .with_details(details)

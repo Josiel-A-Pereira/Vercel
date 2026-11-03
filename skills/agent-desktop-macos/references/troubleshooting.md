@@ -36,6 +36,18 @@ For Automation, open Privacy & Security > Automation and allow the launching app
 
 **Fix.** Use `find` when you know the target. Otherwise use `snapshot --skeleton -i --compact`, then `snapshot --root @<snapshot_id>:eN` to drill down. Add `--window-id` to limit the window.
 
+## AMBIGUOUS_TARGET on launch or window commands
+
+**Symptom.** `launch --activate` or window commands fail with `AMBIGUOUS_TARGET` and report multiple candidate PIDs.
+
+**Cause.** Multiple instances of the application are running (e.g., during integration tests or when multiple worktree apps run side-by-side). Commands that take only `--app` refuse to guess.
+
+**Fix.**
+1. Do not treat this as an unrecoverable blocker. The target window is usually accessible via its window ID.
+2. Run `list-windows --app "App"` to inspect candidates and match the target's PID.
+3. Switch to window-scoped targeting: use `focus-window --window-id w-XXXX` and pass `--window-id w-XXXX` to subsequent `snapshot` and input commands.
+4. Only treat as a true obstruction if `list-windows` shows no accessible window (`accessible: false`) or the window has closed.
+
 ## ACTION_FAILED
 
 **Symptom.** A ref action returns `ACTION_FAILED`.
