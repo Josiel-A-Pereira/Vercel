@@ -19,6 +19,23 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  jev:
+    name: JEv (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - run: node --test scripts/jev/*.test.mjs
+
   fmt:
     name: Format
     runs-on: ubuntu-latest
@@ -188,13 +205,6 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
-
-      - name: jev-desktop tests
-        run: |
-          node scripts/jev/run.test.mjs
-          node scripts/jev/act.test.mjs
-          node scripts/jev/run.integration.test.mjs
-          node scripts/jev/evidence.test.mjs
 
       - name: NPM package contents
         run: |

@@ -162,11 +162,10 @@ next round reads the screen again and asks for what is left. `--text` belongs
 to the step written before it, and `press:<combo>` sends a key without asking
 Jev. Without `--execute` the first round is printed and nothing runs.
 
-Measured on a browser page with 120 candidates: one question took about 0.5 s
-and five questions in one request took the same, so a run's time is set by
-how many screens it passes through, not by its steps. Each question repeats
-the candidate list, so elements are described by role, label and up to sixty
-characters of value, and at most 150 visible, labelled elements are offered.
+Grouping decisions reduces the number of model requests. Total latency still
+depends on the application, request size, and model service. Each question
+repeats the candidate list, so elements are described by role, label and up to
+sixty characters of value, and at most 150 visible, labelled elements are offered.
 
 After an action the screen is read until it differs from the one acted on. If
 Jev then finds nothing and the screen never changed, the run stops with
@@ -174,6 +173,11 @@ Jev then finds nothing and the screen never changed, the run stops with
 Text is written with `set-value` and no separate `focus`: on Windows `focus`
 moves the foreground, which headless delivery refuses. Each round prints one
 JSON line with `read_ms`, `ask_ms` and `act_ms`.
+
+If a batch fails, completed steps stay completed. The runner refreshes the
+screen and retries a stale ref only when the error says delivery did not
+occur and retry is safe. Other errors stop the flow, including failures
+after earlier steps in the batch succeeded.
 
 ## Calling it
 

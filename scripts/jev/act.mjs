@@ -242,8 +242,14 @@ const main = async (argv) => {
     fail("root_outside_window", { detail: `the region is not in window ${windowId}` });
   }
 
-  const overlay = overlayRole(snap.data.tree);
-  if (overlay && !root) {
+  let overlay = overlayRole(snap.data.tree);
+  if (!overlay && !root && process.platform === "win32") {
+    const popover = run(bin, ["snapshot", ...scope, "--surface", "popover", "-i", "--compact", "--include-bounds", ...flags]);
+    if (popover.ok && offerable(collect(popover.data.tree)).length && !(windowId && outsideWindow(popover.data, windowId))) {
+      snap = popover;
+      overlay = "popover";
+    }
+  } else if (overlay && !root) {
     const surfaceSnap = run(bin, ["snapshot", ...scope, "--surface", overlay, "-i", "--compact", "--include-bounds", ...flags]);
     if (surfaceSnap.ok && windowId && outsideWindow(surfaceSnap.data, windowId)) {
       fail("surface_outside_window", { detail: `the ${overlay} is not in window ${windowId}` });

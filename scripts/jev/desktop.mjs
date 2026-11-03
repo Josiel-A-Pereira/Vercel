@@ -46,7 +46,9 @@ export const stopCursor = () => cli("cursor-overlay", "disable");
  * holding thousands of elements costs the same first look as a panel holding
  * thirty. A region cut off by that shallow read still reports how much it holds,
  * which is what makes it worth drilling into. A sheet or menu owns the screen
- * while it is up, so it is read instead of the window behind it.
+ * while it is up, so it is read instead of the window behind it. On Windows a
+ * Chromium toolbar bubble is a separate popup window the frame's tree does not
+ * contain, so when the tree shows no overlay the popover surface is read too.
  */
 export const observe = (app, root, windowId = null) => {
   const scope = windowId ? ["--app", app, "--window-id", windowId] : ["--app", app];
@@ -65,8 +67,14 @@ export const observe = (app, root, windowId = null) => {
   }
   if (!snap.ok && snap.error?.code !== "WINDOW_NOT_FOUND") snap = cli(...shallow, "--max-depth", "4");
   if (!snap.ok) throw unreadable("the screen", snap.error);
-  const surface = root ? null : overlayRole(snap.data.tree);
-  if (surface) {
+  let surface = root ? null : overlayRole(snap.data.tree);
+  if (!surface && !root && process.platform === "win32") {
+    const popover = cli("snapshot", ...scope, "--surface", "popover", "-i", "--compact", "--include-bounds", ...snapshotFlags());
+    if (popover.ok && offerable(collect(popover.data.tree)).length && !(windowId && outsideWindow(popover.data, windowId))) {
+      snap = popover;
+      surface = "popover";
+    }
+  } else if (surface) {
     const scoped = cli("snapshot", ...scope, "--surface", surface, "-i", "--compact", "--include-bounds", ...snapshotFlags());
     if (scoped.ok && windowId && outsideWindow(scoped.data, windowId)) {
       throw Object.assign(new Error(`the ${surface} is not in window ${windowId}`), { code: "SURFACE_OUTSIDE_WINDOW" });

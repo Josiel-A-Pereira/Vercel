@@ -12,8 +12,8 @@
  * what is left. `--text` belongs to the step written before it, and
  * `press:<combo>` sends a key without asking Jev anything.
  *
- * Asking five steps costs about what asking one does, so the time a run takes
- * is set by how many distinct screens it passes through, not by its steps.
+ * Grouping decisions reduces the number of model requests. Total latency
+ * still depends on the application, the request size, and the model service.
  */
 import { fileURLToPath } from "node:url";
 
@@ -235,7 +235,10 @@ export const flow = async (steps, { app, windowId = null, execute = false } = {}
     const done = completedSteps(entries, results);
     const firstError = results.find((r) => !r.ok)?.error ?? (batch.ok ? null : batch.error);
     emit({ ...event, act_ms: since(start), ran: [...done], ...(firstError ? { error: firstError.code } : {}) });
-    if (firstError && firstError.code !== "STALE_REF" && !done.size) {
+    const refreshable = firstError?.code === "STALE_REF"
+      && firstError.disposition?.retry === "safe"
+      && firstError.disposition?.delivery === "not_delivered";
+    if (firstError && !refreshable) {
       return { stop: "action_failed", error: firstError };
     }
     pending = pending.filter((s) => !done.has(s.index));
