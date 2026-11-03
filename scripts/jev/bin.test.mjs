@@ -20,8 +20,9 @@ for (const bad of ["0", "-1", "1.5", "abc", "120001"]) {
 }
 assert.throws(() => snapshotFlags({ env: { JEV_SNAPSHOT_MAX_DEPTH: "101" } }), /JEV_SNAPSHOT_MAX_DEPTH/);
 
-assert.equal(defaultBin({ platform: "linux", env: {} }), "agent-desktop");
-assert.equal(defaultBin({ platform: "darwin", env: {} }), "agent-desktop");
+const absent = join(tmpdir(), "jev-no-release-build");
+assert.equal(defaultBin({ platform: "linux", env: {}, release: absent }), "agent-desktop");
+assert.equal(defaultBin({ platform: "darwin", env: {}, release: absent }), "agent-desktop");
 
 const directory = mkdtempSync(join(tmpdir(), "jev-bin-test-"));
 try {
@@ -34,13 +35,17 @@ try {
   mkdirSync(empty);
   const path = [empty, shims].join(process.platform === "win32" ? ";" : ":");
 
-  assert.equal(defaultBin({ platform: "win32", arch: "x64", env: { PATH: path } }),
+  assert.equal(defaultBin({ platform: "win32", arch: "x64", env: { PATH: path }, release: absent }),
     join(native, "agent-desktop-win32-x64.exe"), "the npm shim on PATH leads to the shipped executable");
-  assert.equal(defaultBin({ platform: "win32", arch: "x64", env: { Path: path } }),
+  assert.equal(defaultBin({ platform: "win32", arch: "x64", env: { Path: path }, release: absent }),
     join(native, "agent-desktop-win32-x64.exe"), "Windows spells the variable Path");
-  assert.equal(defaultBin({ platform: "win32", arch: "arm64", env: { PATH: path } }), "agent-desktop.exe",
+  assert.equal(defaultBin({ platform: "win32", arch: "arm64", env: { PATH: path }, release: absent }), "agent-desktop.exe",
     "an executable for another architecture is not used");
-  assert.equal(defaultBin({ platform: "win32", arch: "x64", env: { PATH: empty } }), "agent-desktop.exe");
+  assert.equal(defaultBin({ platform: "win32", arch: "x64", env: { PATH: empty }, release: absent }), "agent-desktop.exe");
+  const release = join(directory, "agent-desktop.exe");
+  writeFileSync(release, "");
+  assert.equal(defaultBin({ platform: "win32", arch: "x64", env: { PATH: path }, release }), release,
+    "a release build in the clone wins over the installed package");
 } finally {
   rmSync(directory, { recursive: true, force: true });
 }

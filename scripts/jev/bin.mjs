@@ -23,8 +23,9 @@ const npmNative = (env, arch) => {
   return null;
 };
 
-export const defaultBin = ({ platform = process.platform, arch = process.arch, env = process.env } = {}) => {
-  const release = join(REPO, "target", "release", platform === "win32" ? "agent-desktop.exe" : "agent-desktop");
+const releaseBuild = (platform) => join(REPO, "target", "release", platform === "win32" ? "agent-desktop.exe" : "agent-desktop");
+
+export const defaultBin = ({ platform = process.platform, arch = process.arch, env = process.env, release = releaseBuild(platform) } = {}) => {
   if (existsSync(release)) return release;
   if (platform === "win32") return npmNative(env, arch) ?? "agent-desktop.exe";
   return "agent-desktop";
