@@ -188,6 +188,104 @@ fn a_modifier_the_caller_already_asked_for_is_not_pressed_twice() {
     assert_eq!(chord_modifiers(&combo, resolved), vec![VK_SHIFT]);
 }
 
+/// Without the extended flag the arrow reaches the target as the numeric
+/// keypad Down, which some applications move the caret with but do not
+/// extend the selection with.
+#[test]
+fn shift_down_sends_the_arrow_as_an_extended_key_on_both_edges() {
+    reset();
+    let combo = KeyCombo {
+        key: "down".into(),
+        modifiers: vec![Modifier::Shift],
+    };
+    synthesize_key(&combo, Deadline::after(5_000).expect("bounded deadline"))
+        .expect("an ample deadline must succeed");
+
+    let recorded = sink::recorded();
+    let flags: Vec<(u16, u32)> = recorded
+        .iter()
+        .map(|event| (event.vk, event.flags))
+        .collect();
+    assert_eq!(
+        flags,
+        vec![
+            (VK_SHIFT, 0),
+            (keyboard_map::VK_DOWN, KEYEVENTF_EXTENDEDKEY),
+            (
+                keyboard_map::VK_DOWN,
+                KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP
+            ),
+            (VK_SHIFT, KEYEVENTF_KEYUP),
+        ]
+    );
+}
+
+#[test]
+fn every_navigation_key_is_extended_and_backspace_and_letters_are_not() {
+    for name in [
+        "up",
+        "down",
+        "left",
+        "right",
+        "home",
+        "end",
+        "pageup",
+        "pagedown",
+        "forwarddelete",
+        "cmd",
+    ] {
+        let vk = keyboard_map::resolve_key(name)
+            .expect("the name resolves")
+            .vk;
+        assert_eq!(
+            key_input(vk, false).flags,
+            KEYEVENTF_EXTENDEDKEY,
+            "'{name}' press"
+        );
+        assert_eq!(
+            key_input(vk, true).flags,
+            KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP,
+            "'{name}' release"
+        );
+    }
+    for name in [
+        "delete",
+        "backspace",
+        "a",
+        "5",
+        "return",
+        "tab",
+        "shift",
+        "ctrl",
+        "alt",
+    ] {
+        let vk = keyboard_map::resolve_key(name)
+            .expect("the name resolves")
+            .vk;
+        assert_eq!(key_input(vk, false).flags, 0, "'{name}' press");
+        assert_eq!(
+            key_input(vk, true).flags,
+            KEYEVENTF_KEYUP,
+            "'{name}' release"
+        );
+    }
+}
+
+#[test]
+fn the_release_sweep_releases_an_extended_key_as_extended() {
+    reset();
+    key_state::set_down(keyboard_map::VK_DOWN);
+
+    {
+        let mut guard = KeyReleaseGuard::new();
+        guard.note_pressed(keyboard_map::VK_DOWN);
+    }
+
+    let recorded = sink::recorded();
+    assert_eq!(recorded.len(), 1);
+    assert_eq!(recorded[0].flags, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP);
+}
+
 #[test]
 fn a_key_the_layout_produces_unshifted_carries_only_the_callers_modifiers() {
     let combo = KeyCombo {

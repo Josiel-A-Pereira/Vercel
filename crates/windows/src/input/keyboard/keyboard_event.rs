@@ -23,6 +23,7 @@ const VK_SHIFT: u16 = 0x10;
 const VK_CONTROL: u16 = 0x11;
 const VK_MENU: u16 = 0x12;
 const VK_LWIN: u16 = 0x5B;
+const KEYEVENTF_EXTENDEDKEY: u32 = 0x0001;
 const KEYEVENTF_KEYUP: u32 = 0x0002;
 const KEY_SETTLE: Duration = Duration::from_millis(4);
 const KEY_RELEASE_SUGGESTION: &str = "Inspect which modifiers may still be held before retrying; the emergency release was posted without an OS acknowledgement";
@@ -34,6 +35,7 @@ const _: () = {
     assert!(VK_CONTROL == win32::VK_CONTROL);
     assert!(VK_MENU == win32::VK_MENU);
     assert!(VK_LWIN == win32::VK_LWIN);
+    assert!(KEYEVENTF_EXTENDEDKEY == win32::KEYEVENTF_EXTENDEDKEY);
     assert!(KEYEVENTF_KEYUP == win32::KEYEVENTF_KEYUP);
 };
 
@@ -96,11 +98,20 @@ pub(crate) fn modifier_vk(modifier: &Modifier) -> u16 {
     }
 }
 
+/// Both edges of an extended key carry `KEYEVENTF_EXTENDEDKEY`, so the
+/// release matches the press and the release-guard sweep releases the same
+/// key the chord pressed.
 pub(crate) fn key_input(vk: u16, key_up: bool) -> KeyboardInputEvent {
+    let edge = if key_up { KEYEVENTF_KEYUP } else { 0 };
+    let extended = if keyboard_map::is_extended_key(vk) {
+        KEYEVENTF_EXTENDEDKEY
+    } else {
+        0
+    };
     KeyboardInputEvent {
         vk,
         scan: 0,
-        flags: if key_up { KEYEVENTF_KEYUP } else { 0 },
+        flags: edge | extended,
     }
 }
 

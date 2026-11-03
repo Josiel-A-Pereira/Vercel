@@ -249,6 +249,7 @@ pub(crate) mod fixture {
     use crate::input::keyboard::keyboard_send::keyboard_send_fake_sink as key_sink;
     use crate::input::mouse::mouse_send::mouse_send_fake_sink as mouse_sink;
     use agent_desktop_core::Point;
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::KEYEVENTF_KEYUP;
 
     pub(crate) fn reset_sinks() {
         mouse_sink::reset();
@@ -256,12 +257,13 @@ pub(crate) mod fixture {
     }
 
     /// The one keyboard seam records full `KeyboardInputEvent`s; `key_input`
-    /// sets `flags` to `KEYEVENTF_KEYUP` for a release and 0 for a press, so a
-    /// non-zero flag is the key-up.
+    /// sets `KEYEVENTF_KEYUP` on a release and may also set
+    /// `KEYEVENTF_EXTENDEDKEY` on either edge, so only the key-up bit marks
+    /// the release.
     pub(crate) fn modifier_events() -> Vec<(u16, bool)> {
         key_sink::recorded()
             .into_iter()
-            .map(|event| (event.vk, event.flags != 0))
+            .map(|event| (event.vk, event.flags & KEYEVENTF_KEYUP != 0))
             .collect()
     }
 
