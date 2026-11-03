@@ -103,7 +103,8 @@ impl SystemOps for WindowsAdapter {
     }
 
     /// The surfaces this adapter can observe: a named window, the focused
-    /// window, a Chromium modal-as-sheet, an open application menu, and the
+    /// window, a Chromium modal-as-sheet, an open application menu, a popup
+    /// window the requested window owns (a Chromium toolbar bubble), and the
     /// shell kinds the shell-surface resolver reaches on this build. Core
     /// validates the requested surface against this list before the adapter
     /// is ever called (the mirror of macOS `supported_surfaces`), so a kind
@@ -119,6 +120,7 @@ impl SystemOps for WindowsAdapter {
             SnapshotSurface::Focused,
             SnapshotSurface::Sheet,
             SnapshotSurface::Menu,
+            SnapshotSurface::Popover,
             SnapshotSurface::StartMenu,
             SnapshotSurface::Taskbar,
             SnapshotSurface::SystemTray,
