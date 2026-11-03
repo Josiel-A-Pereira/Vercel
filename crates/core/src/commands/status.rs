@@ -1,5 +1,5 @@
 use crate::{
-    AppError, PermissionReport,
+    AppError, ErrorCode, PermissionReport,
     adapter::PlatformAdapter,
     commands::permissions::{self, PermissionsArgs},
     context::CommandContext,
@@ -22,10 +22,16 @@ pub fn execute_with_report_with_context(
     )?;
 
     let store = RefStore::for_session(context.session_id())?;
-    let snapshot_id = store.latest_snapshot_id()?;
-    let ref_count = match snapshot_id.as_deref() {
-        Some(snapshot_id) => Some(store.load_snapshot(snapshot_id)?.len()),
-        None => None,
+    let latest_id = store.latest_snapshot_id()?;
+    let (snapshot_id, ref_count, missing_snapshot_id) = match latest_id {
+        Some(id) => match store.load_snapshot(&id) {
+            Ok(map) => (Some(id), Some(map.len()), None),
+            Err(AppError::Adapter(err)) if err.code == ErrorCode::SnapshotNotFound => {
+                (None, None, Some(id))
+            }
+            Err(err) => return Err(err),
+        },
+        None => (None, None, None),
     };
     let session_id = context.session_id().map(str::to_string);
     let tracing = context.trace_enabled();
@@ -48,6 +54,9 @@ pub fn execute_with_report_with_context(
             .map(|surface| surface.as_str())
             .collect::<Vec<_>>(),
     });
+    if let Some(missing) = missing_snapshot_id {
+        body["missing_snapshot_id"] = json!(missing);
+    }
     if let Some(artifacts) = artifacts {
         body["artifacts"] = json!(artifacts);
     }

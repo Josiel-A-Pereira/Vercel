@@ -109,3 +109,32 @@ fn status_surfaces_artifacts_mode_for_active_session() {
 
     assert_eq!(value["artifacts"], "full");
 }
+
+#[test]
+fn status_survives_a_deleted_latest_snapshot() {
+    let guard = crate::refs::refs_test_support::HomeGuard::new();
+    let store = RefStore::for_session(None).unwrap();
+    let id = store
+        .save_new_snapshot(&crate::refs::RefMap::new())
+        .unwrap();
+    let dir = guard
+        .path()
+        .join(".agent-desktop")
+        .join("snapshots")
+        .join(&id);
+    std::fs::remove_dir_all(&dir).unwrap();
+    let report = PermissionReport {
+        accessibility: PermissionState::Granted,
+        screen_recording: PermissionState::Granted,
+        automation: PermissionState::NotRequired,
+    };
+
+    let value =
+        execute_with_report_with_context(&DeniedAdapter, &report, &CommandContext::default())
+            .unwrap();
+
+    assert!(value["snapshot_id"].is_null());
+    assert!(value["ref_count"].is_null());
+    assert_eq!(value["missing_snapshot_id"], id.as_str());
+    assert_eq!(value["permissions"]["accessibility"]["state"], "granted");
+}
