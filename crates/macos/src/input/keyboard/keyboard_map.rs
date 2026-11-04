@@ -1,4 +1,6 @@
-use agent_desktop_core::{AdapterError, DeliverySemantics, ErrorCode};
+use agent_desktop_core::{AdapterError, DeliverySemantics, ErrorCode, KeyCombo, Modifier};
+
+use crate::input::keyboard::keyboard_layout::LayoutLookup;
 
 const PUNCTUATION: [(char, &str); 11] = [
     (',', "comma"),
@@ -21,7 +23,39 @@ pub(crate) fn punctuation(key: &str) -> Option<char> {
         .map(|(symbol, _)| *symbol)
 }
 
-pub(crate) fn key_name_to_code(key: &str) -> Result<u16, AdapterError> {
+/// Returns the virtual key code to send for `combo`. A letter or punctuation
+/// key is the one that types it in the active keyboard layout, read with
+/// Command held when the combo holds Command, because macOS matches Command
+/// shortcuts against that key map. A letter keeps its US ANSI key when the
+/// layout cannot be read or has no key for it.
+pub(crate) fn key_code(combo: &KeyCombo) -> Result<u16, AdapterError> {
+    let command_held = combo.modifiers.contains(&Modifier::Meta);
+    code_in_layout(&combo.key, |symbol| {
+        crate::input::keyboard::keyboard_layout::code_for_symbol(symbol, command_held)
+    })
+}
+
+fn code_in_layout(key: &str, layout: impl Fn(char) -> LayoutLookup) -> Result<u16, AdapterError> {
+    if let Some(letter) = letter(key)
+        && let LayoutLookup::Found(code) = layout(letter)
+    {
+        return Ok(code);
+    }
+    if let Some(symbol) = punctuation(key) {
+        return layout_code(symbol, layout(symbol));
+    }
+    key_name_to_code(key)
+}
+
+fn letter(key: &str) -> Option<char> {
+    let mut characters = key.chars();
+    match (characters.next(), characters.next()) {
+        (Some(letter), None) if letter.is_ascii_lowercase() => Some(letter),
+        _ => None,
+    }
+}
+
+fn key_name_to_code(key: &str) -> Result<u16, AdapterError> {
     let code = match key {
         "a" => 0,
         "b" => 11,
@@ -90,12 +124,6 @@ pub(crate) fn key_name_to_code(key: &str) -> Result<u16, AdapterError> {
         "f11" => 103,
         "f12" => 111,
         other => {
-            if let Some(symbol) = punctuation(other) {
-                return layout_code(
-                    symbol,
-                    crate::input::keyboard::keyboard_layout::code_for_symbol(symbol),
-                );
-            }
             return Err(AdapterError::new(
                 ErrorCode::InvalidArgs,
                 format!("Unknown key: '{other}'"),
@@ -106,16 +134,12 @@ pub(crate) fn key_name_to_code(key: &str) -> Result<u16, AdapterError> {
     Ok(code)
 }
 
-fn layout_code(
-    symbol: char,
-    lookup: crate::input::keyboard::keyboard_layout::LayoutLookup,
-) -> Result<u16, AdapterError> {
-    use crate::input::keyboard::keyboard_layout::LayoutLookup;
+fn layout_code(symbol: char, lookup: LayoutLookup) -> Result<u16, AdapterError> {
     match lookup {
         LayoutLookup::Found(code) => Ok(code),
         LayoutLookup::NoKeyForSymbol => Err(AdapterError::new(
             ErrorCode::InvalidArgs,
-            format!("No unmodified key types '{symbol}' in the active keyboard layout"),
+            format!("No key types '{symbol}' in the active keyboard layout without Shift or Option"),
         )
         .with_suggestion(
             "This symbol needs a modifier or is missing in the active layout; nothing was sent",
@@ -133,9 +157,9 @@ fn layout_code(
 
 #[cfg(test)]
 mod tests {
-    use agent_desktop_core::{DeliverySemantics, ErrorCode};
+    use agent_desktop_core::{DeliverySemantics, ErrorCode, KeyCombo, Modifier};
 
-    use super::key_name_to_code;
+    use super::{LayoutLookup, key_name_to_code};
 
     #[test]
     fn named_key_aliases_resolve_to_same_code() {
@@ -202,5 +226,61 @@ mod tests {
         assert_eq!(err.code, ErrorCode::InvalidArgs);
         assert!(err.message.contains("hyperkey"));
         assert!(err.suggestion.is_some());
+    }
+
+    fn french_azerty(symbol: char) -> LayoutLookup {
+        match symbol {
+            'q' => LayoutLookup::Found(0),
+            'w' => LayoutLookup::Found(6),
+            'a' => LayoutLookup::Found(12),
+            'z' => LayoutLookup::Found(13),
+            'm' => LayoutLookup::Found(41),
+            _ => LayoutLookup::NoKeyForSymbol,
+        }
+    }
+
+    #[test]
+    fn letters_are_sent_with_the_key_that_types_them_in_the_active_layout() {
+        assert_eq!(super::code_in_layout("a", french_azerty).unwrap(), 12);
+        assert_eq!(super::code_in_layout("q", french_azerty).unwrap(), 0);
+        assert_eq!(super::code_in_layout("z", french_azerty).unwrap(), 13);
+        assert_eq!(super::code_in_layout("w", french_azerty).unwrap(), 6);
+        assert_eq!(super::code_in_layout("m", french_azerty).unwrap(), 41);
+    }
+
+    #[test]
+    fn letters_keep_their_ansi_key_when_the_layout_cannot_place_them() {
+        let unreadable = |_| LayoutLookup::LayoutUnavailable;
+        let no_latin_keys = |_| LayoutLookup::NoKeyForSymbol;
+        for letter in ["a", "q", "z", "w"] {
+            let ansi = key_name_to_code(letter).unwrap();
+            assert_eq!(super::code_in_layout(letter, unreadable).unwrap(), ansi);
+            assert_eq!(super::code_in_layout(letter, no_latin_keys).unwrap(), ansi);
+        }
+    }
+
+    #[test]
+    fn named_keys_never_consult_the_layout() {
+        let layout_must_not_be_read = |symbol| panic!("layout read for {symbol}");
+        assert_eq!(
+            super::code_in_layout("return", layout_must_not_be_read).unwrap(),
+            36
+        );
+        assert_eq!(
+            super::code_in_layout("delete", layout_must_not_be_read).unwrap(),
+            51
+        );
+    }
+
+    #[test]
+    fn off_the_main_thread_a_command_letter_keeps_its_ansi_key() {
+        let combo = KeyCombo {
+            key: "a".into(),
+            modifiers: vec![Modifier::Meta],
+        };
+        let code = std::thread::spawn(move || super::key_code(&combo))
+            .join()
+            .unwrap();
+        assert_eq!(code.unwrap(), 0);
     }
 }
