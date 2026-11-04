@@ -328,6 +328,7 @@ pub(crate) mod legacy_host;
 pub(crate) mod process_apps;
 pub(crate) mod process_identity;
 pub(crate) mod process_state;
+pub(crate) mod provider_script;
 #[cfg(all(test, unix))]
 #[path = "process_tests.rs"]
 mod tests;

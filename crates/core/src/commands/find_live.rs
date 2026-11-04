@@ -48,7 +48,7 @@ pub(super) fn execute(
                 args.surface,
                 deadline,
             )?;
-            snapshot::first_surface_owner(windows, |window| {
+            snapshot::window_capture::first_surface_owner(windows, |window| {
                 resolve_query(adapter, query, ObservationRoot::Window(window), &request)
             })?
             .1

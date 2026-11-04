@@ -94,6 +94,25 @@ pub(crate) fn capture_window(
     })
 }
 
+pub(crate) fn first_surface_owner<T>(
+    windows: Vec<WindowInfo>,
+    mut observe: impl FnMut(&WindowInfo) -> Result<T, AppError>,
+) -> Result<(WindowInfo, T), AppError> {
+    let mut windows = windows.into_iter().peekable();
+    while let Some(window) = windows.next() {
+        match observe(&window) {
+            Err(AppError::Adapter(error))
+                if error.code == crate::ErrorCode::ElementNotFound && windows.peek().is_some() => {}
+            result => return result.map(|observed| (window, observed)),
+        }
+    }
+    Err(
+        crate::AdapterError::new(crate::ErrorCode::WindowNotFound, "No window to observe")
+            .unsent()
+            .into(),
+    )
+}
+
 /// The whole-window read that proves tokenless refs, or why it cannot.
 fn whole_window(
     adapter: &dyn PlatformAdapter,

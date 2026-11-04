@@ -1,0 +1,93 @@
+use crate::sandbox::sandbox_name::validate_sandbox_name;
+use crate::sandbox::sandbox_record::SandboxRecord;
+use crate::storage::private_file::{read_private_bounded, write_atomic};
+use crate::storage::private_file_ops::temporary_file_name;
+use crate::storage::private_file_parent::ensure_private;
+use crate::{AdapterError, AppError, DeliverySemantics, ErrorCode};
+use std::ffi::OsStr;
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
+
+pub(crate) const RECORD_FILE: &str = "sandbox.json";
+const MAX_RECORD_BYTES: u64 = 4096;
+
+pub(crate) fn create(root: &Path, record: &SandboxRecord) -> Result<PathBuf, AppError> {
+    validate_sandbox_name(&record.name)?;
+    let dir = root.join(&record.name);
+    ensure_private(&dir)?;
+    let staging = dir.join(temporary_file_name(OsStr::new(RECORD_FILE)));
+    write_atomic(&staging, &serde_json::to_vec(record)?)?;
+    let published = std::fs::hard_link(&staging, dir.join(RECORD_FILE));
+    let _ = std::fs::remove_file(&staging);
+    match published {
+        Ok(()) => Ok(dir),
+        Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+            Err(already_exists(&load(root, &record.name)?))
+        }
+        Err(error) => Err(error.into()),
+    }
+}
+
+pub(crate) fn load(root: &Path, name: &str) -> Result<SandboxRecord, AppError> {
+    validate_sandbox_name(name)?;
+    match read_private_bounded(&root.join(name).join(RECORD_FILE), MAX_RECORD_BYTES) {
+        Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
+        Err(error) if error.kind() == ErrorKind::NotFound => Err(not_found(name)),
+        Err(error) => Err(error.into()),
+    }
+}
+
+pub(crate) fn list(root: &Path) -> Result<Vec<SandboxRecord>, AppError> {
+    let entries = match std::fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error.into()),
+    };
+    let mut records: Vec<SandboxRecord> = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| load(root, &entry.file_name().to_string_lossy()).ok())
+        .collect();
+    records.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(records)
+}
+
+pub(crate) fn remove(root: &Path, name: &str) -> Result<(), AppError> {
+    validate_sandbox_name(name)?;
+    match std::fs::remove_dir_all(root.join(name)) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == ErrorKind::NotFound => Err(not_found(name)),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn already_exists(record: &SandboxRecord) -> AppError {
+    AppError::Adapter(
+        AdapterError::new(
+            ErrorCode::InvalidArgs,
+            format!(
+                "A sandbox named {} already exists (provider {}).",
+                record.name, record.provider
+            ),
+        )
+        .with_suggestion(format!(
+            "Pick another name, or run `agent-desktop sandbox rm {}` first.",
+            record.name
+        ))
+        .with_disposition(DeliverySemantics::not_delivered()),
+    )
+}
+
+fn not_found(name: &str) -> AppError {
+    AppError::Adapter(
+        AdapterError::new(
+            ErrorCode::SandboxNotFound,
+            format!("No sandbox named {name} exists."),
+        )
+        .with_suggestion("Run `agent-desktop sandbox list` to see the sandboxes that exist.")
+        .with_disposition(DeliverySemantics::not_delivered()),
+    )
+}
+
+#[cfg(test)]
+#[path = "sandbox_store_tests.rs"]
+mod tests;
