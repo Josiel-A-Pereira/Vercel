@@ -11,6 +11,8 @@ Start with `agent-desktop status` and `agent-desktop list-apps`.
 | App runs, `--app` finds nothing | Not on the bus, or wrong name. Use the `list-apps` name; see "Apps that are not on the bus" |
 | Chromium shows a bus entry but no windows | Renderer accessibility is off. Add `--force-renderer-accessibility` |
 | Window appears, `snapshot` is thin | Content not ready. `wait --window`, then `wait --text`; raise the wait's `--timeout` or the snapshot's `--timeout-ms` |
+| `snapshot` returns a handful of nodes and `window.title` is a dialog caption rather than the page title | A modal owns the window and the app tree behind it cannot be read. Act on the dialog, then snapshot again. A Chromium `Profile error occurred` modal means the profile directory is not writable by the running user: `find <profile> ! -user <user>` and `chown -R` it |
+| The browser disappears mid-session and the log ends in `Received signal 11 SEGV_MAPERR` | Chromium crashed on page content, not on the automation. In a container, `--disable-gpu` combined with `--disable-software-rasterizer` is unstable on heavy SPAs; see "Containers and non-desktop sessions" |
 | `TIMEOUT` on `snapshot` | No usable observation before the deadline, or an incomplete `--root` drill-down. Raise `--timeout-ms`; see "Observation details" |
 | `ACTION_FAILED` `activation_not_granted` | The window manager never activated the window: `references/windows-and-lifecycle.md`, Focus |
 | `ACTION_FAILED` `overview_open` | GNOME Activities Overview is open. `focus-window` refuses with it, and a `click` or `expand` on a menu opener that showed no popup (`details.kind: popup_not_observed`) names it while it is open. Close it and retry |
@@ -66,6 +68,56 @@ A GNOME desktop keeps the shell connected, so this does not occur there. Electro
 them, but no read command sees them. Tree items that report `expandable` have no
 expand action, and menu items cannot be clicked by ref: use `--headed` pointer
 input on their bounds.
+
+## Containers and non-desktop sessions
+
+Xvfb and Xvnc containers need more than the bus variable above. A Chromium
+driven there can pass every accessibility check and still fail in three ways
+that read as automation bugs.
+
+**Renderer crashes on real pages.** `--disable-gpu` together with
+`--disable-software-rasterizer` leaves no rasterizer at all. That combination
+survives `about:blank` and dies with `Received signal 11 SEGV_MAPERR` on a heavy
+single-page app: webmail, chat, dashboards. Ask for software GL instead.
+
+```bash
+agent-desktop launch google-chrome \
+  --arg=--force-renderer-accessibility \
+  --arg=--use-gl=swiftshader \
+  --arg=--disable-dev-shm-usage
+```
+
+A small `/dev/shm` is the usual cause on its own, so keep
+`--disable-dev-shm-usage` as well.
+
+**X authorization for helper processes.** When the session cookie lives outside
+the default path, the browser's own children can fail with "Authorization
+required, but no authorization protocol specified" while the window still opens
+and content still renders, which makes the warning look harmless. Copy the
+cookie to the default path for the user that runs the browser, and the browser
+no longer needs `XAUTHORITY` in its environment:
+
+```bash
+cp "$XAUTHORITY" ~/.Xauthority && chmod 600 ~/.Xauthority
+```
+
+**A profile the browser cannot write.** Any root-side copy of a profile
+directory leaves `Preferences`, `IndexedDB/*` and `Network Persistent State`
+owned by root. The browser opens a `Profile error occurred` modal on the next
+start, and because that modal owns the window, `snapshot` returns a few nodes
+with the dialog caption as the window title. Count the damage and repair it:
+
+```bash
+find <profile-dir> ! -user <user> | wc -l    # non-zero means broken
+chown -R <user>:<user> <profile-dir>
+```
+
+For web content in these sessions a headless `click` is the reliable delivery:
+the semantic `Action.DoAction` path needs no compositor hit-test, while headed
+pointer input can refuse with `pointer_hit_unproven` and `hit_test: Unknown`
+under Xvnc, or time out on `sibling_overlap` for adjacent controls such as a
+browser tab strip. Reserve `--headed` for `type`, which needs the focus
+fallback, and for the twin-control case `--headed mouse-click --xy` exists for.
 
 ## Observation details
 
