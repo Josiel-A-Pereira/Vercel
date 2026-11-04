@@ -21,8 +21,13 @@ pub(crate) fn ensure_private_portable(path: &Path) -> std::io::Result<()> {
             ));
         }
         if metadata.mode() & 0o077 != 0 {
-            return Err(super::private_file::permission_denied(
-                "private file parent is accessible by group or other users",
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                format!(
+                    "private file parent {} is accessible by group or other users; use chmod 700 {}",
+                    path.display(),
+                    path.display()
+                ),
             ));
         }
     }

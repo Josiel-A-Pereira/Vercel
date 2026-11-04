@@ -110,10 +110,10 @@ fn private_writes_and_locks_reject_group_accessible_parent() {
     std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o770)).unwrap();
     let path = directory.join("data");
 
-    assert_eq!(
-        write_atomic(&path, b"private").unwrap_err().kind(),
-        std::io::ErrorKind::PermissionDenied
-    );
+    let error = write_atomic(&path, b"private").unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+    assert!(error.to_string().contains(&directory.display().to_string()));
+    assert!(error.to_string().contains("chmod 700"));
     assert_eq!(
         open_private_lock(&path, true).unwrap_err().kind(),
         std::io::ErrorKind::PermissionDenied
