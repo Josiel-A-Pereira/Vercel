@@ -6,6 +6,7 @@ use agent_desktop_core::{
 
 use crate::system::app_ops;
 use crate::system::process_identity;
+use crate::system::window::frame_identity;
 use crate::system::window::listing_retry::{LISTING_RACE_ATTEMPTS, retry_transient_window_race};
 use crate::system::window::window_enum::{EnumeratedWindow, enumerate_top_level};
 use crate::system::window::window_identity;
@@ -135,7 +136,7 @@ fn walk_phase(
         if index > 0 {
             deadline.ensure_remaining()?;
         }
-        let Some(pid) = window_identity::live_window_owner(window.handle) else {
+        let Some(pid) = window_owner(window.handle) else {
             continue;
         };
         let token = cached_token(&mut cache, pid)?;
@@ -175,7 +176,7 @@ fn assembly_phase(
         if index > 0 {
             deadline.ensure_remaining()?;
         }
-        let Some(current_pid) = window_identity::live_window_owner(entry.window.handle) else {
+        let Some(current_pid) = window_owner(entry.window.handle) else {
             continue;
         };
         if current_pid != entry.pid {
@@ -222,6 +223,14 @@ fn assembly_phase(
         windows_complete: true,
         apps_complete: true,
     }))
+}
+
+/// The pid a window is attributed to, matching `list-windows`: an application
+/// frame host frame belongs to the application it hosts, so an event filtered
+/// by that application's name sees the windows `list-windows` reports for it.
+fn window_owner(handle: crate::system::window::window_enum::WindowHandle) -> Option<ProcessId> {
+    frame_identity::hosted_application_pid(handle)
+        .or_else(|| window_identity::live_window_owner(handle))
 }
 
 fn cached_token(
