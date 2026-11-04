@@ -105,8 +105,8 @@ pub(crate) fn capture_with(
     if all.len() == 1 && matches!(target, ScreenshotTarget::FullScreen) {
         return Ok(whole);
     }
-    let rect = pixel_rect(&display, &all, (whole.width, whole.height))?;
-    crop_png(&whole.data, rect, display.scale)
+    let (rect, scale) = pixel_rect(&display, &all, (whole.width, whole.height))?;
+    crop_png(&whole.data, rect, scale)
 }
 
 /// Captures the whole desktop through the desktop portal's `Screenshot` call.

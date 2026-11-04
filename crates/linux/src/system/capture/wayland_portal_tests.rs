@@ -186,6 +186,23 @@ fn a_screen_target_is_the_displays_rectangle_of_the_portals_image() {
 }
 
 #[test]
+fn a_screen_of_a_mixed_scale_layout_is_cut_at_the_largest_scale() {
+    let dir = scratch("mixed");
+    let path = dir.join("Screenshot.png");
+    fs::write(&path, gradient_png(60, 30)).expect("a png");
+    let mut high = display("a", 0.0, 20.0, 15.0);
+    high.scale = 2.0;
+    let shown = vec![high, display("b", 20.0, 10.0, 10.0)];
+    let (outcome, _) = run_on(&ScreenshotTarget::Screen(1), granted(&path), &[dir], shown);
+    let image = outcome.expect("a crop");
+    assert_eq!(
+        (image.width, image.height, image.scale_factor),
+        (20, 20, 2.0)
+    );
+    assert!(!path.exists());
+}
+
+#[test]
 fn a_display_target_that_changed_makes_no_portal_call() {
     let stale = display("b", 40.0, 25.0, 20.0);
     let (outcome, calls) = run(

@@ -30,7 +30,7 @@ fn logical_rectangles_with_one_common_scale_are_multiplied() {
     let all = [display("a", 0.0, 0.0, 1280.0, 800.0, 2.0)];
     assert_eq!(
         pixel_rect(&all[0], &all, (2560, 1600)).expect("a rect"),
-        rect(0, 0, 2560, 1600)
+        (rect(0, 0, 2560, 1600), 2.0)
     );
 }
 
@@ -42,7 +42,7 @@ fn rectangles_already_in_image_pixels_win_with_mixed_scales() {
     ];
     assert_eq!(
         pixel_rect(&all[1], &all, (3360, 1600)).expect("a rect"),
-        rect(2560, 0, 800, 600)
+        (rect(2560, 0, 800, 600), 1.0)
     );
 }
 
@@ -54,7 +54,7 @@ fn an_origin_that_is_not_zero_is_removed() {
     ];
     assert_eq!(
         pixel_rect(&all[0], &all, (2080, 800)).expect("a rect"),
-        rect(0, 0, 1280, 800)
+        (rect(0, 0, 1280, 800), 1.0)
     );
 }
 
@@ -66,6 +66,11 @@ fn an_image_that_fits_no_hypothesis_is_refused() {
     ];
     let error = pixel_rect(&all[0], &all, (2000, 1000)).expect_err("no mapping");
     assert_eq!(error.code, ErrorCode::PlatformNotSupported);
+    assert!(
+        error
+            .suggestion
+            .is_some_and(|suggestion| suggestion.contains("'snapshot'"))
+    );
 }
 
 #[test]
@@ -76,6 +81,47 @@ fn mixed_logical_scales_that_the_image_does_not_confirm_are_refused() {
     ];
     assert!(pixel_rect(&all[0], &all, (2080, 800)).is_ok());
     assert!(pixel_rect(&all[0], &all, (2560, 1600)).is_err());
+}
+
+#[test]
+fn mixed_logical_scales_are_drawn_at_the_largest_scale() {
+    let scale = 1.6666666269302368;
+    let all = [
+        display("HDMI-1", 0.0, 144.0, 2304.0, 1296.0, scale),
+        display("DP-2", 2304.0, 0.0, 2560.0, 1440.0, 1.0),
+    ];
+    assert_eq!(
+        pixel_rect(&all[0], &all, (8107, 2400)).expect("a rect"),
+        (rect(0, 240, 3840, 2160), scale)
+    );
+    assert_eq!(
+        pixel_rect(&all[1], &all, (8107, 2400)).expect("a rect"),
+        (rect(3840, 0, 4267, 2400), scale)
+    );
+}
+
+#[test]
+fn a_display_edge_between_image_pixels_takes_the_nearest_pixel() {
+    let scale = 1.6666666269302368;
+    let all = [
+        display("DP-2", 0.0, 0.0, 2560.0, 1440.0, 1.0),
+        display("HDMI-1", 2560.0, 0.0, 2304.0, 1296.0, scale),
+    ];
+    assert_eq!(
+        pixel_rect(&all[1], &all, (8107, 2400)).expect("a rect"),
+        (rect(4267, 0, 3840, 2160), scale)
+    );
+}
+
+#[test]
+fn mixed_logical_scales_need_the_rounded_size_at_the_largest_scale() {
+    let all = [
+        display("HDMI-1", 0.0, 144.0, 2304.0, 1296.0, 1.6666666269302368),
+        display("DP-2", 2304.0, 0.0, 2560.0, 1440.0, 1.0),
+    ];
+    for image in [(8106, 2400), (8108, 2400), (8107, 2399), (6400, 2160)] {
+        assert!(pixel_rect(&all[0], &all, image).is_err(), "{image:?}");
+    }
 }
 
 fn gradient(width: u32, height: u32, alpha: bool) -> Vec<u8> {

@@ -72,7 +72,9 @@ agent-desktop screenshot /tmp/desktop.png
 - `--screen N` and a display target crop the whole-desktop image to that
   monitor. Cropping requires dimensions that confirm the monitor layout;
   otherwise the call answers `PLATFORM_NOT_SUPPORTED` with reason
-  `display_mapping`.
+  `display_mapping`. When GNOME lays out monitors with different scales in
+  logical pixels, it draws the whole desktop at the largest scale, so a crop of
+  a lower-scale monitor reports that larger scale in `scale_factor`.
 - A known display layout is rechecked after consent, including when it had only
   one monitor. A changed layout returns `ACTION_FAILED` without pixels.
 - A window target (`--app`, `--window-id`) is `PLATFORM_NOT_SUPPORTED` on
