@@ -40,7 +40,7 @@ Choose the scope:
 
 ### Partial trees
 
-`data.complete` is on every snapshot. When the observation budget runs out, the command still succeeds with `"complete": false`, `"truncated": true`, `"nodes_observed"`, and the tree it saw. Each node with cut descendants carries `"subtree_truncated": true`. Read `complete`; do not wait for a `TIMEOUT`. Raise `--timeout-ms` (default 3000) or drill with `--root` to finish the tree. A `--root` drill is all or nothing: an incomplete read returns `TIMEOUT`.
+`data.complete` is on every snapshot. When the observation budget runs out, the command still succeeds with `"complete": false`, `"truncated": true`, `"nodes_observed"`, and the tree it saw. Each node with cut descendants carries `"subtree_truncated": true`. On macOS, an `AXTable` with off-screen rows can also be partial: it includes visible rows and reports the total in `children_count`. Scroll the table and snapshot again to inspect another range. Read `complete`; do not wait for a `TIMEOUT`. Raise `--timeout-ms` (default 3000) or drill with `--root` to finish a budget-limited tree. A `--root` drill is all or nothing: an incomplete read returns `TIMEOUT`.
 
 `"identity_unproven": true` means the snapshot could not read the whole window in time to prove its refs. On Windows and Linux, and on macOS for an element with no address, those refs fail with `identity_not_unique`, so retake the snapshot with a larger `--timeout-ms` before acting.
 

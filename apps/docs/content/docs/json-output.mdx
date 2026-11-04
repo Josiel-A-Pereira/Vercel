@@ -90,7 +90,7 @@ An error envelope has `error` and no `data`:
 }
 ```
 
-A snapshot that runs out of budget still returns `ok: true`, with `"complete": false`, `"truncated": true`, `nodes_observed`, and `"subtree_truncated": true` on each cut node. Read `data.complete` before you treat a tree as whole. Node fields are in [Snapshots and refs](/desktop/snapshots-and-refs), and partial observations in [Skeleton and drill-down](/desktop/skeleton-and-drill-down#partial-observations).
+A snapshot that runs out of budget still returns `ok: true`, with `"complete": false`, `"truncated": true`, `nodes_observed`, and `"subtree_truncated": true` on each cut node. A macOS snapshot can also be partial when an `AXTable` has off-screen rows; the table reports its total in `children_count`. Read `data.complete` before you treat a tree as whole. Node fields are in [Snapshots and refs](/desktop/snapshots-and-refs), and partial observations in [Skeleton and drill-down](/desktop/skeleton-and-drill-down#partial-observations).
 
 ## Action results and disposition
 

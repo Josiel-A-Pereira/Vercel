@@ -144,6 +144,12 @@ impl LocatorTraversal {
                 read.child_read.complete,
             )
         } else {
+            let children_count = read
+                .child_read
+                .truncated()
+                .then(|| u32::try_from(read.child_read.total_count).ok())
+                .flatten()
+                .filter(|count| *count > 0);
             self.usage.claim_edges(loaded_child_count);
             let original_viewport = self.context.window_bounds;
             self.context.window_bounds = crate::tree::element_bounds::clipped_viewport(
@@ -154,7 +160,7 @@ impl LocatorTraversal {
             let result = self.visit_children(read.child_read, (child_logical_depth, raw_depth));
             self.context.window_bounds = original_viewport;
             let (children, complete) = result?;
-            (children, None, complete)
+            (children, children_count, complete)
         };
         self.arena.ancestors.remove(&pointer);
         self.arena.drop_handles(1);
@@ -183,6 +189,7 @@ impl LocatorTraversal {
             return Ok((Vec::new(), false));
         }
         let total = read.elements.len();
+        let source_index_offset = read.source_index_offset.unwrap_or(0);
         let mut children = Vec::new();
         let mut predecessors_complete = read.prefix_certain;
         for (child_index, child) in read.elements.into_iter().enumerate() {
@@ -196,9 +203,10 @@ impl LocatorTraversal {
                 Some(subtree) => {
                     complete &= subtree.is_complete();
                     let edge_complete = retained_edge_certainty(&mut predecessors_complete, true);
+                    let source_child_index = source_index_offset + child_index;
                     children.push(
                         subtree
-                            .with_source_child_index(child_index)
+                            .with_source_child_index(source_child_index)
                             .with_predecessors_complete(edge_complete),
                     );
                 }
