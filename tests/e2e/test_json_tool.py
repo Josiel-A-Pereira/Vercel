@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -10,6 +11,47 @@ from json_tool import command_delivered_mechanism, command_get, run_bounded
 
 
 class RunBoundedTests(unittest.TestCase):
+    def test_nonfinite_timeouts_are_rejected_before_starting_a_child(self):
+        for timeout in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(timeout=timeout), mock.patch(
+                "bounded_process.subprocess.Popen", side_effect=AssertionError("child started before validation")
+            ) as start:
+                with self.assertRaises(ValueError):
+                    run_bounded([sys.executable, "-c", "pass"], timeout_seconds=timeout)
+                start.assert_not_called()
+
+    def test_nonfinite_environment_timeout_is_rejected_before_starting_a_child(self):
+        for timeout in ("nan", "inf", "-inf"):
+            with self.subTest(timeout=timeout), mock.patch.dict(
+                os.environ, {"AGENT_DESKTOP_E2E_TIMEOUT_SECONDS": timeout}
+            ), mock.patch(
+                "bounded_process.subprocess.Popen", side_effect=AssertionError("child started before validation")
+            ) as start:
+                with self.assertRaises(ValueError):
+                    run_bounded([sys.executable, "-c", "pass"])
+                start.assert_not_called()
+
+    def test_exec_rejects_an_infinite_environment_timeout(self):
+        environment = os.environ.copy()
+        environment["AGENT_DESKTOP_E2E_TIMEOUT_SECONDS"] = "inf"
+        result = subprocess.run(
+            [
+                sys.executable,
+                os.path.join(os.path.dirname(__file__), "json_tool.py"),
+                "exec",
+                sys.executable,
+                "-c",
+                "print('child started')",
+            ],
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("child started", result.stdout)
+        self.assertIn("timeout must be finite", result.stderr)
+
     def test_delivered_mechanism_reports_the_first_successful_step(self):
         payload = {
             "ok": True,

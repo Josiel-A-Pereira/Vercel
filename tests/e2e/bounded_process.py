@@ -1,4 +1,5 @@
 import dataclasses
+import math
 import os
 import resource
 import selectors
@@ -110,8 +111,8 @@ def run_bounded(
         if max_capture_bytes is not None
         else os.environ.get("AGENT_DESKTOP_E2E_MAX_CAPTURE_BYTES", DEFAULT_MAX_CAPTURE_BYTES)
     )
-    if timeout_seconds <= 0 or max_capture_bytes <= 0:
-        raise ValueError("timeout and capture limits must be positive")
+    if not math.isfinite(timeout_seconds) or timeout_seconds <= 0 or max_capture_bytes <= 0:
+        raise ValueError("timeout must be finite and positive and capture limit must be positive")
 
     usage_before = resource.getrusage(resource.RUSAGE_CHILDREN)
     started = time.perf_counter()
