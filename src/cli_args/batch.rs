@@ -2,7 +2,10 @@ use clap::Parser;
 
 #[derive(Parser, Debug)]
 pub(crate) struct BatchArgs {
-    #[arg(value_name = "JSON", help = "JSON array of {command, args} objects")]
+    #[arg(
+        value_name = "JSON",
+        help = "JSON array of {command, args} objects, or - to read it from stdin"
+    )]
     pub commands_json: String,
     #[arg(long, help = "Halt the batch on the first failed command")]
     pub stop_on_error: bool,
