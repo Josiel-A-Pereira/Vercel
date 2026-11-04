@@ -1,0 +1,77 @@
+---
+title: Sandboxes
+description: What an agent-desktop sandbox is, the commands that manage one, the states it reports, and where its files live.
+---
+
+A sandbox is a desktop that agent-desktop manages on your machine, with its own accessibility tree, so your commands act on apps in the sandbox instead of the desktop you are using. One provider owns that desktop: `macos-vm` runs a macOS virtual machine on an Apple Silicon Mac. Linux and Windows have no provider.
+
+```bash
+agent-desktop install                                  # report the provider's state
+agent-desktop sandbox create demo --provider macos-vm  # create a stopped sandbox
+```
+
+## How a sandbox command runs
+
+<Diagram name="sandboxes" title="How agent-desktop works with sandboxes" aspectRatio="720 / 468" />
+
+The same flow in text:
+
+1. Your agent runs agent-desktop commands.
+2. agent-desktop on your computer passes the command to the sandbox with `sandbox exec <name> -- <command>`.
+3. The same agent-desktop runs the command inside the sandbox, which is a macOS virtual machine.
+4. Inside, it reads and acts on that desktop's own apps and windows.
+5. `sandbox exec` returns the JSON result to your agent.
+
+A provider answers one verb with one JSON line on stdout: `ok`, `state`, `message`, and an optional `next`. agent-desktop reads the last line and turns a failure object into its own error envelope.
+
+## Commands
+
+<table>
+  <thead>
+    <tr><th>Command</th><th>What it does</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>install</code></td><td>Report the provider's state.</td></tr>
+    <tr><td><code>install PROVIDER</code></td><td>Satisfy one provider's host requirements, such as compiling its binary.</td></tr>
+    <tr><td><code>sandbox create NAME --provider PROVIDER</code></td><td>Create a stopped sandbox. Repeat <code>--set key=value</code> to pass provider options.</td></tr>
+    <tr><td><code>sandbox start NAME</code></td><td>Start a stopped sandbox.</td></tr>
+    <tr><td><code>sandbox status NAME</code></td><td>Report one sandbox's state and its next command.</td></tr>
+    <tr><td><code>sandbox list</code></td><td>Report every sandbox with its provider and state.</td></tr>
+    <tr><td><code>sandbox exec NAME -- ARGS</code></td><td>Run agent-desktop inside the sandbox and pass its output through.</td></tr>
+    <tr><td><code>sandbox stop NAME</code></td><td>Stop a running sandbox.</td></tr>
+    <tr><td><code>sandbox rm NAME</code></td><td>Remove a stopped sandbox. A sandbox reported as <code>running</code> is refused.</td></tr>
+  </tbody>
+</table>
+
+## Read the state
+
+Follow `next` when it is present. A successful reply means the provider answered; it does not mean the sandbox is ready.
+
+<table>
+  <thead>
+    <tr><th>State</th><th>What to do</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>unavailable</code></td><td>Satisfy the host requirements in <code>message</code> and <code>next</code>.</td></tr>
+    <tr><td><code>missing</code></td><td>Install the provider.</td></tr>
+    <tr><td><code>ready</code></td><td>Create a sandbox.</td></tr>
+    <tr><td><code>working</code></td><td>Repeat the command in <code>next</code> until the work finishes.</td></tr>
+    <tr><td><code>needs_setup</code></td><td>Have a person finish guest setup, then check the status again.</td></tr>
+    <tr><td><code>running</code></td><td>Run guest commands, or stop the sandbox before removing it.</td></tr>
+    <tr><td><code>stopped</code></td><td>Start the sandbox to use it, or remove it.</td></tr>
+    <tr><td><code>broken</code></td><td>Follow <code>next</code>. An interrupted install is not resumed, so the sandbox is removed.</td></tr>
+  </tbody>
+</table>
+
+[Errors and recovery](/desktop/errors-and-recovery) lists the codes a sandbox command returns, including `SANDBOX_NOT_FOUND`. [JSON output](/desktop/json-output#sandbox-results) defines the fields of each entry.
+
+## Where sandboxes live
+
+Sandbox state is under the state root, `~/.agent-desktop` or `AGENT_DESKTOP_HOME` when set:
+
+- `providers/<provider>/<hash>/` holds the provider files agent-desktop writes for one build of the binary, including `provider.sh`.
+- `sandboxes/<name>/sandbox.json` records the name, the provider, and the creation time. Everything else in that directory belongs to the provider.
+
+Names are 1 to 32 lowercase letters, digits, or dashes, starting with a letter or digit. Creating a name that already exists fails and leaves the existing sandbox in place.
+
+[macOS VM sandbox](/desktop/sandboxes/macos-vm) covers the provider, its one-time guest setup, and its limits. To run agent-desktop inside a container you manage yourself, see [Run agent-desktop in a Docker container](/desktop/guides/docker-container).
