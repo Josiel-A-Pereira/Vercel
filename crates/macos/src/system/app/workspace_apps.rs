@@ -229,10 +229,12 @@ fn apps_inventory_from_json_with(
         let process_instance = match resolve(app.pid) {
             Ok(Some(instance)) => instance,
             Ok(None) => {
-                return Err(records::with_skipped(
-                    inventory_error("Selected application exited during inventory"),
-                    &bridged.skipped,
-                ));
+                tracing::debug!(
+                    pid = app.pid,
+                    name = %app.name,
+                    "Dropped AppKit application record with no live process"
+                );
+                continue;
             }
             Err(error)
                 if skip_cross_uid
