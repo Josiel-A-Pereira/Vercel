@@ -17,6 +17,9 @@ use core_foundation_sys::{
     string::CFStringRef,
 };
 
+#[cfg(target_os = "macos")]
+use crate::tree::properties::offspace_windows as offspace;
+
 const MAX_IPC_SLICE: Duration = Duration::from_millis(250);
 
 pub(crate) trait AxDeadline: Copy {
@@ -113,6 +116,7 @@ pub(crate) fn copy_attribute_value(
         Ok(_) => unsafe { AXUIElementCopyAttributeValue(element.0, attribute, &mut value) },
         Err(error) => adapter_error_to_ax(&error),
     };
+    let (error, value) = offspace::extend_value(element, attribute, (error, value), deadline);
     (error, value)
 }
 
@@ -148,7 +152,13 @@ pub(crate) fn copy_attribute_values(
         },
         Err(error) => adapter_error_to_ax(&error),
     };
-    (error, values)
+    offspace::extend_values(
+        element,
+        attribute,
+        (error, values),
+        (index, max_values),
+        deadline,
+    )
 }
 
 #[cfg(target_os = "macos")]
@@ -183,6 +193,9 @@ pub(crate) fn attribute_value_count(
         Ok(_) => unsafe { AXUIElementGetAttributeValueCount(element.0, attribute, &mut count) },
         Err(error) => adapter_error_to_ax(&error),
     };
+    if let Some(merged) = offspace::extend_count(element, attribute, (error, count), deadline) {
+        return Ok(merged);
+    }
     if error != kAXErrorSuccess {
         return Err(error);
     }

@@ -20,6 +20,8 @@ pub(crate) mod node_attrs;
 pub(crate) mod node_control_states;
 pub(crate) mod node_identifiers;
 pub(crate) mod node_semantic_states;
+pub(crate) mod offspace_probe;
+pub(crate) mod offspace_windows;
 pub(crate) mod readonly;
 #[cfg(target_os = "macos")]
 pub(crate) mod selection_owner;
