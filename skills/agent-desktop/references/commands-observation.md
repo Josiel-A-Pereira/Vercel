@@ -114,6 +114,8 @@ agent-desktop screenshot --app "Finder" out.png
 agent-desktop screenshot --screen 0 display.png
 ```
 
+Use `--window-id` from `list-windows` to select one window when several app instances share a name. You can also pass `--app` to restrict that window to a matching application process instance.
+
 With no path, the PNG returns as base64 in `data`. `--screen` takes a display index from `list-displays`; `0` is the primary display. A screenshot is evidence for you, not proof that an action worked. Permission denial returns `PERM_DENIED` (see the platform skill).
 
 ## list-displays

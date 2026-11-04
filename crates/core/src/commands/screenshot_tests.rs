@@ -343,3 +343,6 @@ fn output_path() -> PathBuf {
 
 #[path = "screenshot_output_tests.rs"]
 mod output_tests;
+
+#[path = "screenshot_scope_tests.rs"]
+mod scope_tests;
