@@ -9,9 +9,10 @@ agent-browser). It cannot see UIs that expose no accessibility tree.
 
 ## Commands
 
-Each platform adapter compiles only on its own OS and the workspace names all three, so an unscoped `cargo build`,
-`cargo test --workspace` or `cargo clippy --all-targets` fails on every host. Scope cargo to the host's package set,
-the same set `.githooks/pre-commit` uses:
+Each platform adapter compiles only on its own OS. The workspace default members are the core crate and the CLI,
+so a bare `cargo build` compiles the host adapter through the CLI's target-gated dependency; `cargo build --workspace`,
+`cargo test --workspace` and `cargo clippy --all-targets` still include all three adapters and fail on every host.
+Scope those to the host's package set, the same set `.githooks/pre-commit` uses:
 
 ```bash
 HOST_PKGS=(-p agent-desktop-core -p agent-desktop-macos -p agent-desktop -p agent-desktop-ffi)
