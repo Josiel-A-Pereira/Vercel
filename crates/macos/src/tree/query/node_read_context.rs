@@ -5,4 +5,5 @@ pub(crate) struct NodeReadContext<'a> {
     pub(crate) requirements: agent_desktop_core::EvidenceRequirements,
     pub(crate) deadline: std::time::Instant,
     pub(crate) child_plan: super::child_read_plan::ChildReadPlan,
+    pub(crate) visible_table_rows_only: bool,
 }

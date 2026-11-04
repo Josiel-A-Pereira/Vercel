@@ -127,6 +127,7 @@ fn candidate_read(
                 1,
                 0,
             ),
+            visible_table_rows_only: false,
         },
     )?;
     if read.invalid_element {

@@ -95,8 +95,9 @@ mod imp {
         role: Option<&str>,
         budget: ChildReadBudget,
         deadline: std::time::Instant,
+        visible_table_rows_only: bool,
     ) -> ChildRead {
-        super::table_child_read::read(element, role, budget, deadline)
+        super::table_child_read::read(element, role, budget, deadline, visible_table_rows_only)
     }
 
     pub(crate) fn read_child_at(
@@ -364,6 +365,7 @@ mod imp {
         _role: Option<&str>,
         _budget: ChildReadBudget,
         _deadline: std::time::Instant,
+        _visible_table_rows_only: bool,
     ) -> ChildRead {
         ChildRead::empty(true)
     }

@@ -16,8 +16,9 @@ pub(super) fn read(
     role: Option<&str>,
     budget: ChildReadBudget,
     deadline: Instant,
+    visible_table_rows_only: bool,
 ) -> ChildRead {
-    if role != Some(TABLE_ROLE) {
+    if role != Some(TABLE_ROLE) || !visible_table_rows_only {
         return read_standard(element, role, budget, deadline);
     }
 

@@ -101,6 +101,7 @@ impl LocatorTraversal {
                 requirements,
                 deadline: self.deadline,
                 child_plan,
+                visible_table_rows_only: self.request.observation_mode.visible_table_rows_only,
             },
         )?;
         let renderer_surface_observed = read

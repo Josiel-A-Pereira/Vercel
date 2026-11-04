@@ -155,6 +155,7 @@ fn read_node(
             requirements,
             deadline: context.deadline,
             child_plan,
+            visible_table_rows_only: false,
         },
     )?;
     context
