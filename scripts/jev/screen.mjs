@@ -28,6 +28,7 @@ export const outsideWindow = (data, windowId) => {
 export const overlayRole = (tree) => {
   let found = null;
   const walk = (n) => {
+    if (n.role === "menu" && n.native_id?.value === "TitleBar") return;
     if (!found && ["sheet", "alert", "menu", "popover"].includes(n.role)) found = n.role;
     for (const c of n.children ?? []) walk(c);
   };

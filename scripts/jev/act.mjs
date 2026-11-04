@@ -14,16 +14,13 @@
  * comes from --text.
  */
 import { execFileSync, } from "node:child_process";
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { collect, describe, label, offerable, outsideWindow, overlayRole } from "./screen.mjs";
 import { NO_MATCH, resolveModel, typesafeApi, route } from "./policy.mjs";
+import { defaultBin, minimizedHint, snapshotFlags } from "./bin.mjs";
 
 export { collect, describe, label, offerable, overlayRole, route };
-
-const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /** A Choice accepts 255 options. One is reserved for the no-match outcome. */
 const MAX_OPTIONS = 254;
@@ -219,9 +216,7 @@ const main = async (argv) => {
   const windowId = flag("window-id");
   const execute = argv.includes("--execute");
   const values = !argv.includes("--no-values");
-  const bin = flag("bin") ?? (existsSync(join(REPO, "target/release/agent-desktop"))
-    ? join(REPO, "target/release/agent-desktop")
-    : "agent-desktop");
+  const bin = flag("bin") ?? defaultBin();
   const intent = argv
     .filter((a, i) => !a.startsWith("--") && !(argv[i - 1]?.startsWith("--") && !bools.has(argv[i - 1])))
     .join(" ");
@@ -233,16 +228,29 @@ const main = async (argv) => {
   if (!process.env.TYPESAFE_API_KEY) fail("TYPESAFE_API_KEY unset");
 
   const scope = windowId ? ["--app", app, "--window-id", windowId] : ["--app", app];
-  const base = ["snapshot", ...scope, "-i", "--compact", "--include-bounds"];
+  let flags;
+  try {
+    flags = snapshotFlags();
+  } catch (e) {
+    fail(e.message);
+  }
+  const hint = () => minimizedHint((...a) => run(bin, a), app, windowId);
+  const base = ["snapshot", ...scope, "-i", "--compact", "--include-bounds", ...flags];
   let snap = run(bin, root ? [...base, "--root", root] : base);
-  if (!snap.ok) fail(`snapshot failed: ${snap.error?.code}`, { detail: snap.error?.message });
+  if (!snap.ok) fail(`snapshot failed: ${snap.error?.code}`, { detail: snap.error?.message, hint: hint() });
   if (root && windowId && outsideWindow(snap.data, windowId)) {
     fail("root_outside_window", { detail: `the region is not in window ${windowId}` });
   }
 
-  const overlay = overlayRole(snap.data.tree);
-  if (overlay && !root) {
-    const surfaceSnap = run(bin, ["snapshot", ...scope, "--surface", overlay, "-i", "--compact", "--include-bounds"]);
+  let overlay = overlayRole(snap.data.tree);
+  if (!overlay && !root && process.platform === "win32") {
+    const popover = run(bin, ["snapshot", ...scope, "--surface", "popover", "-i", "--compact", "--include-bounds", ...flags]);
+    if (popover.ok && offerable(collect(popover.data.tree)).length && !(windowId && outsideWindow(popover.data, windowId))) {
+      snap = popover;
+      overlay = "popover";
+    }
+  } else if (overlay && !root) {
+    const surfaceSnap = run(bin, ["snapshot", ...scope, "--surface", overlay, "-i", "--compact", "--include-bounds", ...flags]);
     if (surfaceSnap.ok && windowId && outsideWindow(surfaceSnap.data, windowId)) {
       fail("surface_outside_window", { detail: `the ${overlay} is not in window ${windowId}` });
     }
@@ -256,7 +264,7 @@ const main = async (argv) => {
     overlay,
   };
   let candidates = offerable(collect(snap.data.tree));
-  if (candidates.length === 0) fail("no actionable element on screen");
+  if (candidates.length === 0) fail("no actionable element on screen", { hint: hint() });
 
   const truncated = candidates.length > MAX_OPTIONS;
   if (truncated) candidates = candidates.slice(0, MAX_OPTIONS);

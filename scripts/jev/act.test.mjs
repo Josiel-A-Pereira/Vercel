@@ -34,6 +34,8 @@ assert.equal(label(screen[2]), 'button "Save"');
 
 assert.equal(overlayRole({ role: "window", children: [{ role: "group" }] }), null);
 assert.equal(overlayRole({ role: "window", children: [{ role: "group", children: [{ role: "sheet" }] }] }), "sheet");
+assert.equal(overlayRole({ role: "window", children: [{ role: "menu", native_id: { value: "TitleBar" } }] }), null);
+assert.equal(overlayRole({ role: "window", children: [{ role: "menu", children: [{ role: "menuitem" }] }] }), "menu");
 
 const req = buildRequest("save the file", { app: "TextEdit", window: "Untitled" }, offerable(screen));
 assert.deepEqual(Object.keys(req.questions), ["target", "command", "present", "destructive", "needs_text"]);

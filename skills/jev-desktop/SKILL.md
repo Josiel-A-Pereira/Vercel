@@ -64,7 +64,7 @@ one.
 **Text goes in by whichever route the application accepts.** A direct value
 write (`set-value`) is one verified call. Only when the application refuses it
 and the refusal says a retry is safe does the value go through the clipboard and
-a `cmd+v` paste (macOS only). The clipboard is put back when the run ends, or
+a paste: `cmd+v` on macOS, `ctrl+v` elsewhere. The clipboard is put back when the run ends, or
 emptied if it held anything but text. One key press per character is never used:
 it drops characters and loses capitals.
 
@@ -146,6 +146,39 @@ node scripts/jev/act.mjs --app TextEdit --execute \
 }
 ```
 
+## Several steps per screen
+
+You know the steps; you want them run without a round trip after each one.
+
+```sh
+node scripts/jev/flow.mjs --app msedge --window-id w-42 --execute \
+  "the search box in the page header" --text "hello" press:return
+```
+
+Each round reads the screen once, asks Jev for the target of every pending
+step in one request, and runs the leading steps it is sure of as one
+`agent-desktop batch`. The first step it is not sure of ends the batch; the
+next round reads the screen again and asks for what is left. `--text` belongs
+to the step written before it, and `press:<combo>` sends a key without asking
+Jev. Without `--execute` the first round is printed and nothing runs.
+
+Grouping decisions reduces the number of model requests. Total latency still
+depends on the application, request size, and model service. Each question
+repeats the candidate list, so elements are described by role, label and up to
+sixty characters of value, and at most 150 visible, labelled elements are offered.
+
+After an action the screen is read until it differs from the one acted on. If
+Jev then finds nothing and the screen never changed, the run stops with
+`no_effect` instead of waiting. The confidence bars are the same as `act.mjs`.
+Text is written with `set-value` and no separate `focus`: on Windows `focus`
+moves the foreground, which headless delivery refuses. Each round prints one
+JSON line with `read_ms`, `ask_ms` and `act_ms`.
+
+If a batch fails, completed steps stay completed. The runner refreshes the
+screen and retries a stale ref only when the error says delivery did not
+occur and retry is safe. Other errors stop the flow, including failures
+after earlier steps in the batch succeeded.
+
 ## Calling it
 
 | Flag | Meaning |
@@ -156,12 +189,18 @@ node scripts/jev/act.mjs --app TextEdit --execute \
 | `--execute` | `act.mjs` only. Run the command when `decision` is `act`. Without it, nothing runs. |
 | `--text "…"` | Text the intent needs. Jev returns choices, never strings. `run.mjs` takes it repeatedly; `act.mjs` takes one value. |
 | `--root @ref` | Resolve inside one container instead of the whole window. |
-| `--bin <path>` | `act.mjs` only. agent-desktop binary. Defaults to the release build, then `PATH`. `run.mjs` reads `AGENT_DESKTOP_BIN` instead, with the same default. |
+| `--bin <path>` | `act.mjs` only. agent-desktop binary. Defaults to the release build, then `PATH`. On Windows the `PATH` lookup finds the `.exe` the npm package ships next to its `agent-desktop.cmd` shim, because Node cannot start the shim without a shell. `run.mjs` reads `AGENT_DESKTOP_BIN` instead, with the same default. |
 
 Environment: `TYPESAFE_API_KEY` is required (both scripts fail with
 `TYPESAFE_API_KEY unset`). `TYPESAFE_BASE_URL` and `TYPESAFE_MODEL` are covered
 below. `JEV_VERIFY_MS` sets the paste read-back deadline in ms (default 2000, 0
-to 60000).
+to 60000). `JEV_SNAPSHOT_TIMEOUT_MS` (1 to 120000) and `JEV_SNAPSHOT_MAX_DEPTH`
+(1 to 100) pass `--timeout-ms` and `--max-depth` to every screen read; unset,
+the CLI defaults of 3000 ms and depth 10 apply. A Chromium or Electron window
+often needs both: its controls can sit below depth 10, where a read returns a
+tree without them. The skeleton first look keeps the CLI depth. When a read
+fails and every window of the app is minimized, the error says so and names the
+`restore` command.
 
 `argv` is the exact agent-desktop command. `double-click` and `hover` carry
 `--headed`; `scroll` always goes down.
@@ -266,6 +305,8 @@ change shape.
 | `scripts/jev/desktop.mjs` | The only code that speaks to agent-desktop. |
 | `scripts/jev/run.mjs` | The loop and its command line. |
 | `scripts/jev/act.mjs` | The single-step resolver. |
+| `scripts/jev/flow.mjs` | Several known steps per screen: one read, one request, one batch. |
+| `scripts/jev/bin.mjs` | Which binary runs and the snapshot flags every read shares. |
 
 ## Checks
 
@@ -277,6 +318,8 @@ After a paste the field is read back. If it does not hold the requested text the
 
 ```sh
 node scripts/jev/act.test.mjs
+node scripts/jev/flow.test.mjs
+node scripts/jev/bin.test.mjs
 node scripts/jev/run.test.mjs
 node scripts/jev/run.integration.test.mjs
 node scripts/jev/evidence.test.mjs

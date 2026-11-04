@@ -26,6 +26,8 @@ if (command === 'snapshot' && mode === 'window_closed' && clicked()) result = er
 else if (command === 'snapshot' && mode === 'closed_top' &&
   require('node:fs').readFileSync(process.env.JEV_TEST_LOG,'utf8').split('\\n').filter(l=>l.includes('"command":"snapshot"')).length >= 3)
   result = error('WINDOW_NOT_FOUND','safe','not_delivered');
+else if (command === 'snapshot' && args.includes('popover') && !['popover_open','popover_other'].includes(mode))
+  result = error(mode === 'popover_unsupported' ? 'INVALID_ARGS' : 'ELEMENT_NOT_FOUND','safe','not_delivered');
 else if (command === 'snapshot') {
   const at = args.indexOf('--window-id');
   const actions = require('node:fs').readFileSync(process.env.JEV_TEST_LOG,'utf8').split('\\n').filter(Boolean)
@@ -36,7 +38,7 @@ else if (command === 'snapshot') {
   const surfaced = args.includes('--surface');
   const rooted = args.includes('--root');
   let id = pinned;
-  if (surfaced && mode === 'surface_other') id = 'w-other';
+  if (surfaced && ['surface_other','popover_other'].includes(mode)) id = 'w-other';
   if (rooted && mode === 'root_other') id = 'w-other';
   const window = surfaced && mode === 'surface_noid' ? {title:'試験'} : {title:'試験',id};
   const sheet = mode.startsWith('surface') && !surfaced ? [{role:'sheet',children:[]}] : [];
@@ -67,7 +69,7 @@ if (command === 'get') {
 }
 console.log(JSON.stringify(result));
 `;
-for (const command of ["snapshot", "click", "set-value", "focus", "clipboard-get", "clipboard-set", "press", "get"]) {
+for (const command of ["snapshot", "click", "set-value", "focus", "clipboard-get", "clipboard-set", "press", "get", "list-windows"]) {
   writeFileSync(join(directory, command), fake);
 }
 writeFileSync(preload, `
@@ -83,7 +85,7 @@ globalThis.fetch=async (_url,options)=>{
   if (['destructive','risk_safe'].includes(mode)) {
     appendFileSync(process.env.JEV_TEST_LOG,JSON.stringify({command:'goal',args:[body.state.goal]})+'\\n');
   }
-  const operation=['destructive','risk_safe'].includes(mode)?(calls===1?'CLICK':'DONE'):mode==='direct_type'?(calls===1?'TYPE_TEXT':'DONE'):mode==='sequence'?({1:'TYPE_TEXT',2:'CLICK',3:'TYPE_TEXT',4:'CLICK'}[calls]??'DONE'):mode==='wait'?(calls<=3?'WAIT':'DONE'):mode==='closed_top'?'WAIT':(mode==='done'||mode.startsWith('surface')||mode.endsWith('_other'))?'DONE':
+  const operation=['destructive','risk_safe'].includes(mode)?(calls===1?'CLICK':'DONE'):mode==='direct_type'?(calls===1?'TYPE_TEXT':'DONE'):mode==='sequence'?({1:'TYPE_TEXT',2:'CLICK',3:'TYPE_TEXT',4:'CLICK'}[calls]??'DONE'):mode==='wait'?(calls<=3?'WAIT':'DONE'):mode==='closed_top'?'WAIT':(mode==='done'||mode.startsWith('surface')||mode.startsWith('popover')||mode.endsWith('_other'))?'DONE':
     mode==='blocked'?'BLOCKED':mode==='click_error'||mode==='window_closed'?'CLICK':(mode==='paste_correct'||mode==='paste_late')&&calls>1?'DONE':'TYPE_TEXT';
   if (mode==='sequence') appendFileSync(process.env.JEV_TEST_LOG,JSON.stringify({command:'request',body})+'\\n');
   const answers={};
@@ -145,6 +147,20 @@ const run = (mode, extra = [], input = "試験") => {
 };
 
 try {
+  if (process.platform === "win32") {
+    for (const [mode, expected] of [["popover_open", "popover"], ["popover_other", "window"], ["popover_unsupported", "window"]]) {
+      const observed = run(mode, ["--window-id", "w-42"]);
+      assert.equal(observed.status, 0, mode);
+      assert.equal(observed.stop.screen.surface, expected, mode);
+      const resolved = act(mode, ["--window-id", "w-42"]);
+      assert.equal(resolved.status, 0, mode);
+      assert.equal(resolved.out.surface, expected, mode);
+      for (const commands of [observed.commands, resolved.commands]) {
+        assert.ok(commands.some(c => c.command === "snapshot" && c.args.includes("popover")), mode);
+        assert.equal(commands.some(c => ["click", "set-value", "press"].includes(c.command)), false, mode);
+      }
+    }
+  }
   const confirmed = run("destructive", ["--confirm-destructive"]);
   assert.equal(confirmed.status, 1);
   assert.match(confirmed.stop.stop, /^confirm: hard to undo/);
