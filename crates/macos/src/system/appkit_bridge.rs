@@ -95,6 +95,24 @@ pub(crate) fn ensure_cocoa_multithreaded() -> Result<(), String> {
 }
 
 #[cfg(target_os = "macos")]
+pub(crate) fn application_names(pid: i32) -> Result<Vec<String>, AdapterError> {
+    let result = unsafe { agent_desktop_copy_application_names_json(pid) };
+    let bytes = BridgeBytes(result.bytes);
+    if result.status != 0 {
+        return Err(bridge_error("application_names", result.status, false));
+    }
+    if result.length > MAX_BRIDGE_BYTES || (result.length > 0 && bytes.0.is_null()) {
+        return Err(bridge_error("application_names", u8::MAX, false));
+    }
+    let json = if result.length == 0 {
+        &[]
+    } else {
+        unsafe { std::slice::from_raw_parts(bytes.0, result.length) }
+    };
+    serde_json::from_slice(json).map_err(|_| bridge_error("application_names", u8::MAX, false))
+}
+
+#[cfg(target_os = "macos")]
 pub(crate) fn workspace_snapshot_json() -> Result<Vec<u8>, AdapterError> {
     let result = unsafe { agent_desktop_copy_workspace_snapshot_json() };
     let bytes = BridgeBytes(result.bytes);
@@ -204,6 +222,7 @@ unsafe extern "C" {
     ) -> TerminateResult;
     fn agent_desktop_app_finished_launching(pid: i32) -> i32;
     fn agent_desktop_ensure_cocoa_multithreaded() -> u8;
+    fn agent_desktop_copy_application_names_json(pid: i32) -> BytesResult;
     fn agent_desktop_copy_workspace_snapshot_json() -> BytesResult;
     fn agent_desktop_free_bridge_bytes(bytes: *mut u8);
 }
