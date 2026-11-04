@@ -9,9 +9,26 @@ agent-desktop version
 
 Without `-g`, the command goes to `./node_modules/.bin` instead of your PATH. Run it with `npx agent-desktop`, or install globally.
 
-## Homebrew and Scoop
+## Homebrew
 
-There is no Homebrew or Scoop package. The custom Homebrew tap and Scoop bucket were removed in 1.0.1. An install from them stays on its old version and can shadow the npm command. Uninstall it with the package manager that installed it. Check which executable runs with `command -v agent-desktop` on macOS and Linux, or `Get-Command agent-desktop` on Windows.
+On macOS and Linux, install from Homebrew's default catalog:
+
+```bash
+brew install agent-desktop
+agent-desktop version
+```
+
+The formula lives in `Homebrew/homebrew-core`. It builds from the tagged source, installs the platform helper beside
+the CLI, and Homebrew manages its own bottles. Homebrew's automation picks up new release tags, so a new version can
+reach Homebrew after npm and GitHub Releases. Upgrade with `brew upgrade agent-desktop`.
+
+## Scoop and older installations
+
+There is no official Scoop package yet. This repository no longer maintains a custom Homebrew tap or Scoop bucket;
+existing custom installations remain pinned to their installed version.
+
+If an older installation shadows the command, uninstall it through its original package manager. Check resolution
+with `command -v agent-desktop` on macOS/Linux or `Get-Command agent-desktop` on Windows.
 
 ## Blocked install scripts
 

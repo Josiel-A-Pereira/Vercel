@@ -58,8 +58,10 @@ refused until it is fixed. Read-only commands still run so the agent can report
 the problem, and the healthy layers still judge them, so a broken layer never
 lifts the owner's rules.
 
-Policies are judged by the CLI. The C library (`libagent_desktop_ffi`) does not
-run the gate.
+Policies are judged by the CLI. `agent-desktop mcp` runs each tool call as a
+CLI process, so every call is judged, and `--policy` or `--policy-dir` given
+to `mcp` add their layers to every call. The C library
+(`libagent_desktop_ffi`) does not run the gate.
 
 ## History
 

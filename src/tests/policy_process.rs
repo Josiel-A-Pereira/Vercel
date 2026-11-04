@@ -295,3 +295,51 @@ fn one_shot_processes_checkpoint_the_log_they_grow() {
         "a process that grew the log past the interval checkpoints it"
     );
 }
+
+/// An MCP server runs each tool call as its own CLI process, so the owner's
+/// folder and the policy flags given to `mcp` judge every call it serves.
+#[test]
+fn an_mcp_server_judges_every_tool_call_under_its_policy_flags() {
+    use std::io::Write;
+    use std::process::Stdio;
+    let home = PolicyHome::new("mcp");
+    let layer = home.layer(
+        "harness",
+        r#"@id("allow-all")
+permit (principal, action, resource);
+
+@id("no-display-listing")
+forbid (principal, action == Desktop::Action::"list-displays", resource);"#,
+    );
+    let mut child = binary()
+        .arg("--policy-dir")
+        .arg(&layer)
+        .arg("mcp")
+        .env("AGENT_DESKTOP_HOME", &home.root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("binary starts");
+    let mut stdin = child.stdin.take().expect("stdin");
+    for (id, tool) in [(1, "desktop_list_displays"), (2, "desktop_version")] {
+        let request = serde_json::json!({ "jsonrpc": "2.0", "id": id, "method": "tools/call",
+                                          "params": { "name": tool, "arguments": {} } });
+        writeln!(stdin, "{request}").expect("request written");
+    }
+    drop(stdin);
+    let output = child.wait_with_output().expect("server exits");
+    let mut responses = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).expect("JSON-RPC line"))
+        .collect::<Vec<_>>();
+    responses.sort_by_key(|response| response["id"].as_i64());
+
+    let refused = &responses[0]["result"]["structuredContent"];
+    assert_eq!(refused["error"]["code"], "POLICY_DENIED", "{responses:?}");
+    assert_eq!(
+        refused["error"]["details"]["policies"],
+        serde_json::json!(["no-display-listing"]),
+        "{refused}"
+    );
+    assert_eq!(responses[1]["result"]["isError"], false, "{responses:?}");
+}

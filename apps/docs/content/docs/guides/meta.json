@@ -7,6 +7,7 @@
     "chromium-and-electron",
     "headed-mode",
     "policies",
-    "traces"
+    "traces",
+    "mcp"
   ]
 }

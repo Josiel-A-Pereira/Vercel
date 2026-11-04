@@ -1,7 +1,7 @@
 ---
 title: Installation
 navTitle: Installation
-description: Install agent-desktop with npm, pnpm, Yarn, or Bun, from a release archive, or from source, and verify the install on macOS, Windows, or Linux.
+description: Install agent-desktop with npm, pnpm, Yarn, Bun, or Homebrew, from a release archive, or from source, and verify the install on macOS, Windows, or Linux.
 ---
 
 Install the `agent-desktop` npm package globally with npm, pnpm, Yarn, or Bun. It needs Node 18 or later and runs on macOS, Windows, and Linux.
@@ -48,11 +48,18 @@ The package's `postinstall` script replaces the Node launcher with a link to the
 npm install -g agent-desktop --allow-scripts=agent-desktop
 ```
 
-For a project install, run `npm install-scripts approve agent-desktop` inside the project, then `npm rebuild agent-desktop`. The approve command only edits the project's `package.json` and fails for a global install.
+## Homebrew
 
-## Homebrew and Scoop
+On macOS and Linux, install from Homebrew's default catalog. Homebrew builds from the tagged source and installs the platform helper beside the CLI.
 
-There is no Homebrew or Scoop package. The custom Homebrew tap and Scoop bucket were removed in 1.0.1 (see the [changelog](/desktop/changelog)). An older tap or bucket install stays pinned to its version and can shadow the npm command. Check which executable runs, and uninstall the old one with the package manager that installed it:
+```bash
+brew install agent-desktop     # macOS and Linux
+brew upgrade agent-desktop     # new versions arrive shortly after each GitHub release
+```
+
+## Scoop and older installs
+
+There is no Scoop package. The custom Homebrew tap and Scoop bucket were removed in 1.0.1 (see the [changelog](/desktop/changelog)). An older tap or bucket install stays pinned to its version and can shadow the npm or Homebrew command. Check which executable runs, and uninstall the old one with the package manager that installed it:
 
 ```bash
 command -v agent-desktop     # macOS and Linux; in PowerShell: Get-Command agent-desktop

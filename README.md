@@ -21,8 +21,12 @@ agent-desktop status                # platform, permissions, supported surfaces
 agent-desktop permissions --guide   # macOS: walks you through the Accessibility grant
 ```
 
-- **Windows:** no grant for apps at your terminal's integrity level.
-- **Linux:** run in the user's graphical session with `at-spi2-core`.
+Bun, Yarn and pnpm can install the same package. It includes native binaries and platform helpers for x64 and ARM64.
+For direct execution without a JavaScript launcher, download the matching native archive from
+[GitHub Releases](https://github.com/vercel-labs/agent-desktop/releases) and keep its helper beside the executable.
+
+On macOS and Linux, Homebrew also works: `brew install agent-desktop`. There is no official Scoop package yet.
+The repository no longer maintains a custom Homebrew tap or Scoop bucket.
 
 Release archives and building from source are covered in [Installation](https://agent-browser.dev/desktop/installation).
 
@@ -97,6 +101,16 @@ Use `agent-desktop` to see and operate desktop apps. Before the first use, run
 ```
 
 Retry a failed command only when `error.disposition.retry` is `safe`. See [JSON output](https://agent-browser.dev/desktop/json-output) for the envelope, error codes, and exit codes.
+
+### MCP
+
+`agent-desktop mcp` serves every command as an MCP tool over stdio. A tool is named after its command (`desktop_snapshot`, `desktop_click`, `desktop_session_start`), takes that command's arguments, and returns its JSON envelope:
+
+```json
+{ "mcpServers": { "agent-desktop": { "command": "agent-desktop", "args": ["mcp"] } } }
+```
+
+Global flags given to `mcp`, such as `--session`, `--headed` or `--trace`, apply to every call.
 
 ## Owner policies
 
