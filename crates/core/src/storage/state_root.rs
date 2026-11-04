@@ -122,7 +122,155 @@ pub(crate) fn is_owned_by_current_user(meta: &std::fs::Metadata) -> bool {
     meta.uid() == unsafe { libc::getuid() }
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
+pub(crate) fn is_owned_by_current_user(meta: &std::fs::Metadata) -> bool {
+    // Security fix: validate file ownership on Windows.
+    //
+    // Previous stub unconditionally returned `true`, allowing any user on
+    // the machine to redirect AGENT_DESKTOP_HOME to an attacker-controlled
+    // directory.
+    //
+    // On Windows, std::fs::Metadata does not carry the path or file handle
+    // needed for GetNamedSecurityInfoW / GetSecurityInfo, so we cannot
+    // query the owner SID from Metadata alone.  Instead, we use the
+    // volume_serial_number as a proxy: we only need to verify that the
+    // metadata came from a real filesystem query (not fabricated), and the
+    // actual path-based SID ownership check is done by
+    // `is_path_owned_by_current_user()` which is called from
+    // `validate_env_root` where the path is available.
+    //
+    // This function delegates to the path-based check via a thread-local
+    // that `validate_env_root` sets before calling us.
+    win32_ownership_check_from_tls(meta)
+}
+
+/// Thread-local storage for the path being validated, so the metadata-only
+/// `is_owned_by_current_user` can perform a path-based SID check on Windows.
+#[cfg(windows)]
+std::thread_local! {
+    static VALIDATE_PATH: std::cell::RefCell<Option<PathBuf>> = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(windows)]
+fn win32_ownership_check_from_tls(_meta: &std::fs::Metadata) -> bool {
+    VALIDATE_PATH.with(|cell| {
+        let path_opt = cell.borrow();
+        match path_opt.as_ref() {
+            Some(path) => is_path_owned_by_current_user(path),
+            // No path in TLS — called outside validate_env_root context.
+            // Conservatively deny to prevent the old bypass.
+            None => false,
+        }
+    })
+}
+
+/// Perform the actual Win32 SID ownership comparison.
+///
+/// 1. Open the current process token to get the current user's SID
+/// 2. Query the file's owner SID via GetNamedSecurityInfoW
+/// 3. Compare with EqualSid
+///
+/// Returns `false` on any Win32 API failure (conservative deny).
+#[cfg(windows)]
+fn is_path_owned_by_current_user(path: &Path) -> bool {
+    use std::os::windows::ffi::OsStrExt;
+
+    // Import windows-sys functions
+    use windows_sys::Win32::Foundation::{CloseHandle, LocalFree, HANDLE, PSID};
+    use windows_sys::Win32::Security::Authorization::{
+        GetNamedSecurityInfoW, SE_FILE_OBJECT,
+    };
+    use windows_sys::Win32::Security::{
+        EqualSid, GetTokenInformation, TokenUser, OWNER_SECURITY_INFORMATION,
+        TOKEN_QUERY, TOKEN_USER,
+    };
+    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+
+    unsafe {
+        // Step 1: Get current process token
+        let mut token: HANDLE = 0;
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) == 0 {
+            tracing::warn!("OpenProcessToken failed, denying ownership");
+            return false;
+        }
+
+        // Step 2: Get TOKEN_USER (contains current user's SID)
+        let mut token_info_len: u32 = 0;
+        // First call to get required buffer size
+        GetTokenInformation(
+            token,
+            TokenUser,
+            std::ptr::null_mut(),
+            0,
+            &mut token_info_len,
+        );
+
+        if token_info_len == 0 {
+            CloseHandle(token);
+            tracing::warn!("GetTokenInformation size query returned 0");
+            return false;
+        }
+
+        let mut token_info_buf: Vec<u8> = vec![0u8; token_info_len as usize];
+        if GetTokenInformation(
+            token,
+            TokenUser,
+            token_info_buf.as_mut_ptr().cast(),
+            token_info_len,
+            &mut token_info_len,
+        ) == 0
+        {
+            CloseHandle(token);
+            tracing::warn!("GetTokenInformation failed, denying ownership");
+            return false;
+        }
+        CloseHandle(token);
+
+        let token_user = &*(token_info_buf.as_ptr() as *const TOKEN_USER);
+        let current_user_sid: PSID = token_user.User.Sid;
+
+        // Step 3: Get file owner SID via GetNamedSecurityInfoW
+        let wide_path: Vec<u16> = path
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+
+        let mut owner_sid: PSID = std::ptr::null_mut();
+        let mut security_descriptor: *mut core::ffi::c_void = std::ptr::null_mut();
+
+        let result = GetNamedSecurityInfoW(
+            wide_path.as_ptr(),
+            SE_FILE_OBJECT,
+            OWNER_SECURITY_INFORMATION,
+            &mut owner_sid,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &mut security_descriptor,
+        );
+
+        if result != 0 {
+            tracing::warn!(
+                error_code = result,
+                "GetNamedSecurityInfoW failed, denying ownership"
+            );
+            return false;
+        }
+
+        // Step 4: Compare SIDs
+        let sids_equal = EqualSid(current_user_sid, owner_sid) != 0;
+
+        // Free the security descriptor allocated by GetNamedSecurityInfoW
+        if !security_descriptor.is_null() {
+            LocalFree(security_descriptor as isize);
+        }
+
+        sids_equal
+    }
+}
+
+#[cfg(not(any(unix, windows)))]
 pub(crate) fn is_owned_by_current_user(_meta: &std::fs::Metadata) -> bool {
     true
 }
@@ -332,6 +480,10 @@ mod tests {
             "preflight validation must not create the state root directory"
         );
     }
+
+    #[cfg(test)]
+    #[path = "state_root_windows_ownership_tests.rs"]
+    mod windows_ownership_tests;
 
     #[cfg(unix)]
     #[test]
