@@ -71,7 +71,9 @@ fn switch_on(
     match lease {
         Some(lease) => adapter.activate_renderer_accessibility(process, lease)?,
         None => {
-            let acquired = adapter.acquire_interaction_lease(crate::Deadline::standard()?)?;
+            let scope = crate::InteractionLeaseScope::app(None, Some(process.pid));
+            let acquired =
+                adapter.acquire_scoped_interaction_lease(scope, crate::Deadline::standard()?)?;
             adapter.activate_renderer_accessibility(process, &acquired)?;
         }
     }
