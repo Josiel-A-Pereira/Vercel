@@ -72,13 +72,44 @@ fn injected_group_kill_failure_is_reported_without_blocking_wait() {
     );
 }
 
+fn wait_for_unreaped_exit(pid: libc::id_t) {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        assert!(Instant::now() < deadline, "fixture process did not exit");
+        let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+        let result = unsafe {
+            libc::waitid(
+                libc::P_PID,
+                pid,
+                &mut info,
+                libc::WEXITED | libc::WNOWAIT | libc::WNOHANG,
+            )
+        };
+        if result == -1 && std::io::Error::last_os_error().kind() == std::io::ErrorKind::Interrupted
+        {
+            continue;
+        }
+        assert_eq!(
+            result,
+            0,
+            "waitid failed: {}",
+            std::io::Error::last_os_error()
+        );
+        if libc::id_t::try_from(info.si_pid).ok() == Some(pid) {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+}
+
 #[test]
 fn zombie_only_group_does_not_turn_sigkill_eperm_into_cleanup_failure() {
-    let mut command = Command::new("/usr/bin/true");
+    let mut command = Command::new("/bin/sh");
+    command.args(["-c", "sleep 0.2; exec /usr/bin/true"]);
     configure_process_group(&mut command);
     let mut child = command.spawn().unwrap();
     let process_group = i32::try_from(child.id()).expect("child pid fits macOS pid_t");
-    std::thread::sleep(Duration::from_millis(25));
+    wait_for_unreaped_exit(child.id());
     let mut signals = Vec::new();
     let deadline = Instant::now() + Duration::from_secs(5);
     let failures =
