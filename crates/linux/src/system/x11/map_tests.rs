@@ -206,3 +206,21 @@ fn an_unnamed_local_frame_needs_one_exact_same_process_size_match() {
         ClientMatch::NoClient
     );
 }
+
+#[test]
+fn matches_client_when_x11_title_has_app_suffix_like_kate() {
+    let clients = [client(1, 10, "display_probe.rs  — Kate", 157, 37)];
+    assert_eq!(
+        match_client(&frame(10, "display_probe.rs ", None, false), &clients),
+        ClientMatch::One(1)
+    );
+}
+
+#[test]
+fn matches_client_when_x11_title_has_hyphen_app_suffix() {
+    let clients = [client(2, 20, "Notes - Text Editor", 157, 37)];
+    assert_eq!(
+        match_client(&frame(20, "Notes", None, false), &clients),
+        ClientMatch::One(2)
+    );
+}

@@ -63,6 +63,37 @@ fn unnamed_client(frame: &FrameFacts, clients: &[X11Client]) -> ClientMatch {
     }
 }
 
+fn titles_match(client_title: &str, frame_title: &str) -> bool {
+    if client_title == frame_title {
+        return true;
+    }
+    let ct = client_title.trim();
+    let ft = frame_title.trim();
+    if ct == ft {
+        return true;
+    }
+    if ft.is_empty() {
+        return false;
+    }
+    let client_doc = ct.split_once(" — ").map(|(doc, _)| doc.trim()).unwrap_or(ct);
+    let frame_doc = ft.split_once(" — ").map(|(doc, _)| doc.trim()).unwrap_or(ft);
+    if client_doc == frame_doc {
+        return true;
+    }
+    let client_doc_dash = ct.split_once(" - ").map(|(doc, _)| doc.trim()).unwrap_or(ct);
+    let frame_doc_dash = ft.split_once(" - ").map(|(doc, _)| doc.trim()).unwrap_or(ft);
+    if client_doc_dash == frame_doc_dash {
+        return true;
+    }
+    if ct.starts_with(ft) {
+        let rest = ct[ft.len()..].trim_start();
+        if rest.starts_with('—') || rest.starts_with('-') {
+            return true;
+        }
+    }
+    false
+}
+
 /// The client of a window, by process id and title first. A tie is broken by
 /// the window's extents only when the toolkit reports them in screen
 /// coordinates: the accessibility rectangle then equals the client rectangle
@@ -78,10 +109,16 @@ pub(crate) fn match_client(frame: &FrameFacts, clients: &[X11Client]) -> ClientM
             ClientMatch::NoClient
         };
     }
-    let named: Vec<&X11Client> = clients
+    let mut named: Vec<&X11Client> = clients
         .iter()
         .filter(|client| client.pid == Some(frame.pid) && client.title == frame.title)
         .collect();
+    if named.is_empty() {
+        named = clients
+            .iter()
+            .filter(|client| client.pid == Some(frame.pid) && titles_match(&client.title, &frame.title))
+            .collect();
+    }
     let [_, _, ..] = named.as_slice() else {
         return named
             .first()
