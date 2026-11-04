@@ -46,7 +46,7 @@ Read the core skill first (`agent-desktop skills get desktop`) for the observe, 
 
 **Notification Center.** The notification commands drive Notification Center through accessibility, with the rules in the core `commands-system` reference. When agent-desktop opens the center, it closes it afterwards and restores the previous app focus. Pass both `--expected-app` and `--expected-title` on a single dismiss or action, because the stack shifts. Use `wait --notification --app "App"` for banners that vanish before you list them.
 
-**Chromium and Electron.** agent-desktop switches on the web accessibility of a Chromium renderer automatically when it needs it. For a dense running app, use `snapshot --skeleton -i --compact`, then drill with `--root @ref`.
+**Chromium and Electron.** agent-desktop switches on the web accessibility of a Chromium renderer automatically when it needs it. For a dense running app, use `snapshot --skeleton -i --compact`, then drill with `--root @ref`. For Chrome extension action popups, see "Chrome extension popups" in [references/troubleshooting.md](references/troubleshooting.md).
 
 **Identity.** `launch` accepts a display name (`"System Settings"`) or a bundle ID (`com.apple.systempreferences`). Other commands take the display name through `--app`, or the bundle ID or executable name (`ControlCenter`) when no running app has that display name. Window IDs such as `w-4521` stay valid for the life of the window. Find them with `list-windows`.
 
