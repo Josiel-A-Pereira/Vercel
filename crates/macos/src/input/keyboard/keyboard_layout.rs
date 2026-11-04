@@ -5,8 +5,8 @@ pub(crate) enum LayoutLookup {
     LayoutUnavailable,
 }
 
-pub(crate) fn code_for_symbol(symbol: char) -> LayoutLookup {
-    match platform::with_translator(|translate| find_code(symbol, translate)) {
+pub(crate) fn code_for_symbol(symbol: char, command_held: bool) -> LayoutLookup {
+    match platform::with_translator(command_held, |translate| find_code(symbol, translate)) {
         Some(Some(code)) => LayoutLookup::Found(code),
         Some(None) => LayoutLookup::NoKeyForSymbol,
         None => LayoutLookup::LayoutUnavailable,
@@ -35,6 +35,7 @@ mod platform {
 
     const KUC_KEY_ACTION_DOWN: u16 = 0;
     const KUC_KEY_TRANSLATE_DEAD_KEYS: u32 = 0;
+    const UC_COMMAND_KEY_STATE: u32 = 1;
 
     #[link(name = "Carbon", kind = "framework")]
     unsafe extern "C" {
@@ -58,8 +59,14 @@ mod platform {
     }
 
     pub(super) fn with_translator<T>(
+        command_held: bool,
         run: impl FnOnce(&dyn Fn(u16) -> Option<char>) -> T,
     ) -> Option<T> {
+        let modifier_key_state = if command_held {
+            UC_COMMAND_KEY_STATE
+        } else {
+            0
+        };
         unsafe {
             if pthread_main_np() != 1 {
                 return None;
@@ -77,14 +84,19 @@ mod platform {
             };
             let result = (!layout.is_null()).then(|| {
                 let keyboard_type = u32::from(LMGetKbdType());
-                run(&|code| translate(layout, keyboard_type, code))
+                run(&|code| translate(layout, keyboard_type, modifier_key_state, code))
             });
             CFRelease(source.cast_const());
             result
         }
     }
 
-    unsafe fn translate(layout: *const c_void, keyboard_type: u32, code: u16) -> Option<char> {
+    unsafe fn translate(
+        layout: *const c_void,
+        keyboard_type: u32,
+        modifier_key_state: u32,
+        code: u16,
+    ) -> Option<char> {
         let mut dead_key_state = 0;
         let mut length = 0;
         let mut buffer = [0_u16; 4];
@@ -93,7 +105,7 @@ mod platform {
                 layout,
                 code,
                 KUC_KEY_ACTION_DOWN,
-                0,
+                modifier_key_state,
                 keyboard_type,
                 KUC_KEY_TRANSLATE_DEAD_KEYS,
                 &mut dead_key_state,
@@ -109,6 +121,7 @@ mod platform {
 #[cfg(not(target_os = "macos"))]
 mod platform {
     pub(super) fn with_translator<T>(
+        _command_held: bool,
         _run: impl FnOnce(&dyn Fn(u16) -> Option<char>) -> T,
     ) -> Option<T> {
         None
@@ -154,7 +167,7 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn the_layout_is_never_read_off_the_main_thread() {
-        let lookup = std::thread::spawn(|| super::code_for_symbol(','))
+        let lookup = std::thread::spawn(|| super::code_for_symbol(',', false))
             .join()
             .unwrap();
         assert_eq!(lookup, super::LayoutLookup::LayoutUnavailable);
