@@ -63,6 +63,32 @@ fn unnamed_client(frame: &FrameFacts, clients: &[X11Client]) -> ClientMatch {
     }
 }
 
+/// Whether an X11 client title and an accessibility frame title refer to the
+/// same window. Toolkits such as Qt/KDE append an application name suffix
+/// (for example ` - Kate`, or the same with an em dash) to the window manager title while
+/// accessibility reports only the document or widget title, so a client title
+/// whose trimmed prefix equals the trimmed frame title counts as a match.
+fn titles_match(left: &str, right: &str) -> bool {
+    let left = left.trim();
+    let right = right.trim();
+    if left.is_empty() || right.is_empty() {
+        return false;
+    }
+    if left == right {
+        return true;
+    }
+    for (long, short) in [(left, right), (right, left)] {
+        for separator in [" \u{2014} ", " - "] {
+            if let Some(rest) = long.strip_prefix(short) {
+                if rest.starts_with(separator) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 /// The client of a window, by process id and title first. A tie is broken by
 /// the window's extents only when the toolkit reports them in screen
 /// coordinates: the accessibility rectangle then equals the client rectangle
@@ -80,7 +106,7 @@ pub(crate) fn match_client(frame: &FrameFacts, clients: &[X11Client]) -> ClientM
     }
     let named: Vec<&X11Client> = clients
         .iter()
-        .filter(|client| client.pid == Some(frame.pid) && client.title == frame.title)
+        .filter(|client| client.pid == Some(frame.pid) && titles_match(&client.title, &frame.title))
         .collect();
     let [_, _, ..] = named.as_slice() else {
         return named
