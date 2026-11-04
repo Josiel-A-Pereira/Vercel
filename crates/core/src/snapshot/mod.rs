@@ -1,8 +1,7 @@
 use crate::{
-    AccessibilityNode, AppError, WindowInfo,
+    AppError, WindowInfo,
     adapter::{PlatformAdapter, TreeOptions, WindowFilter},
     context::CommandContext,
-    locator::live_locator::{ObservationRequest, ObservationRoot},
     refs::RefMap,
     refs::ref_alloc::{self, RefAllocConfig},
     refs::ref_alloc_options::RefAllocOptions,
@@ -13,23 +12,6 @@ use crate::{
 };
 use serde_json::json;
 
-#[derive(Clone)]
-pub struct SnapshotResult {
-    pub tree: AccessibilityNode,
-    pub refmap: RefMap,
-    pub window: WindowInfo,
-    pub snapshot_id: Option<String>,
-    pub complete: bool,
-    pub nodes_observed: usize,
-}
-
-impl SnapshotResult {
-    pub(crate) fn bind_snapshot_id(&mut self, snapshot_id: String) {
-        crate::refs::ref_token::qualify_tree_refs(&mut self.tree, &snapshot_id);
-        self.snapshot_id = Some(snapshot_id);
-    }
-}
-
 pub fn build(
     adapter: &dyn PlatformAdapter,
     opts: &TreeOptions,
@@ -38,16 +20,12 @@ pub fn build(
     deadline: crate::Deadline,
 ) -> Result<SnapshotResult, AppError> {
     let windows = surface_windows(adapter, app_name, window_id, opts.surface, deadline)?;
-    let observation_options = opts.with_ref_identity_bounds();
-    let request = ObservationRequest::snapshot(&observation_options, deadline).validate()?;
-    let (window, observed) = first_surface_owner(windows, |window| {
-        crate::tree::renderer_accessibility::observe_tree(
-            adapter,
-            ObservationRoot::Window(window),
-            &request,
-        )
+    let (window, capture) = first_surface_owner(windows, |window| {
+        window_capture::capture_window(adapter, opts, window, deadline)
     })?;
-    let (raw_tree, complete, nodes_observed) = observed.into_accessibility_tree_partial()?;
+    let identity_unproven = capture.identity_unproven.clone();
+    let (raw_tree, complete, nodes_observed, observed) = capture.into_parts()?;
+    let capture_proof = crate::refs::ref_capture_proof::CaptureProof::new(&observed);
 
     let mut refmap = RefMap::new();
     let config = RefAllocConfig {
@@ -55,11 +33,12 @@ pub fn build(
             include_bounds: opts.include_bounds,
             interactive_only: opts.interactive_only,
             compact: opts.compact,
+            force_renderer_accessibility: opts.force_renderer_accessibility,
         },
         source: RefAllocSource {
             pid: window.pid,
             app: Some(window.app.as_str()),
-            window_id: Some(window.id.as_str()),
+            window_id: (!window.is_process_owner()).then_some(window.id.as_str()),
             window_title: Some(window.title.as_str()),
             window_bounds_hash: window.bounds.as_ref().and_then(crate::Rect::bounds_hash),
             process_instance: window.process_instance.as_deref(),
@@ -69,6 +48,7 @@ pub fn build(
             root_ref_id: None,
             path_prefix: &[],
         },
+        capture: Some(&capture_proof),
     };
     let mut tree = ref_alloc::allocate_refs(raw_tree, &mut refmap, &config)?;
 
@@ -81,6 +61,7 @@ pub fn build(
         snapshot_id: None,
         complete,
         nodes_observed,
+        identity_unproven,
     })
 }
 
@@ -91,10 +72,15 @@ pub fn build(
 /// Kinds naming OS chrome rather than a window's own sub-surface are routed to
 /// the adapter's `resolve_shell_surface` seam ahead of the application path,
 /// because no application owns them and the window inventory cannot identify
-/// them. An adapter that answers with the trait default falls through to the
-/// application path, so an adapter's shape never changes by upgrading; every
+/// them - not even a recorded or requested window id, which a shell container
+/// carries too. An adapter that answers with the trait default falls through to
+/// the application path, so an adapter's shape never changes by upgrading; every
 /// other answer - a missing surface, a build refusal, a timeout - is returned
-/// as the adapter supplied it.
+/// as the adapter supplied it, and a surface that answers with another window
+/// leaves the id to the application path.
+///
+/// `menu-bar-extras` with an app name is that app's own status item and takes the
+/// application path, where a background app that lists no window is read through its process.
 pub(crate) fn resolve_window_for_surface(
     adapter: &dyn PlatformAdapter,
     app_name: Option<&str>,
@@ -102,20 +88,32 @@ pub(crate) fn resolve_window_for_surface(
     surface: crate::SnapshotSurface,
     deadline: crate::Deadline,
 ) -> Result<WindowInfo, AppError> {
-    if window_id.is_some() || matches!(surface, crate::SnapshotSurface::Window) {
-        return resolve_window(adapter, app_name, window_id, deadline);
-    }
-    if is_shell_surface(surface) {
+    let app_status_item = app_name.is_some() && surface == crate::SnapshotSurface::MenuBarExtras;
+    if is_shell_surface(surface) && !app_status_item {
         match adapter.resolve_shell_surface(surface, deadline) {
-            Ok(window) => return Ok(window),
-            Err(error) if !error.is_default_not_supported("resolve_shell_surface") => {
+            Ok(window) if window_id.is_none_or(|id| window.id == id) => return Ok(window),
+            Ok(_) => {}
+            Err(error)
+                if window_id.is_none()
+                    && !error.is_default_not_supported("resolve_shell_surface") =>
+            {
                 return Err(error.into());
             }
             Err(_) => {}
         }
     }
+    if window_id.is_some() || (surface == crate::SnapshotSurface::Window && app_name.is_none()) {
+        return resolve_window(adapter, app_name, window_id, deadline);
+    }
+    let windows = windows_for_app(adapter, app_name, deadline)?;
+    if let (true, Some(app)) = (windows.is_empty() && is_process_surface(surface), app_name) {
+        return crate::system::app_lookup::windowless_app_owner(adapter, app, deadline);
+    }
+    if let (crate::SnapshotSurface::Window, Some(app)) = (surface, app_name) {
+        return select_app_window(windows, app);
+    }
     crate::system::window_lookup::select_surface_owner(
-        windows_for_app(adapter, app_name, deadline)?,
+        windows,
         crate::AdapterError::new(
             crate::ErrorCode::WindowNotFound,
             format!(
@@ -139,6 +137,27 @@ fn is_shell_surface(surface: crate::SnapshotSurface) -> bool {
             | crate::SnapshotSurface::SystemTrayOverflow
             | crate::SnapshotSurface::ActionCenter
             | crate::SnapshotSurface::QuickSettings
+            | crate::SnapshotSurface::Dock
+            | crate::SnapshotSurface::MenuBarExtras
+    )
+}
+
+/// Surfaces a background app with no window still presents, read from its
+/// process; the owner then carries an empty window id.
+fn is_process_surface(surface: crate::SnapshotSurface) -> bool {
+    matches!(
+        surface,
+        crate::SnapshotSurface::Window
+            | crate::SnapshotSurface::Menubar
+            | crate::SnapshotSurface::MenuBarExtras
+    )
+}
+
+fn select_app_window(windows: Vec<WindowInfo>, app: &str) -> Result<WindowInfo, AppError> {
+    crate::system::window_lookup::select_window(
+        windows,
+        crate::AdapterError::app_has_no_window(app),
+        "More than one window matches the target",
     )
 }
 
@@ -245,15 +264,7 @@ pub(crate) fn resolve_window(
                 }
             }
         }
-        crate::system::window_lookup::select_window(
-            windows,
-            crate::AdapterError::new(
-                crate::ErrorCode::WindowNotFound,
-                format!("Application '{app}' is running but has no matching window"),
-            )
-            .with_suggestion("Wait for the app to present a window, or run 'list-windows --app'."),
-            "More than one window matches the target",
-        )
+        select_app_window(windows, app)
     } else {
         crate::system::window_lookup::select_window(
             windows,
@@ -314,29 +325,13 @@ pub fn run_with_context(
         crate::Deadline::after(timeout_ms)?,
     )?;
     let store = RefStore::for_session(context.session_id())?;
-    let snapshot_id = store
-        .save_new_snapshot(&result.refmap)
-        .map_err(|error| note_observed_depth(error, opts.max_depth))?;
+    let snapshot_id = result
+        .save_refmap(&store)
+        .map_err(|error| crate::refs::refmap_cap::note_observed_depth(error, opts.max_depth))?;
     trace_artifacts::copy_refmap_if_full(context, &store, &snapshot_id, &result.refmap)?;
     result.bind_snapshot_id(snapshot_id);
     emit_snapshot_saved(context, &result)?;
     Ok(result)
-}
-
-/// Adds the depth an observation ran at to a `TREE_TOO_LARGE` error raised
-/// while its refmap was being saved, so the caller can choose a lower
-/// `--max-depth` from the envelope instead of guessing. Any other error
-/// passes through unchanged.
-pub(crate) fn note_observed_depth(error: AppError, max_depth: u8) -> AppError {
-    match error {
-        AppError::Adapter(mut adapter) if adapter.code == crate::ErrorCode::TreeTooLarge => {
-            if let Some(serde_json::Value::Object(details)) = adapter.details.as_mut() {
-                details.insert("max_depth".to_owned(), json!(max_depth));
-            }
-            AppError::Adapter(adapter)
-        }
-        other => other,
-    }
 }
 
 pub(crate) fn emit_snapshot_saved(
@@ -351,16 +346,38 @@ pub(crate) fn emit_snapshot_saved(
         if !result.window.app.is_empty() {
             fields["app"] = json!(result.window.app);
         }
+        if let Some(reason) = &result.identity_unproven {
+            fields["identity_unproven"] = json!(reason);
+        }
         fields
     })
 }
 
 pub mod hints;
+mod snapshot_result;
+pub use snapshot_result::SnapshotResult;
 pub mod snapshot_ref;
 pub mod snapshot_surface;
 #[cfg(test)]
 #[path = "snapshot_tests.rs"]
 mod tests;
+pub(crate) mod window_capture;
+
+#[cfg(test)]
+#[path = "tokenless_capture_support.rs"]
+mod tokenless_capture_support;
+
+#[cfg(test)]
+#[path = "tokenless_capture_tests.rs"]
+mod tokenless_capture_tests;
+
+#[cfg(test)]
+#[path = "tokenless_drill_tests.rs"]
+mod tokenless_drill_tests;
+
+#[cfg(test)]
+#[path = "snapshot_deadline_tests.rs"]
+mod deadline_tests;
 
 #[cfg(test)]
 #[path = "snapshot_window_tests.rs"]

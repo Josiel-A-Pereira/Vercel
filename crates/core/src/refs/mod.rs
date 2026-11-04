@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::collections::hash_map::RandomState;
 use std::hash::BuildHasher;
 use std::path::{Path, PathBuf};
@@ -14,30 +15,6 @@ pub type RefPath = SmallVec<[usize; 8]>;
 
 pub(crate) const MAX_REFMAP_BYTES: u64 = 1_048_576;
 
-/// `TREE_TOO_LARGE` for a refmap that serialized to `serialized_bytes`, above
-/// `MAX_REFMAP_BYTES`. The observation finished and nothing reached the
-/// application, so the disposition is `not_delivered` and a narrower retry is
-/// safe. `details` carries the measured size and the cap so the caller can
-/// judge how far to narrow.
-pub(crate) fn tree_too_large(serialized_bytes: u64) -> crate::AdapterError {
-    crate::AdapterError::new(
-        crate::ErrorCode::TreeTooLarge,
-        format!(
-            "RefMap serialized to {serialized_bytes} bytes, above the {MAX_REFMAP_BYTES} byte limit for one snapshot"
-        ),
-    )
-    .with_suggestion(
-        "Narrow the observation and retry: snapshot with a lower --max-depth, or snapshot --skeleton \
-         and then --root @<snapshot_id>:eN to drill into one subtree; for find, tighten the query or lower --limit",
-    )
-    .with_details(serde_json::json!({
-        "kind": "refmap_too_large",
-        "serialized_bytes": serialized_bytes,
-        "limit_bytes": MAX_REFMAP_BYTES,
-        "retryable": true,
-    }))
-    .with_disposition(crate::DeliverySemantics::not_delivered())
-}
 static SNAPSHOT_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 thread_local! {
@@ -128,24 +105,38 @@ impl RefMap {
             .filter_map(|entry| entry.identity.retained_object.as_deref())
     }
 
+    /// Removes the refs a drill-down replaces: the entries rooted at `root`, the
+    /// entries the same capture recorded below the root's own path, and -
+    /// transitively - everything those entries rooted, so a re-drill of an
+    /// ancestor leaves no ref of a nested drill behind. The selected root always
+    /// survives.
     pub fn remove_by_root_ref(&mut self, root: &str) {
-        let root_entry = self.inner.get(root).cloned();
-        self.inner.retain(|ref_id, entry| {
+        let root_entry = self.inner.get(root);
+        let mut removed: HashSet<String> = HashSet::new();
+        for (ref_id, entry) in &self.inner {
             if ref_id == root {
-                return true;
+                continue;
             }
             let owned = entry.scope.root_ref.as_deref() == Some(root);
-            let descendant = root_entry.as_ref().is_some_and(|parent| {
-                entry.process == parent.process
-                    && entry.source == parent.source
-                    && (parent.scope.root_ref.is_none() || parent.scope.path_is_absolute)
-                    && (entry.scope.root_ref.is_none() || entry.scope.path_is_absolute)
-                    && entry.scope.path.starts_with(&parent.scope.path)
-                    && (entry.scope.path.len() > parent.scope.path.len()
-                        || entry.scope.root_ref.is_some())
-            });
-            !owned && !descendant
-        });
+            let replaced = root_entry.is_some_and(|parent| same_capture_descendant(entry, parent));
+            if owned || replaced {
+                removed.insert(ref_id.clone());
+            }
+        }
+        let mut pending: Vec<String> = removed.iter().cloned().collect();
+        while let Some(owner) = pending.pop() {
+            for (ref_id, entry) in &self.inner {
+                if removed.contains(ref_id)
+                    || ref_id == root
+                    || entry.scope.root_ref.as_deref() != Some(owner.as_str())
+                {
+                    continue;
+                }
+                removed.insert(ref_id.clone());
+                pending.push(ref_id.clone());
+            }
+        }
+        self.inner.retain(|ref_id, _| !removed.contains(ref_id));
     }
 
     pub fn validate(&self) -> Result<(), AppError> {
@@ -177,7 +168,7 @@ impl RefMap {
         let json = serde_json::to_string(self)?;
         let serialized_bytes = json.len() as u64;
         if serialized_bytes > MAX_REFMAP_BYTES {
-            return Err(tree_too_large(serialized_bytes).into());
+            return Err(refmap_cap::tree_too_large(serialized_bytes).into());
         }
         Ok(json)
     }
@@ -202,6 +193,22 @@ impl Default for RefMap {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Whether `entry` sits below `parent` within one capture's path coordinates.
+///
+/// The ref that allocated a set of entries names that capture: the window walk
+/// records none, and a drill records the ref it drilled, which also makes its
+/// paths absolute. An entry another capture observed - another region's drill,
+/// or a node the tree has since moved under these coordinates - never compares
+/// equal however its path reads.
+fn same_capture_descendant(entry: &RefEntry, parent: &RefEntry) -> bool {
+    entry.process == parent.process
+        && entry.source == parent.source
+        && entry.scope.root_ref == parent.scope.root_ref
+        && entry.scope.path_is_absolute == parent.scope.path_is_absolute
+        && entry.scope.path.len() > parent.scope.path.len()
+        && entry.scope.path.starts_with(&parent.scope.path)
 }
 
 fn refmap_path() -> Result<PathBuf, AppError> {
@@ -355,16 +362,22 @@ pub(crate) mod ref_alloc_scope;
 pub(crate) mod ref_alloc_source;
 pub(crate) mod ref_allocation;
 pub(crate) mod ref_capabilities;
+pub(crate) mod ref_capture_proof;
 pub(crate) mod ref_entry;
 pub(crate) mod ref_entry_identity;
+pub(crate) mod ref_full_predicate;
 pub(crate) mod ref_geometry;
 pub mod ref_identity;
 pub(crate) mod ref_identity_match;
+pub(crate) mod ref_live_predicate;
 pub(crate) mod ref_process;
 pub(crate) mod ref_resolve_deadline;
+pub(crate) mod ref_root_read;
 pub(crate) mod ref_scope;
+pub(crate) mod ref_skeleton_anchors;
 pub(crate) mod ref_source;
 pub(crate) mod ref_token;
+pub(crate) mod refmap_cap;
 pub(crate) mod refs_lock;
 pub mod refs_store;
 #[cfg(test)]
@@ -372,13 +385,13 @@ pub(crate) mod refs_test_support;
 pub(crate) mod refs_validate;
 pub(crate) mod resolve_attempt_outcome;
 pub mod resolve_errors;
-#[cfg(test)]
-#[path = "refs_tests.rs"]
-mod tests;
-
+pub mod resolve_saved_ref;
 #[cfg(test)]
 #[path = "refs_serde_tests.rs"]
 mod serde_tests;
+#[cfg(test)]
+#[path = "refs_tests.rs"]
+mod tests;
 
 #[cfg(test)]
 #[path = "refs_size_tests.rs"]
