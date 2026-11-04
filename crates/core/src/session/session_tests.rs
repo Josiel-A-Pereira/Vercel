@@ -365,3 +365,36 @@ fn ending_a_default_session_keeps_refmaps_because_nothing_else_copies_them() {
             .is_some()
     );
 }
+
+#[test]
+fn a_denied_private_root_reports_perm_denied_not_internal() {
+    use crate::storage::private_file_ops::{PrivateFileOps, with_test_ops_override};
+
+    struct DenyEnsurePrivate;
+
+    impl PrivateFileOps for DenyEnsurePrivate {
+        fn ensure_private(&self, _path: &std::path::Path) -> std::io::Result<()> {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "private file DACL grants an untrusted principal",
+            ))
+        }
+    }
+
+    let _guard = HomeGuard::new();
+    let ops = std::rc::Rc::new(DenyEnsurePrivate);
+    let error = with_test_ops_override(ops, || {
+        start_session(StartSessionOptions {
+            name: None,
+            trace: SessionTraceMode::On,
+            ..Default::default()
+        })
+    })
+    .expect_err("a denied private root is refused");
+
+    assert_eq!(
+        error.code(),
+        "PERM_DENIED",
+        "a private-root denial must keep its PERM_DENIED code, not collapse into INTERNAL"
+    );
+}

@@ -8,8 +8,7 @@ use crate::AppError;
 /// here exactly as it is for a snapshot.
 pub(super) fn create(dir: &Path) -> Result<(), AppError> {
     let root = crate::storage::state_root::resolve_configured_state_root()?;
-    crate::storage::private_file_parent::ensure_private(&root)
-        .map_err(|error| AppError::Internal(error.to_string()))?;
+    crate::storage::private_file_parent::ensure_private(&root)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
