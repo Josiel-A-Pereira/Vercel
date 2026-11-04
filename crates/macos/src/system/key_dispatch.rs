@@ -48,7 +48,7 @@ fn press_for_app(
         return post_delivery_process_result(&process, semantic_step(action));
     }
 
-    crate::input::keyboard::keyboard_map::key_name_to_code(&combo.key)?;
+    crate::input::keyboard::keyboard_map::key_code(combo)?;
     if policy.allow_focus_steal {
         crate::system::process::process_identity::require_core(&process)?;
         crate::system::focus::verify_app_focused(pid, deadline)?;
