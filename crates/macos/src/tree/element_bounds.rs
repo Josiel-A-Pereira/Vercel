@@ -105,11 +105,14 @@ pub(crate) fn ancestor_viewport(
     element: &AXElement,
     deadline: Deadline,
 ) -> Result<Option<Rect>, AdapterError> {
-    let mut viewport = owning_window_bounds(element, deadline)?;
+    let instant = super::locator_deadline::from_operation(deadline)?;
+    let mut viewport = match owning_window_bounds(element, deadline)? {
+        Some(bounds) => Some(bounds),
+        None => window_ancestor_bounds(element, instant)?,
+    };
     if viewport.is_none() {
         return Ok(None);
     }
-    let instant = super::locator_deadline::from_operation(deadline)?;
     let mut current = super::surface_read::element(element, "AXParent", instant)?;
     for _ in 0..super::properties::element::ABSOLUTE_MAX_DEPTH {
         let Some(parent) = current else {
@@ -136,6 +139,50 @@ pub(crate) fn ancestor_viewport(
     Err(AdapterError::new(
         ErrorCode::AppUnresponsive,
         "Clipping ancestry exceeded its bounded depth",
+    ))
+}
+
+fn window_ancestor_bounds(
+    element: &AXElement,
+    instant: std::time::Instant,
+) -> Result<Option<Rect>, AdapterError> {
+    let window = first_window_ancestor(
+        element.clone(),
+        |current| super::surface_read::element(current, "AXParent", instant),
+        |current| super::surface_read::string(current, "AXRole", instant),
+    )?;
+    match window {
+        Some(window) => read_bounds_with_deadline(&window, instant),
+        None => Ok(None),
+    }
+}
+
+/// Some controls, such as System Settings popup buttons, answer
+/// `kAXErrorNoValue` for `AXWindow` although an `AXWindow` encloses them. The
+/// parent chain still reaches that window. Menu content has no window even
+/// when its chain passes through one, because an open menu draws outside the
+/// window and would be judged offscreen; the search stops at the first menu
+/// role, and a chain that ends at the application has no window either.
+fn first_window_ancestor<E>(
+    start: E,
+    mut parent: impl FnMut(&E) -> Result<Option<E>, AdapterError>,
+    mut role: impl FnMut(&E) -> Result<Option<String>, AdapterError>,
+) -> Result<Option<E>, AdapterError> {
+    let mut current = parent(&start)?;
+    for _ in 0..super::properties::element::ABSOLUTE_MAX_DEPTH {
+        let Some(ancestor) = current else {
+            return Ok(None);
+        };
+        match role(&ancestor)?.as_deref() {
+            Some("AXWindow") => return Ok(Some(ancestor)),
+            Some("AXApplication" | "AXMenu" | "AXMenuItem" | "AXMenuBarItem" | "AXMenuBar")
+            | None => return Ok(None),
+            Some(_) => current = parent(&ancestor)?,
+        }
+    }
+    Err(AdapterError::new(
+        ErrorCode::AppUnresponsive,
+        "Window ancestry exceeded its bounded depth",
     ))
 }
 
@@ -255,5 +302,89 @@ mod tests {
             assert_eq!(failure, ("AXWindow", error));
             assert_eq!(calls.get(), 1);
         }
+    }
+
+    fn ancestry(roles: &[&'static str]) -> impl Fn(&usize) -> Result<Option<usize>, AdapterError> {
+        let len = roles.len();
+        move |index| Ok((index + 1 < len).then_some(index + 1))
+    }
+
+    #[test]
+    fn a_window_ancestor_stands_in_for_a_missing_window_attribute() {
+        let roles = [
+            "AXPopUpButton",
+            "AXGroup",
+            "AXScrollArea",
+            "AXSplitGroup",
+            "AXWindow",
+            "AXApplication",
+        ];
+
+        let window = first_window_ancestor(0, ancestry(&roles), |index| {
+            Ok(Some(roles[*index].to_owned()))
+        })
+        .unwrap();
+
+        assert_eq!(window, Some(4));
+    }
+
+    #[test]
+    fn a_chain_that_reaches_the_application_has_no_window_ancestor() {
+        let roles = [
+            "AXMenuItem",
+            "AXMenu",
+            "AXMenuBarItem",
+            "AXMenuBar",
+            "AXApplication",
+        ];
+
+        let window = first_window_ancestor(0, ancestry(&roles), |index| {
+            Ok(Some(roles[*index].to_owned()))
+        })
+        .unwrap();
+
+        assert_eq!(window, None);
+    }
+
+    #[test]
+    fn a_popup_menu_item_inside_a_window_has_no_window_ancestor() {
+        let roles = [
+            "AXMenuItem",
+            "AXMenu",
+            "AXPopUpButton",
+            "AXGroup",
+            "AXWindow",
+        ];
+
+        let window = first_window_ancestor(0, ancestry(&roles), |index| {
+            Ok(Some(roles[*index].to_owned()))
+        })
+        .unwrap();
+
+        assert_eq!(window, None);
+    }
+
+    #[test]
+    fn an_ancestor_without_a_role_ends_the_search_unknown() {
+        let roles = ["AXPopUpButton", "AXGroup", "AXWindow"];
+
+        let window = first_window_ancestor(0, ancestry(&roles), |index| {
+            Ok((*index != 1).then(|| roles[*index].to_owned()))
+        })
+        .unwrap();
+
+        assert_eq!(window, None);
+    }
+
+    #[test]
+    fn an_unbounded_ancestry_fails_instead_of_looping() {
+        let error = first_window_ancestor(
+            0_usize,
+            |index| Ok(Some(index + 1)),
+            |_| Ok(Some("AXGroup".to_owned())),
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, ErrorCode::AppUnresponsive);
     }
 }
