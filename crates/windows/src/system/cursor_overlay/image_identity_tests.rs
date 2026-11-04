@@ -23,6 +23,16 @@ fn the_installed_binary_is_recognised_with_and_without_its_extension() {
     assert!(is_agent_desktop_image(Path::new("agent-desktop.exe")));
 }
 
+#[test]
+fn the_npm_package_binaries_are_recognised() {
+    assert!(is_agent_desktop_image(&under_build_tree(
+        "agent-desktop-win32-x64.exe"
+    )));
+    assert!(is_agent_desktop_image(&under_build_tree(
+        "agent-desktop-win32-arm64.exe"
+    )));
+}
+
 /// `QueryFullProcessImageNameW` reports whatever case the file system holds,
 /// which on a case-insensitive volume is not necessarily the case the build
 /// produced.
@@ -43,6 +53,12 @@ fn another_binary_is_rejected_even_from_our_own_build_tree() {
         "agent-desktop-ffi.exe"
     )));
     assert!(!is_agent_desktop_image(&under_build_tree("agent.exe")));
+    assert!(!is_agent_desktop_image(&under_build_tree(
+        "agent-desktop-win32-x64.exe.sha256"
+    )));
+    assert!(!is_agent_desktop_image(&under_build_tree(
+        "agent-desktop-linux-x64"
+    )));
 }
 
 /// Only the final component is the image. A directory named after the project
