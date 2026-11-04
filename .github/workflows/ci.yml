@@ -195,6 +195,7 @@ jobs:
           node scripts/jev/act.test.mjs
           node scripts/jev/run.integration.test.mjs
           node scripts/jev/evidence.test.mjs
+          node scripts/jev/desktop.windows.test.mjs
 
       - name: NPM package contents
         run: |

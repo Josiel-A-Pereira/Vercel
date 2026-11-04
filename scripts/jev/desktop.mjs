@@ -9,23 +9,47 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { collect, offerable, outsideWindow, overlayRole } from "./screen.mjs";
+import { collect, hasState, isMenuBar, isPopupHint, label, offerable, outsideWindow, overlayRole, popupHints } from "./screen.mjs";
 import { ARGV } from "./policy.mjs";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const WINDOWS = process.platform === "win32";
 
 export const bin =
   process.env.AGENT_DESKTOP_BIN ??
   (existsSync(join(REPO, "target/release/agent-desktop")) ? join(REPO, "target/release/agent-desktop") : "agent-desktop");
 
+/**
+ * JEV_TRACE=1 writes one line per binary call to stderr: the argv, the outcome
+ * and how many refs came back. For a command that carries text, everything
+ * after the command name and its ref is replaced by position, so a trace never
+ * holds what was typed, copied or put back on the clipboard, whatever the text
+ * begins with.
+ */
+const TEXT_COMMANDS = new Map([["set-value", 2], ["type", 2], ["clipboard-set", 1]]);
+
+const countRefs = (node) => (node ? (node.ref_id ? 1 : 0) + (node.children ?? []).reduce((n, c) => n + countRefs(c), 0) : 0);
+
+export const traced = (argv) => {
+  const keep = TEXT_COMMANDS.get(argv[0]);
+  return keep === undefined ? argv : argv.map((a, i) => (i < keep ? a : "[redacted]"));
+};
+
+const trace = (argv, result) => {
+  if (process.env.JEV_TRACE !== "1") return result;
+  const refs = result.data?.tree ? countRefs(result.data.tree) : undefined;
+  process.stderr.write(`${JSON.stringify({ argv: traced(argv), ok: result.ok, code: result.error?.code, refs })}\n`);
+  return result;
+};
+
 export const cli = (...argv) => {
   try {
-    return JSON.parse(execFileSync(bin, argv, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }));
+    return trace(argv, JSON.parse(execFileSync(bin, argv, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })));
   } catch (error) {
     try {
-      return JSON.parse(error.stdout ?? "");
+      return trace(argv, JSON.parse(error.stdout ?? ""));
     } catch {
-      return { ok: false, error: { code: "SPAWN_FAILED", message: String(error.message ?? error) } };
+      return trace(argv, { ok: false, error: { code: "SPAWN_FAILED", message: String(error.message ?? error) } });
     }
   }
 };
@@ -48,11 +72,103 @@ export const startCursor = (label) => {
 export const stopCursor = () => cli("cursor-overlay", "disable");
 
 /**
+ * On Windows, WinUI and XAML applications open menus, flyouts and combo lists
+ * as a window of their own, which the binary's `menu` surface detector does not
+ * cover. The owner's own tree still announces every open popup as a `window`
+ * child named "Pop-up", and a rooted read of that child returns the popup's
+ * items with refs that act, so a popup is read through its owner. Ownership is
+ * given by the tree, a parent menu and its open submenu are both announced and
+ * both are offered, and a read that answers for another window is discarded.
+ * A popup that has just opened can read as an empty container until XAML has
+ * populated it, so such a read is repeated a bounded number of times.
+ */
+const POPUP_READ_ATTEMPTS = 3;
+const POPUP_SETTLE_MS = 200;
+const CONTAINERS = new Set(["menu", "group", "pane", "window", "list", "listbox", "toolbar"]);
+
+const settle = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+const populated = (nodes) => nodes.some((n) => !CONTAINERS.has(n.role));
+
+/** The items, plus a container only when it can scroll more of them into view. */
+const actionable = (nodes) =>
+  nodes.filter((n) => !isPopupHint(n) && (!CONTAINERS.has(n.role) || (n.available_actions ?? []).includes("Scroll")));
+
+export const readPopups = (scope, home, hints, call = cli) => {
+  const nodes = [];
+  let count = 0;
+  for (const hint of hints) {
+    if (!hint.ref_id) continue;
+    let found = [];
+    for (let attempt = 0; attempt < POPUP_READ_ATTEMPTS; attempt += 1) {
+      if (attempt) settle(POPUP_SETTLE_MS);
+      const read = call("snapshot", ...scope, "--root", hint.ref_id, "-i", "--compact", "--include-bounds");
+      if (!read.ok) break;
+      if (home?.id && read.data.window?.id && read.data.window.id !== home.id) break;
+      found = actionable(offerable(collect(read.data.tree)));
+      if (populated(found)) break;
+      found = [];
+    }
+    if (!found.length) continue;
+    count += 1;
+    nodes.push(...found);
+  }
+  return count ? { count, nodes } : null;
+};
+
+/**
+ * A menu bar is the way into every menu and holds a handful of entries, so a
+ * shallow read that cut it off is completed on the spot: its entries are
+ * offered in its place. An entry is the element that opens the menu, which is
+ * the entry itself when it advertises Click or Expand and otherwise the control
+ * it wraps, so one name is one element and the opener is never dropped. A bar
+ * that holds more stays a region for the policy to DRILL into, and a read that
+ * answers for another window is discarded.
+ */
+const MENU_BAR_LIMIT = 12;
+const OPENERS = ["Click", "Expand"];
+
+const opens = (n) => (n.available_actions ?? []).some((a) => OPENERS.includes(a));
+
+const entriesOf = (node, depth = 0) => {
+  if (opens(node)) return [node];
+  if (depth >= 2 || !node.children?.length) return [];
+  if (node.role === "menuitem") {
+    const wrapped = node.children.find((c) => opens(c));
+    return wrapped ? [wrapped] : [];
+  }
+  return node.children.flatMap((c) => entriesOf(c, depth + 1));
+};
+
+export const expandMenuBars = (nodes, scope, home, call = cli) => {
+  const out = [];
+  for (const node of nodes) {
+    if (!(isMenuBar(node) && node.children_count > 0 && node.children_count <= MENU_BAR_LIMIT)) {
+      out.push(node);
+      continue;
+    }
+    const bar = call("snapshot", ...scope, "--root", node.ref_id, "-i", "--compact", "--include-bounds");
+    const foreign = home?.id && bar.ok && bar.data.window?.id && bar.data.window.id !== home.id;
+    if (!bar.ok || foreign) {
+      out.push(node);
+      continue;
+    }
+    const entries = (bar.data.tree.children ?? []).flatMap((c) => entriesOf(c));
+    const items = offerable(entries.map((n) => ({ ...n, path: [...node.path, label(node)], parentRole: node.role })));
+    out.push(...(items.length ? items : [node]));
+  }
+  return out;
+};
+
+/**
  * A window is read shallowly until the policy asks to go deeper, so a document
  * holding thousands of elements costs the same first look as a panel holding
  * thirty. A region cut off by that shallow read still reports how much it holds,
  * which is what makes it worth drilling into. A sheet or menu owns the screen
- * while it is up, so it is read instead of the window behind it.
+ * while it is up, so it is read instead of the window behind it. On Windows an
+ * open popup is announced by the owner's whole-window read; a rooted read shows
+ * the entry that opened it in the `expanded` state and then costs one
+ * whole-window read to find the announcement. The root is kept for afterwards.
  */
 export const observe = (app, root, windowId = null) => {
   const scope = windowId ? ["--app", app, "--window-id", windowId] : ["--app", app];
@@ -66,19 +182,34 @@ export const observe = (app, root, windowId = null) => {
   }
   if (!snap.ok && snap.error?.code !== "WINDOW_NOT_FOUND") snap = cli(...base, "--max-depth", "4");
   if (!snap.ok) throw unreadable("the screen", snap.error);
-  const surface = root ? null : overlayRole(snap.data.tree);
+  const home = snap.data.window ?? null;
+  let surface = root ? null : overlayRole(snap.data.tree);
   if (surface) {
     const scoped = cli("snapshot", ...scope, "--surface", surface, "-i", "--compact", "--include-bounds");
     if (scoped.ok && windowId && outsideWindow(scoped.data, windowId)) {
       throw Object.assign(new Error(`the ${surface} is not in window ${windowId}`), { code: "SURFACE_OUTSIDE_WINDOW" });
     }
     if (scoped.ok) snap = scoped;
+    else surface = null;
   }
-  const nodes = offerable(collect(snap.data.tree));
+  let popup = null;
+  if (WINDOWS && !surface) {
+    let hints = root ? [] : popupHints(snap.data.tree);
+    if (root && hasState(snap.data.tree, "expanded")) {
+      const whole = cli(...base, "--skeleton");
+      if (whole.ok && (!windowId || !outsideWindow(whole.data, windowId))) hints = popupHints(whole.data.tree);
+    }
+    if (hints.length) {
+      popup = readPopups(scope, home, hints);
+      if (popup) surface = "popup";
+    }
+  }
+  let nodes = popup ? popup.nodes : offerable(collect(snap.data.tree));
+  if (!root && !surface) nodes = expandMenuBars(nodes, scope, home);
   return {
     nodes,
     screen: { app, window: snap.data.window?.title ?? null, window_id: snap.data.window?.id ?? windowId,
-      surface: surface ?? "window", root },
+      surface: surface ?? "window", root, ...(popup ? { popups: popup.count } : {}) },
   };
 };
 

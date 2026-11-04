@@ -151,7 +151,7 @@ node scripts/jev/act.mjs --app TextEdit --execute \
 | Flag | Meaning |
 | --- | --- |
 | `--app <name>` | Required. |
-| `--window-id <id>` | Read one window of the app, by the id `agent-desktop list-windows --app <name>` reports. Needed only when the app has more than one visible window and none of them is focused, which otherwise fails with `AMBIGUOUS_TARGET`. The run stays on that window: a window the run opens elsewhere is not read. If the window closes after an action, `run.mjs` reports that turn and stops with `window_closed`. A `--root` or an open surface outside the window gives `root_outside_window` or `surface_outside_window` (a stop in `run.mjs`, the `error` in `act.mjs`). Every `run.mjs` stop reports the window it read in `screen.window_id`. `run.mjs` takes it too. |
+| `--window-id <id>` | Read one window of the app, by the id `agent-desktop list-windows --app <name>` reports. Needed only when the app has more than one visible window and none of them is focused, which otherwise fails with `AMBIGUOUS_TARGET`. The run stays on that window: a window the run opens elsewhere is not read, except a WinUI popup on Windows, which is read through the window that announced it (see Known limits). If the window closes after an action, `run.mjs` reports that turn and stops with `window_closed`. A `--root` or an open surface outside the window gives `root_outside_window` or `surface_outside_window` (a stop in `run.mjs`, the `error` in `act.mjs`). Every `run.mjs` stop reports the window it read in `screen.window_id`. `run.mjs` takes it too. |
 | `--no-values` | Withhold accessible field values from the decision request. Supported by both scripts; the default includes values. |
 | `--execute` | `act.mjs` only. Run the command when `decision` is `act`. Without it, nothing runs. |
 | `--text "…"` | Text the intent needs. Jev returns choices, never strings. `run.mjs` takes it repeatedly; `act.mjs` takes one value. |
@@ -161,7 +161,9 @@ node scripts/jev/act.mjs --app TextEdit --execute \
 Environment: `TYPESAFE_API_KEY` is required (both scripts fail with
 `TYPESAFE_API_KEY unset`). `TYPESAFE_BASE_URL` and `TYPESAFE_MODEL` are covered
 below. `JEV_VERIFY_MS` sets the paste read-back deadline in ms (default 2000, 0
-to 60000).
+to 60000). `JEV_TRACE=1` writes one line per agent-desktop call to stderr, with
+the argv, the outcome and the number of refs returned; the text passed to
+`set-value`, `type` and `clipboard-set` is replaced by `[redacted]`.
 
 `argv` is the exact agent-desktop command. `double-click` and `hover` carry
 `--headed`; `scroll` always goes down.
@@ -251,6 +253,16 @@ change shape.
   each action, and skips the read after `DRILL` or `WIDEN`. Without a pinned
   region, each read takes a second snapshot when a sheet, alert, menu or popover
   is open. A read takes about 3 s on a dense app; `--root` is far cheaper.
+- On Windows, a WinUI menu, flyout or combo list opens as a `Pop-upHost`
+  window of its own that the `menu` surface does not cover. The owner's tree
+  announces each open popup as a `window` child named `Pop-up`, and a
+  whole-window read reads every announced popup through that child, so a parent
+  menu and its open submenu are offered together. A rooted read does the same
+  when an entry shows the `expanded` state, at the cost of one whole-window
+  read. A whole-window read also offers a menu bar of at most 12 entries as the
+  controls that open each menu, one extra snapshot per bar. A popup whose root
+  is not named `Pop-up`, for example under another UI language, is not
+  detected.
 - `act.mjs` does not retry: a 429 ends the call. `run.mjs` retries 429, 503 and
   529 twice, after 500 ms then 1000 ms, before it fails.
 - Held input is unavailable, so no sustained key and no drag with hold. See
