@@ -324,12 +324,12 @@ The `tree` above is emptied for space; the real one holds the nodes that were re
   <tbody>
     <tr><td><code>complete</code></td><td>On every snapshot. <code>false</code> means the tree is not whole.</td></tr>
     <tr><td><code>truncated</code>, <code>nodes_observed</code></td><td>Added when <code>complete</code> is <code>false</code>. <code>nodes_observed</code> counts the nodes read.</td></tr>
-    <tr><td><code>subtree_truncated: true</code></td><td>On each node whose descendants the budget cut, so you can walk from the root to every boundary.</td></tr>
-    <tr><td><code>children_count</code></td><td>Set by a depth cut. A node cut by the budget may carry no count, so treat <code>subtree_truncated</code> as the signal.</td></tr>
+    <tr><td><code>subtree_truncated: true</code></td><td>On each node with omitted descendants, whether the observation budget cut the tree or a macOS <code>AXTable</code> contains off-screen rows.</td></tr>
+    <tr><td><code>children_count</code></td><td>Set by a depth cut and by partial reads when the native child count is known. A macOS <code>AXTable</code> can include visible rows only and report the total row count. A node cut by the observation budget may carry no count, so treat <code>subtree_truncated</code> as the signal.</td></tr>
   </tbody>
 </table>
 
-Read `complete` instead of waiting for a `TIMEOUT`. Only a full snapshot can be partial; a drill never is. To finish a partial tree, raise `--timeout-ms` or drill the regions you need. Reading the same window with `--timeout-ms 150` returned a complete tree.
+Read `complete` instead of waiting for a `TIMEOUT`. Only a full snapshot can be partial; a drill never is. To finish a budget-limited tree, raise `--timeout-ms` or drill the regions you need. On macOS, an `AXTable` with off-screen rows remains partial even when the observation finishes; scroll the table and take another snapshot to inspect a different range. Reading the same window with `--timeout-ms 150` returned a complete tree.
 
 A cold Chromium or Electron app can take 10 to 25 seconds to expose its web tree. If a fresh snapshot comes back thin, raise `--timeout-ms` and snapshot again.
 

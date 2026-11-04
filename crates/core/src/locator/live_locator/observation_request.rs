@@ -29,6 +29,9 @@ pub struct ObservationMode {
     /// truncated containers are annotated with `children_count` rather than
     /// descended into.
     pub skeleton: bool,
+    /// On macOS snapshots, permit AX tables to include visible rows only.
+    /// Locator reads leave this disabled so they can search the full table.
+    pub visible_table_rows_only: bool,
     /// The caller will pass Chromium's `--force-renderer-accessibility`
     /// (via the `--force-electron-a11y` CLI flag), so the adapter should not
     /// guess at guidance; it returns the tree it observed.
@@ -80,6 +83,7 @@ impl ObservationRequest {
             budget: ObservationBudget::default(),
             observation_mode: ObservationMode {
                 skeleton: options.skeleton,
+                visible_table_rows_only: true,
                 force_renderer_accessibility: options.force_renderer_accessibility,
                 identity_only: false,
             },
@@ -172,5 +176,29 @@ impl ObservationRequest {
 
     pub fn hydrates_root_name_from_children(self) -> bool {
         self.evidence_plan.hydrates_root_name_from_children()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::locator::live_locator::{LocatorMaterialization, LocatorSelection};
+
+    #[test]
+    fn snapshot_allows_partial_visible_tables_but_locators_do_not() {
+        let deadline = Deadline::after(1_000).unwrap();
+        let snapshot = ObservationRequest::snapshot(&TreeOptions::default(), deadline);
+        let query = LocatorQuery::default();
+        let locator = LocatorResolveRequest {
+            selection: LocatorSelection::Count,
+            deadline,
+            max_raw_depth: 50,
+            materialization: LocatorMaterialization::None,
+            surface: None,
+        };
+        let locator = ObservationRequest::locator(&query, &locator, deadline);
+
+        assert!(snapshot.observation_mode.visible_table_rows_only);
+        assert!(!locator.observation_mode.visible_table_rows_only);
     }
 }

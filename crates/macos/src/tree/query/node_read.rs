@@ -30,6 +30,7 @@ pub(crate) fn read_node(
         requirements,
         deadline,
         child_plan,
+        visible_table_rows_only,
     } = context;
     crate::tree::locator_deadline::remaining(deadline)?;
     let read = crate::tree::properties::element::fetch_node_attrs_with_status_for(
@@ -113,6 +114,7 @@ pub(crate) fn read_node(
         attrs.role.as_deref(),
         budget,
         deadline,
+        visible_table_rows_only,
     );
     stats.reads.counts.child_reads += child_read.status.attempts;
     stats.reads.health.cannot_complete += child_read.status.health.cannot_complete;

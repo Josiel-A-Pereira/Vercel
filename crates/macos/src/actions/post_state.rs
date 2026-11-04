@@ -115,6 +115,7 @@ fn read_live_observation_once(
             requirements: EvidenceRequirements::snapshot(),
             deadline: crate::tree::locator_deadline::from_operation(deadline)?,
             child_plan,
+            visible_table_rows_only: false,
         },
     )?;
     usage.note_child_demand(read.child_read.total_count, &mut stats);

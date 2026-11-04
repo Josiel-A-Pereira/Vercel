@@ -5,8 +5,13 @@ use super::{
     child_source_availability::ChildSourceAvailability,
 };
 
+#[cfg(target_os = "macos")]
+#[path = "table_child_read.rs"]
+mod table_child_read;
+
 pub(crate) struct ChildRead {
     pub(crate) elements: Vec<AXElement>,
+    pub(crate) source_index_offset: Option<usize>,
     pub(crate) total_count: usize,
     pub(crate) complete: bool,
     pub(crate) source_availability: ChildSourceAvailability,
@@ -18,6 +23,7 @@ impl ChildRead {
     pub(crate) fn empty(complete: bool) -> Self {
         Self {
             elements: Vec::new(),
+            source_index_offset: None,
             total_count: 0,
             complete,
             source_availability: if complete {
@@ -31,25 +37,16 @@ impl ChildRead {
     }
 
     fn failed(status: ChildReadStatus) -> Self {
-        Self {
-            elements: Vec::new(),
-            total_count: 0,
-            complete: false,
-            source_availability: ChildSourceAvailability::Unknown,
-            prefix_certain: false,
-            status,
-        }
+        let mut read = Self::empty(false);
+        read.status = status;
+        read
     }
 
     fn unavailable(status: ChildReadStatus) -> Self {
-        Self {
-            elements: Vec::new(),
-            total_count: 0,
-            complete: true,
-            source_availability: ChildSourceAvailability::Unavailable,
-            prefix_certain: true,
-            status,
-        }
+        let mut read = Self::empty(true);
+        read.source_availability = ChildSourceAvailability::Unavailable;
+        read.status = status;
+        read
     }
 
     fn indexed(
@@ -68,6 +65,7 @@ impl ChildRead {
         elements.truncate(expected);
         Self {
             elements,
+            source_index_offset: None,
             total_count: final_count,
             complete,
             source_availability: ChildSourceAvailability::Available,
@@ -97,12 +95,9 @@ mod imp {
         role: Option<&str>,
         budget: ChildReadBudget,
         deadline: std::time::Instant,
+        visible_table_rows_only: bool,
     ) -> ChildRead {
-        super::super::child_source::read_resilient(
-            crate::tree::properties::element::child_attributes(role),
-            deadline,
-            |attribute| read_attribute_children(element, attribute, budget, deadline),
-        )
+        super::table_child_read::read(element, role, budget, deadline, visible_table_rows_only)
     }
 
     pub(crate) fn read_child_at(
@@ -168,6 +163,7 @@ mod imp {
         }
         ChildRead {
             elements,
+            source_index_offset: None,
             total_count: final_count,
             complete,
             source_availability: ChildSourceAvailability::Available,
@@ -254,6 +250,7 @@ mod imp {
         ChildRead {
             total_count: elements.len() + usize::from(saturated),
             elements,
+            source_index_offset: None,
             complete: !saturated,
             source_availability: ChildSourceAvailability::Available,
             prefix_certain: !saturated,
@@ -368,6 +365,7 @@ mod imp {
         _role: Option<&str>,
         _budget: ChildReadBudget,
         _deadline: std::time::Instant,
+        _visible_table_rows_only: bool,
     ) -> ChildRead {
         ChildRead::empty(true)
     }

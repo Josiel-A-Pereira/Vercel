@@ -55,7 +55,7 @@ The tree above is trimmed to one button. The real tree nests it under several un
     <tr><td><code>data.app</code>, <code>data.window</code></td><td>The application and the window that was read (<code>id</code>, <code>title</code>). <code>data.window</code> is omitted when macOS reads a background app with no window through its process; see <a href="/desktop/surfaces">Surfaces</a>.</td></tr>
     <tr><td><code>data.snapshot_id</code></td><td>The id of the saved snapshot. It is part of every ref.</td></tr>
     <tr><td><code>data.ref_count</code></td><td>The number of refs the snapshot holds. After a <code>--root</code> drill it counts the whole snapshot, not only the drilled region.</td></tr>
-    <tr><td><code>data.complete</code></td><td>Present on every snapshot. <code>false</code> means the observation ran out of budget. See <a href="/desktop/skeleton-and-drill-down#partial-observations">Partial observations</a>.</td></tr>
+    <tr><td><code>data.complete</code></td><td>Present on every snapshot. <code>false</code> means the tree is partial. The observation budget can expire, or macOS can omit off-screen rows from an <code>AXTable</code>. See <a href="/desktop/skeleton-and-drill-down#partial-observations">Partial observations</a>.</td></tr>
     <tr><td><code>data.truncated</code>, <code>data.nodes_observed</code></td><td>Present only when <code>complete</code> is <code>false</code>.</td></tr>
     <tr><td><code>data.identity_unproven</code></td><td>Present and <code>true</code> only when the snapshot needed one whole read of the window to prove its refs and that read failed or was cut short. The tree is still the one presented, but on Windows and Linux, and on macOS for an element with no address, its refs fail with <code>identity_not_unique</code>. Retake the snapshot with a larger <code>--timeout-ms</code>.</td></tr>
     <tr><td><code>data.tree</code></td><td>The root node. Every node nests its <code>children</code>.</td></tr>
@@ -75,7 +75,7 @@ A node always carries `role` and, when they exist, `ref_id`, `name`, `value`, `d
 }
 ```
 
-`children_count` and `subtree_truncated` mark where the tree was cut; [Skeleton and drill-down](/desktop/skeleton-and-drill-down) explains both. Three flags shrink the tree, and the [commands reference](/desktop/commands/observation#snapshot) lists every flag:
+`children_count` reports the native direct-child count when a node is only partly represented. For a macOS `AXTable`, it includes rows outside the visible range. `subtree_truncated` marks nodes with omitted descendants; [Skeleton and drill-down](/desktop/skeleton-and-drill-down) explains partial observations. Three flags shrink the tree, and the [commands reference](/desktop/commands/observation#snapshot) lists every flag:
 
 - `-i` (`--interactive-only`) drops leaves that have no ref. It keeps nodes that lead to refs and nodes marked with `children_count`. Static text has no ref, so a row's label is dropped: to see which row a repeated button belongs to, drill that row's container with `--root` and leave out `-i`.
 - `--compact` collapses a single-child wrapper that has no name, value, description, id, state, or action.

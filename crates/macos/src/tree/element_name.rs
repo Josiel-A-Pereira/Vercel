@@ -30,6 +30,7 @@ pub(crate) fn resolve_element_name(
             },
             deadline,
             child_plan,
+            visible_table_rows_only: false,
         },
     )?;
     usage.note_child_demand(read.child_read.total_count, &mut stats);

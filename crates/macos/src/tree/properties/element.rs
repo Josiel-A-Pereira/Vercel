@@ -5,6 +5,13 @@ pub(crate) fn child_attributes(ax_role: Option<&str>) -> &'static [&'static str]
         &["AXColumns", "AXContents"]
     } else if ax_role == Some("AXApplication") {
         &["AXWindows", "AXChildren"]
+    } else if ax_role == Some("AXTable") {
+        &[
+            "AXRows",
+            "AXChildren",
+            "AXChildrenInNavigationOrder",
+            "AXContents",
+        ]
     } else {
         &["AXChildren", "AXChildrenInNavigationOrder", "AXContents"]
     }

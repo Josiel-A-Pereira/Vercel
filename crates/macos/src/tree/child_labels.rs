@@ -81,6 +81,7 @@ fn label_from_children(
                         MAX_LABEL_ELEMENTS,
                     ),
                     deadline,
+                    false,
                 );
                 record_child_read(&grandchildren, sinks.stats)?;
                 reads_complete &= grandchildren.complete
