@@ -217,3 +217,29 @@ fn conflicting_workspace_records_remain_incomplete() {
         assert!(require_complete(&inventory.skipped).is_err(), "{field}");
     }
 }
+
+#[test]
+fn record_without_a_live_process_is_dropped_not_fatal() {
+    let bytes = serde_json::to_vec(&json!({
+        "applications":[
+            {"name":"Finder", "pid":10, "launch_time":100.0, "activation_policy":"regular"},
+            {"name":"TextEdit", "pid":11, "launch_time":100.0, "activation_policy":"regular"},
+        ],
+        "frontmost_pid":0, "frontmost_launch_time":null,
+    }))
+    .unwrap();
+    let inventory = apps_inventory_from_json_with(
+        &bytes,
+        deadline(),
+        |_| true,
+        true,
+        |pid| Ok((pid == 10).then(|| "instance-10".to_string())),
+    )
+    .unwrap();
+    assert_eq!(inventory.apps.len(), 1);
+    assert_eq!(inventory.apps[0].name, "Finder");
+    assert!(
+        inventory.skipped.is_empty(),
+        "an absent process is not an incomplete record"
+    );
+}
