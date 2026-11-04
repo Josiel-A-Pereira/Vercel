@@ -73,7 +73,7 @@ Judge delivery by observation. AX return codes do not prove an effect: an app ca
 
 ## Keys and notifications
 
-- The primary modifier is `cmd`: `press cmd+c`. Punctuation keys work as the symbol or by name (`comma`, `period`, `slash`).
+- The primary modifier is `cmd`: `press cmd+c`. Punctuation keys work as the symbol or by name (`comma`, `period`, `slash`). Letters and punctuation are sent with the key that types them in the active keyboard layout, so `press cmd+a` selects all on AZERTY too.
 - `cmd+q`, `cmd+shift+q`, `cmd+alt+esc`, `ctrl+cmd+q`, and `cmd+shift+delete` return `POLICY_DENIED` unless you pass `--force`. To quit an app, use `close-app`.
 - `press cmd+s --app "TextEdit"` sends keys to one app without focusing it.
 - When agent-desktop opens Notification Center, it closes it afterward and restores the previous focus. Pass `--expected-app` and `--expected-title` on a single dismiss or action, because the stack shifts. Use `wait --notification --app "App"` for banners that vanish before you can list them.
