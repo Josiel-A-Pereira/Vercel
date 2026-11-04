@@ -50,15 +50,25 @@ mod tests {
     ///
     /// Before the fix: this test would trivially pass because the stub
     /// returned `true` for everything.
-    /// After the fix: this test exercises the real Win32 ownership check.
+    /// After the fix: this test exercises the real Win32 SID ownership check.
+    #[cfg(windows)]
     #[test]
-    fn current_user_directory_is_accepted_by_real_check() {
+    fn current_user_directory_is_accepted_by_real_win32_check() {
         let dir = TempDir::new();
+        // The path-based check needs the path in TLS
+        VALIDATE_PATH.with(|cell| {
+            *cell.borrow_mut() = Some(dir.path().to_path_buf());
+        });
         let meta = fs::metadata(dir.path()).expect("metadata");
-        // The current user's own temp directory must be accepted
+        let owned = is_owned_by_current_user(&meta);
+        // Clear TLS
+        VALIDATE_PATH.with(|cell| {
+            *cell.borrow_mut() = None;
+        });
         assert!(
-            is_owned_by_current_user(&meta),
-            "is_owned_by_current_user must accept directories owned by the current user"
+            owned,
+            "is_owned_by_current_user must accept directories owned by the current user \
+             (Win32 SID check via GetNamedSecurityInfoW + EqualSid)"
         );
     }
 
@@ -88,5 +98,33 @@ mod tests {
         );
         assert!(result_owned.is_ok(), "own ownership must be accepted");
     }
-}
 
+    /// On Windows, verify the path-based SID check works end-to-end
+    /// via the validate_env_root flow (which sets VALIDATE_PATH TLS).
+    #[cfg(windows)]
+    #[test]
+    fn win32_sid_check_accepts_own_temp_directory() {
+        let dir = TempDir::new();
+        let result = is_path_owned_by_current_user(dir.path());
+        assert!(
+            result,
+            "is_path_owned_by_current_user must accept the current user's temp directory"
+        );
+    }
+
+    /// Verify that without TLS path set, the check conservatively denies.
+    #[cfg(windows)]
+    #[test]
+    fn win32_check_denies_without_tls_path() {
+        VALIDATE_PATH.with(|cell| {
+            *cell.borrow_mut() = None;
+        });
+        let dir = TempDir::new();
+        let meta = fs::metadata(dir.path()).expect("metadata");
+        let result = is_owned_by_current_user(&meta);
+        assert!(
+            !result,
+            "is_owned_by_current_user must deny when no TLS path is set (conservative default)"
+        );
+    }
+}
