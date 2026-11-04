@@ -42,12 +42,13 @@ gh attestation verify <downloaded-archive> --repo vercel-labs/agent-desktop
 
 ## Blocked install scripts
 
-The package's `postinstall` script replaces the Node launcher with a link to the native binary. If your package manager blocks install scripts, the Node launcher runs instead. It works, but every call starts Node first, which adds more than 100 ms. The launcher prints a one-time notice to stderr with the fix. Approve the script and reinstall:
+The package's `postinstall` script replaces the Node launcher with a link to the native binary. If your package manager blocks install scripts, the Node launcher runs instead. It works, but every call starts Node first, which adds more than 100 ms. The launcher prints a one-time notice to stderr with the fix. Allow the script and reinstall:
 
 ```bash
-npm install-scripts approve agent-desktop                    # npm 12
-npm install -g agent-desktop --allow-scripts=agent-desktop   # npm 11
+npm install -g agent-desktop --allow-scripts=agent-desktop
 ```
+
+For a project install, run `npm install-scripts approve agent-desktop` inside the project, then `npm rebuild agent-desktop`. The approve command only edits the project's `package.json` and fails for a global install.
 
 ## Homebrew and Scoop
 
