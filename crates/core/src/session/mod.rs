@@ -2,6 +2,7 @@ mod gc;
 pub(crate) mod interaction_lease;
 mod liveness;
 mod manifest;
+mod manifest_mutation;
 pub(crate) mod process_lease_guard;
 pub(crate) mod session_affinity;
 mod tree;
@@ -118,6 +119,7 @@ pub fn set_cursor_overlay(
     session_id: &str,
     cursor_overlay: CursorOverlayConfig,
 ) -> Result<SessionManifest, AppError> {
+    let _mutation = manifest_mutation::ManifestMutationGuard::acquire(session_id)?;
     let mut manifest = read_manifest(session_id)?.ok_or_else(|| {
         AppError::invalid_input_with_suggestion(
             format!("Session '{session_id}' has no manifest"),
@@ -327,7 +329,7 @@ pub fn start_session(options: StartSessionOptions) -> Result<SessionManifest, Ap
 
 pub fn end_session(session_id: &str) -> Result<SessionManifest, AppError> {
     validate_session_id(session_id)?;
-    let _lease = acquire_liveness_lease(session_id)?;
+    let mut mutation = manifest_mutation::ManifestMutationGuard::acquire(session_id)?;
     let id = session_id.to_string();
     let mut manifest = read_manifest(&id)?.ok_or_else(|| {
         AppError::invalid_input_with_suggestion(
@@ -338,6 +340,7 @@ pub fn end_session(session_id: &str) -> Result<SessionManifest, AppError> {
     if manifest.ended_at.is_none() {
         manifest.ended_at = Some(now_millis());
         write_manifest(&manifest)?;
+        mutation.release_lock();
         if manifest.artifacts == ArtifactsMode::Full
             && let Ok(store) = crate::refs::refs_store::RefStore::for_session(Some(&id))
         {
@@ -384,3 +387,6 @@ mod gc_tests;
 
 #[cfg(test)]
 mod cursor_profile_tests;
+
+#[cfg(test)]
+mod manifest_mutation_tests;
