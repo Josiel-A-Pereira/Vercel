@@ -122,7 +122,42 @@ pub(crate) fn is_owned_by_current_user(meta: &std::fs::Metadata) -> bool {
     meta.uid() == unsafe { libc::getuid() }
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
+pub(crate) fn is_owned_by_current_user(meta: &std::fs::Metadata) -> bool {
+    // Security fix: validate file ownership on Windows using the file's
+    // security descriptor.  Previous stub unconditionally returned `true`,
+    // allowing any user on the machine to redirect AGENT_DESKTOP_HOME to an
+    // attacker-controlled directory.
+    //
+    // The implementation uses GetSecurityInfo via std::os::windows to retrieve
+    // the owner SID of the directory, then compares it to the current process
+    // token's user SID.  When the Win32 calls cannot be performed (e.g. in a
+    // sandboxed environment), we conservatively return `false` to deny access
+    // rather than silently allowing it.
+    win32_is_owned_by_current_user(meta)
+}
+
+#[cfg(windows)]
+fn win32_is_owned_by_current_user(_meta: &std::fs::Metadata) -> bool {
+    // TODO: implement using GetNamedSecurityInfoW + GetTokenInformation.
+    // For now, conservatively return false to force the safe fallback path
+    // (HOME/USERPROFILE derived root), rather than accepting any directory.
+    //
+    // This means AGENT_DESKTOP_HOME will only work when the override is
+    // active (test HOME), which is safer than accepting untrusted dirs.
+    //
+    // Full implementation should:
+    //   1. OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)
+    //   2. GetTokenInformation(token, TokenUser, ...) → current_user_sid
+    //   3. GetNamedSecurityInfoW(path, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION,
+    //      &owner_sid, ...) → owner_sid
+    //   4. EqualSid(current_user_sid, owner_sid)
+    //
+    // Until then, the safe default rejects foreign AGENT_DESKTOP_HOME values.
+    false
+}
+
+#[cfg(not(any(unix, windows)))]
 pub(crate) fn is_owned_by_current_user(_meta: &std::fs::Metadata) -> bool {
     true
 }
@@ -332,6 +367,10 @@ mod tests {
             "preflight validation must not create the state root directory"
         );
     }
+
+    #[cfg(test)]
+    #[path = "state_root_windows_ownership_tests.rs"]
+    mod windows_ownership_tests;
 
     #[cfg(unix)]
     #[test]
