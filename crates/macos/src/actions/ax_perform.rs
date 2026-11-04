@@ -25,7 +25,7 @@ mod imp {
         if advertises_action(el, name, deadline) == Some(false) {
             return Ok(DeliveryOutcome::NotDelivered);
         }
-        let before = activation_effect::focus_state(el, deadline);
+        let before = crate::actions::activation_state::ActivationState::capture(el, name, deadline);
         let action = CFString::new(name);
         let error = crate::tree::properties::ax_ipc::perform_action(
             el,
@@ -50,7 +50,8 @@ mod imp {
             PerformSignal::ReportedUnsupported => Ok(DeliveryOutcome::NotDelivered),
             PerformSignal::ReportedDelivered => Ok(DeliveryOutcome::from_delivery(
                 true,
-                activation_effect::changed_now(&before, el, deadline),
+                before.sheet_closed(deadline)
+                    || activation_effect::changed_now(&before.focus, el, deadline),
             )),
             PerformSignal::Uninformative => ax_mutation::settle_uninformative_perform(
                 name,

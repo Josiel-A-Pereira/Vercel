@@ -1,4 +1,8 @@
 pub(crate) mod activation_effect;
+#[cfg(target_os = "macos")]
+mod activation_sheet;
+#[cfg(target_os = "macos")]
+mod activation_state;
 mod adapter;
 pub(crate) mod ax_helpers;
 #[cfg(target_os = "macos")]
