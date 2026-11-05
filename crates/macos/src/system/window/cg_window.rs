@@ -127,7 +127,7 @@ pub(in crate::system) fn records_from_dictionaries(
     let mut records = Vec::new();
     for dictionary in dictionaries {
         let layer = required_int_field(&dictionary, "kCGWindowLayer")?;
-        if layer != 0 {
+        if !matches!(layer, 0 | 3 | 8) {
             continue;
         }
         let pid = i32::try_from(required_int_field(&dictionary, "kCGWindowOwnerPID")?)
