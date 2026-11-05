@@ -26,6 +26,14 @@ pub struct SnapshotResult {
 }
 
 impl SnapshotResult {
+    pub(crate) fn save_refmap(&self, store: &RefStore) -> Result<String, AppError> {
+        if self.complete {
+            store.save_new_snapshot(&self.refmap)
+        } else {
+            store.save_new_snapshot_detached(&self.refmap)
+        }
+    }
+
     pub(crate) fn bind_snapshot_id(&mut self, snapshot_id: String) {
         crate::refs::ref_token::qualify_tree_refs(&mut self.tree, &snapshot_id);
         self.snapshot_id = Some(snapshot_id);
@@ -40,7 +48,7 @@ pub fn build(
     deadline: crate::Deadline,
 ) -> Result<SnapshotResult, AppError> {
     let windows = surface_windows(adapter, app_name, window_id, opts.surface, deadline)?;
-    let (window, capture) = first_surface_owner(windows, |window| {
+    let (window, capture) = window_capture::first_surface_owner(windows, |window| {
         window_capture::capture_window(adapter, opts, window, deadline)
     })?;
     let identity_unproven = capture.identity_unproven.clone();
@@ -201,25 +209,6 @@ fn frontmost_process_windows(
     Ok(windows)
 }
 
-pub(crate) fn first_surface_owner<T>(
-    windows: Vec<WindowInfo>,
-    mut observe: impl FnMut(&WindowInfo) -> Result<T, AppError>,
-) -> Result<(WindowInfo, T), AppError> {
-    let mut windows = windows.into_iter().peekable();
-    while let Some(window) = windows.next() {
-        match observe(&window) {
-            Err(AppError::Adapter(error))
-                if error.code == crate::ErrorCode::ElementNotFound && windows.peek().is_some() => {}
-            result => return result.map(|observed| (window, observed)),
-        }
-    }
-    Err(
-        crate::AdapterError::new(crate::ErrorCode::WindowNotFound, "No window to observe")
-            .unsent()
-            .into(),
-    )
-}
-
 fn windows_for_app(
     adapter: &dyn PlatformAdapter,
     app_name: Option<&str>,
@@ -327,7 +316,7 @@ pub fn run_with_context(
         crate::Deadline::after(timeout_ms)?,
     )?;
     let store = RefStore::for_session(context.session_id())?;
-    let snapshot_id = store.save_new_snapshot(&result.refmap)?;
+    let snapshot_id = result.save_refmap(&store)?;
     trace_artifacts::copy_refmap_if_full(context, &store, &snapshot_id, &result.refmap)?;
     result.bind_snapshot_id(snapshot_id);
     emit_snapshot_saved(context, &result)?;
@@ -372,6 +361,10 @@ mod tokenless_capture_tests;
 #[cfg(test)]
 #[path = "tokenless_drill_tests.rs"]
 mod tokenless_drill_tests;
+
+#[cfg(test)]
+#[path = "snapshot_deadline_tests.rs"]
+mod deadline_tests;
 
 #[cfg(test)]
 #[path = "snapshot_window_tests.rs"]

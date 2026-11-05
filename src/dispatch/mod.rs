@@ -48,12 +48,13 @@ use serde_json::Value;
 use crate::cli::Commands;
 
 pub(crate) fn dispatch(
-    cmd: Commands,
+    mut cmd: Commands,
     adapter: &dyn PlatformAdapter,
     permission_report: &PermissionReport,
     context: &CommandContext,
 ) -> Result<Value, AppError> {
     let read_only = !cmd.is_mutating();
+    let stdin = crate::cli_args::stdin::input(&mut cmd).is_some();
     let gate_facts = crate::command_policy::dogwood::enforce(&cmd, context, adapter)
         .map_err(|error| disposition::settle_unknown_delivery(error, read_only))?;
     let result = dispatch_command(cmd, adapter, permission_report, context)
@@ -61,7 +62,7 @@ pub(crate) fn dispatch(
     if let Some(facts) = gate_facts {
         crate::command_policy::dogwood::record(&facts, result.is_ok());
     }
-    result
+    crate::cli_args::stdin::redact_result(result, stdin)
 }
 
 fn dispatch_command(

@@ -343,3 +343,41 @@ forbid (principal, action == Desktop::Action::"list-displays", resource);"#,
     );
     assert_eq!(responses[1]["result"]["isError"], false, "{responses:?}");
 }
+
+/// Text piped with `--stdin` is read before the gate runs, so a refusal must
+/// still stop the command and must not repeat the text it consumed.
+#[test]
+fn a_refused_stdin_command_never_repeats_the_text_it_read() {
+    use std::io::Write;
+    use std::process::Stdio;
+    const SECRET: &str = "piped-secret-text";
+    let home = PolicyHome::new("stdin");
+    let layer = home.layer(
+        "harness",
+        r#"@id("no-set-value")
+forbid (principal, action == Desktop::Action::"set-value", resource);"#,
+    );
+    let mut child = binary()
+        .arg("--policy-dir")
+        .arg(&layer)
+        .args(["set-value", "@s12345678:e1", "--stdin"])
+        .env("AGENT_DESKTOP_HOME", &home.root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("binary starts");
+    let mut stdin = child.stdin.take().expect("stdin");
+    stdin.write_all(SECRET.as_bytes()).expect("text written");
+    drop(stdin);
+    let output = child.wait_with_output().expect("binary exits");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let envelope: serde_json::Value = serde_json::from_str(&stdout).expect("one JSON envelope");
+
+    assert_eq!(envelope["error"]["code"], "POLICY_DENIED", "{envelope}");
+    assert!(!stdout.contains(SECRET), "{stdout}");
+    assert!(
+        !String::from_utf8_lossy(&output.stderr).contains(SECRET),
+        "the text reached stderr"
+    );
+}

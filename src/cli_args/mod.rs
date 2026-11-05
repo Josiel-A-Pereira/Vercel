@@ -19,6 +19,7 @@ pub(crate) mod session;
 pub(crate) mod skills;
 mod snapshot;
 pub(crate) mod snapshot_tree;
+pub(crate) mod stdin;
 pub(crate) mod system;
 pub(crate) mod trace;
 
