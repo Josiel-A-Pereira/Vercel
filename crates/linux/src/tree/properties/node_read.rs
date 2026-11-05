@@ -7,6 +7,7 @@ use zbus::zvariant::{DynamicDeserialize, DynamicType, OwnedValue};
 use zbus::{Connection, Message};
 
 use super::absence::gone_error;
+use super::attributes::is_webkit;
 use super::interface_reads::{read_actions, read_extents};
 use super::liveness::Liveness;
 use super::read_purpose::ReadPurpose;
@@ -244,6 +245,8 @@ pub(crate) async fn read_node_for(
         }
     };
     let interfaces = selected(interfaces, liveness)?;
+    let attributes = selected::<BTreeMap<String, String>>(attributes, liveness)?;
+    let webkit = is_webkit(&attributes);
     let (extents, actions) = join(
         async {
             if purpose.bounds() {
@@ -254,7 +257,7 @@ pub(crate) async fn read_node_for(
         },
         async {
             if purpose.actions() {
-                read_actions(connection, element, &interfaces, liveness).await
+                read_actions(connection, element, &interfaces, liveness, webkit).await
             } else {
                 Ok(Field::Failed("field not requested".to_owned()))
             }
@@ -273,7 +276,7 @@ pub(crate) async fn read_node_for(
             states: selected(state, liveness)?,
             interfaces,
         },
-        attributes: selected::<BTreeMap<String, String>>(attributes, liveness)?,
+        attributes,
         extents: extents?,
         actions: actions?,
         children: match child_reply {
