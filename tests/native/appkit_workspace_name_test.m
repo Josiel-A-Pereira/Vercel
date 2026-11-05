@@ -15,6 +15,7 @@ static void require(bool condition, const char *message) {
 @property(nonatomic) pid_t testPID;
 @property(nonatomic) NSApplicationActivationPolicy testPolicy;
 @property(nonatomic, copy) NSDate *testLaunchDate;
+@property(nonatomic) BOOL testTerminated;
 @end
 
 @implementation InventoryTestApplication
@@ -24,6 +25,7 @@ static void require(bool condition, const char *message) {
 - (pid_t)processIdentifier { return self.testPID; }
 - (NSApplicationActivationPolicy)activationPolicy { return self.testPolicy; }
 - (NSDate *)launchDate { return self.testLaunchDate; }
+- (BOOL)isTerminated { return self.testTerminated; }
 @end
 
 static NSArray *testApplications;
@@ -112,6 +114,12 @@ int main(void) {
             require([skipped[0][@"field"] isEqualToString:fields[index]], "skip field");
             require([skipped[0][@"pid"] isEqual:pids[index]], "skip pid");
         }
+        InventoryTestApplication *exited = application(nil, nil, nil, -1);
+        exited.testTerminated = YES;
+        testApplications = @[valid, exited, application(@"Later", nil, nil, 30)];
+        NSDictionary *withExited = snapshot();
+        require([withExited[@"applications"] count] == 2, "terminated pid-less record leaves valid records");
+        require(withExited[@"skipped"] == nil, "terminated pid-less record is not a skipped record");
         testApplications = @[valid, valid, application(@"Conflicting", nil, nil, 10)];
         NSDictionary *duplicates = snapshot();
         NSArray *duplicateRecords = duplicates[@"applications"];
