@@ -79,6 +79,16 @@ fn fan_out(
     unless_gone(world, failure)
 }
 
+/// Why a process with no window to close is refused: a Wayland session with
+/// no foreign route cannot list windows at all, anything else is windowless.
+fn windowless_answer(world: &impl World, request: &Request<'_>) -> AdapterError {
+    if world.on_wayland() && !world.has_foreign_route() {
+        refusal::wayland_session(request)
+    } else {
+        refusal::windowless(request)
+    }
+}
+
 fn request_close(world: &impl World, request: &Request<'_>) -> Result<bool, AdapterError> {
     let windows = match world.toplevels() {
         ControlRead::Ready(windows) => windows,
@@ -100,6 +110,9 @@ fn request_close(world: &impl World, request: &Request<'_>) -> Result<bool, Adap
         Liveness::Stopped => return Err(AdapterError::app_unresponsive(request.name)),
         Liveness::Alive => {}
     }
+    if windows.is_empty() && !world.has_foreign_route() {
+        return unless_gone(world, windowless_answer(world, request));
+    }
     let standing = Standing::of(world, windows);
     if standing.has_dialog() {
         return Err(refusal::dialog_pending(request, &standing, false));
@@ -113,12 +126,7 @@ fn request_close(world: &impl World, request: &Request<'_>) -> Result<bool, Adap
         return Err(refusal::identity_unproven(request, &unproven));
     }
     if standing.windows.is_empty() {
-        let refused = if world.on_wayland() && !world.has_foreign_route() {
-            refusal::wayland_session(request)
-        } else {
-            refusal::windowless(request)
-        };
-        return unless_gone(world, refused);
+        return unless_gone(world, windowless_answer(world, request));
     }
     let ids: Vec<u32> = standing.windows.iter().map(|window| window.id).collect();
     fan_out(world, request, &ids)

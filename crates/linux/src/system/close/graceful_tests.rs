@@ -119,6 +119,23 @@ fn a_windowless_live_process_is_refused_with_the_resident_suggestion() {
 }
 
 #[test]
+fn a_nested_dialog_does_not_turn_a_windowless_answer_off_the_foreign_route_into_a_dialog() {
+    let mut world = Fake::new(Liveness::Alive);
+    world.windows = ControlRead::Ready(Vec::new());
+    world.wayland = true;
+    world.nested_after = Some(std::time::Duration::ZERO);
+    let error = close(&world, &request()).expect_err("refused");
+    assert_eq!(error.code, ErrorCode::ActionNotSupported);
+    assert_eq!(error.details.expect("details")["cause"], "wayland_session");
+    let mut plain = Fake::new(Liveness::Alive);
+    plain.windows = ControlRead::Ready(Vec::new());
+    plain.nested_after = Some(std::time::Duration::ZERO);
+    let error = close(&plain, &request()).expect_err("refused");
+    assert_eq!(error.code, ErrorCode::ActionFailed);
+    assert!(error.suggestion.expect("suggestion").contains("--force"));
+}
+
+#[test]
 fn a_windowless_process_on_a_wayland_session_is_not_supported_with_its_cause() {
     let mut world = Fake::new(Liveness::Alive);
     world.windows = ControlRead::Ready(Vec::new());
