@@ -62,6 +62,11 @@ impl<P: ToplevelPort> ForeignCloseRoute<P> {
     pub(in crate::system) fn release(&self) {
         self.in_use.set(false);
         self.contested.set(0);
+        let mut evidence = self.evidence.borrow_mut();
+        evidence.unproven.clear();
+        evidence.dialogs.clear();
+        evidence.selected.clear();
+        evidence.frames.clear();
     }
 
     /// Whether the last read answered through this route.

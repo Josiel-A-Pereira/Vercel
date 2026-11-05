@@ -85,6 +85,15 @@ pub(in crate::system) fn read_standing(
         }
     }
     if let Some(owners) = owners {
+        if !known.is_empty() {
+            for record in records.iter().filter(|record| {
+                !known.contains(&record.id)
+                    && !owners.contains_key(&record.id)
+                    && names.relates(&record.app_id)
+            }) {
+                unproven.push(record.app_id.clone());
+            }
+        }
         for record in records
             .iter()
             .filter(|record| owners.get(&record.id) == Some(&names.pid()))

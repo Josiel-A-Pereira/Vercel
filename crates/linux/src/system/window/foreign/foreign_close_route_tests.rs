@@ -285,3 +285,32 @@ fn changed_mapped_address_is_never_closed_under_a_reused_handle_id() {
     assert_eq!(route.close(1, deadline()), Err(ControlError::StaleWindow));
     assert!(route.port().unwrap().0.sent().is_empty());
 }
+
+#[test]
+fn releasing_the_route_forgets_what_the_last_read_proved_and_doubted() {
+    let port = FakePort::showing(vec![
+        record(1, "Home", "zzqqxx"),
+        record(2, "Home", "thunar-viewer"),
+        record(3, "Save?", "other"),
+    ]);
+    let route = ForeignCloseRoute::over(port);
+    let frames = vec![
+        Frame {
+            title: "Home".to_owned(),
+            prompt: false,
+        },
+        Frame {
+            title: "Save?".to_owned(),
+            prompt: true,
+        },
+    ];
+    route
+        .standing(&thunar(), || Ok(frames), deadline())
+        .expect("a read");
+    assert!(!route.unproven().is_empty());
+    assert!(!route.dialogs().is_empty());
+    route.release();
+    let evidence = route.evidence.borrow();
+    assert!(evidence.unproven.is_empty() && evidence.dialogs.is_empty());
+    assert!(evidence.selected.is_empty() && evidence.frames.is_empty());
+}

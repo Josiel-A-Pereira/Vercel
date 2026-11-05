@@ -230,3 +230,12 @@ fn a_late_window_of_another_pid_is_not_a_target_prompt() {
     assert!(standing.dialogs.is_empty());
     assert_eq!(standing.windows[0].kind, WindowKind::Normal);
 }
+
+#[test]
+fn a_late_related_toplevel_with_no_owner_entry_is_unproven_in_the_mapped_branch() {
+    let records = [record(1, "Doc", "thunar"), record(9, "Save", "thunar")];
+    let owners = HashMap::from([(1, 7)]);
+    let standing = read_standing(&records, &titles(&["Doc"]), &thunar(), &[1], Some(&owners));
+    assert_eq!(ids(&standing), vec![1]);
+    assert_eq!(standing.unproven, vec!["thunar"]);
+}
