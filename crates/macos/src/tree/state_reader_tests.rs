@@ -51,6 +51,17 @@ fn checked_value_spellings_match_action_readback() {
 }
 
 #[test]
+fn explicit_collapsed_state_is_preserved_for_expandable_buttons() {
+    let mut attrs = sample_attrs();
+    attrs.role = Some("AXButton".into());
+    attrs.states.control.expanded = Some(false);
+    let el = AXElement(std::ptr::null_mut());
+    let states = states_from_element(&el, &attrs, "button", &ctx_with(None, false));
+    assert!(states.contains(&state::COLLAPSED.to_string()));
+    assert!(!states.contains(&state::EXPANDED.to_string()));
+}
+
+#[test]
 fn hidden_attr_emits_hidden_token() {
     let mut attrs = sample_attrs();
     attrs.states.semantic.hidden = Some(true);

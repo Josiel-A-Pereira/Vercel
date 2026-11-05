@@ -77,6 +77,7 @@ pub fn execute(
         IsProperty::Expanded => (
             crate::tree::roles::is_expandable_role(&entry.identity.role)
                 || state::has_state(&state.states, EXPANDED)
+                || state::has_state(&state.states, state::COLLAPSED)
                 || crate::actions::capability::contains_any(
                     &entry.capabilities.available_actions,
                     crate::actions::capability::EXPANDED_APPLICABILITY,

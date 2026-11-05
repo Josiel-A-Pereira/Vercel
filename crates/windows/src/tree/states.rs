@@ -19,6 +19,7 @@ const STATE_SYSTEM_PRESSED: i32 = 0x0000_0008;
 const TOGGLE_STATE_ON: i32 = 1;
 const TOGGLE_STATE_INDETERMINATE: i32 = 2;
 
+const EXPAND_COLLAPSE_STATE_COLLAPSED: i32 = 0;
 const EXPAND_COLLAPSE_STATE_EXPANDED: i32 = 1;
 
 /// Ungated sources the walk always requests for every node. If every one of
@@ -155,8 +156,10 @@ fn push_expand_collapse_state(properties: &ElementProperties, states: &mut Vec<S
     let Some(value) = properties.gated_number(TreeProperty::ExpandCollapseState) else {
         return;
     };
-    if value == EXPAND_COLLAPSE_STATE_EXPANDED {
-        states.push(state::EXPANDED.to_string());
+    match value {
+        EXPAND_COLLAPSE_STATE_EXPANDED => states.push(state::EXPANDED.to_string()),
+        EXPAND_COLLAPSE_STATE_COLLAPSED => states.push(state::COLLAPSED.to_string()),
+        _ => {}
     }
 }
 

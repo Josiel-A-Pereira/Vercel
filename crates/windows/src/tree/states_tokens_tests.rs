@@ -12,6 +12,7 @@ const STATE_SYSTEM_HASPOPUP_BITS: i32 = 0x4000_0000;
 const STATE_SYSTEM_PRESSED_BITS: i32 = 0x0000_0008;
 const TOGGLE_STATE_ON: i32 = 1;
 const TOGGLE_STATE_INDETERMINATE: i32 = 2;
+const EXPAND_COLLAPSE_COLLAPSED: i32 = 0;
 const EXPAND_COLLAPSE_EXPANDED: i32 = 1;
 
 /// Resolves one element's tokens with the read-health prerequisite satisfied,
@@ -102,6 +103,14 @@ fn cases() -> Vec<TokenCase> {
             ],
             role: "treeitem",
             expected: &[state::EXPANDED],
+        },
+        TokenCase {
+            reads: vec![
+                flag(TreeProperty::ExpandCollapseAvailable, true),
+                number(TreeProperty::ExpandCollapseState, EXPAND_COLLAPSE_COLLAPSED),
+            ],
+            role: "treeitem",
+            expected: &[state::COLLAPSED],
         },
         TokenCase {
             reads: vec![

@@ -2,8 +2,8 @@ use super::*;
 use crate::Rect;
 
 #[test]
-fn vocabulary_contains_seventeen_tokens() {
-    assert_eq!(STATE_VOCABULARY.len(), 17);
+fn vocabulary_contains_eighteen_tokens() {
+    assert_eq!(STATE_VOCABULARY.len(), 18);
 }
 
 #[test]

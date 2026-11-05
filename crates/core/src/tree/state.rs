@@ -4,6 +4,7 @@ pub const FOCUSED: &str = "focused";
 pub const DISABLED: &str = "disabled";
 pub const SECURE: &str = "secure";
 pub const EXPANDED: &str = "expanded";
+pub const COLLAPSED: &str = "collapsed";
 pub const CHECKED: &str = "checked";
 pub const SELECTED: &str = "selected";
 pub const HIDDEN: &str = "hidden";
@@ -35,6 +36,7 @@ pub const STATE_VOCABULARY: &[&str] = &[
     DISABLED,
     SECURE,
     EXPANDED,
+    COLLAPSED,
     CHECKED,
     SELECTED,
     HIDDEN,

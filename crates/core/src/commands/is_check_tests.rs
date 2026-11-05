@@ -327,6 +327,23 @@ fn checked_falls_back_to_snapshot_state_when_live_state_is_missing() {
 }
 
 #[test]
+fn a_collapsed_button_is_expandable_but_not_expanded() {
+    let _guard = HomeGuard::new();
+    let snapshot_id = save_entry(entry(vec![], None, vec![]));
+    let adapter = LiveStateAdapter::with_live(visible_bounds(), vec![state::COLLAPSED.into()]);
+    let result = execute(
+        IsArgs {
+            ref_id: format!("@{}:e1", snapshot_id),
+            property: IsProperty::Expanded,
+        },
+        &adapter,
+        &CommandContext::default(),
+    ).unwrap();
+    assert_eq!(result["applicable"], true);
+    assert_eq!(result["result"], false);
+}
+
+#[test]
 fn basic_state_properties_use_live_state() {
     let _guard = HomeGuard::new();
     let snapshot_id = save_entry(entry(vec![], None, vec![]));

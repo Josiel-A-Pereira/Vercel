@@ -29,8 +29,10 @@ pub(crate) fn states_from_element(
     if ctx.is_secure_text {
         states.push(state::SECURE.into());
     }
-    if expanded_from_attrs(attrs) == Some(true) {
-        states.push(state::EXPANDED.into());
+    match expanded_from_attrs(attrs) {
+        Some(true) => states.push(state::EXPANDED.into()),
+        Some(false) => states.push(state::COLLAPSED.into()),
+        None => {}
     }
     if super::roles::is_toggleable_role(role) {
         if value_is_checked(attrs.value.as_deref()) {
