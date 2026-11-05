@@ -1,5 +1,5 @@
 const { existsSync, realpathSync, readFileSync, writeFileSync } = require('fs');
-const { dirname, join, relative, resolve } = require('path');
+const { dirname, isAbsolute, join, relative, resolve } = require('path');
 
 module.exports = function linkWindowsBin(directory, binaryName) {
   const binary = resolve(directory, binaryName);
@@ -22,10 +22,16 @@ module.exports = function linkWindowsBin(directory, binaryName) {
       try {
         const contents = readFileSync(command, 'utf8').replace(/\\/g, '/');
         if (!matches(contents)) continue;
-        writeFileSync(command, `@echo off\r\n"${binary}" %*\r\nexit /b %errorlevel%\r\n`);
+        const local = relative(destination, binary).replace(/\//g, '\\');
+        const portable = local !== '' && !isAbsolute(local);
+        const commandTarget = portable ? `%~dp0${local}` : binary;
+        writeFileSync(command, `@echo off\r\n"${commandTarget}" %*\r\nexit /b %errorlevel%\r\n`);
         const powershell = join(destination, 'agent-desktop.ps1');
         if (existsSync(powershell) && matches(readFileSync(powershell, 'utf8').replace(/\\/g, '/'))) {
-          writeFileSync(powershell, `& '${binary.replace(/'/g, "''")}' @args\r\nexit $LASTEXITCODE\r\n`);
+          const powershellTarget = portable
+            ? `(Join-Path $PSScriptRoot '${local.replace(/'/g, "''")}')`
+            : `'${binary.replace(/'/g, "''")}'`;
+          writeFileSync(powershell, `& ${powershellTarget} @args\r\nexit $LASTEXITCODE\r\n`);
         }
         linked = true;
       } catch (error) {
