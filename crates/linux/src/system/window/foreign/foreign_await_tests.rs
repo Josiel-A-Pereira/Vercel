@@ -59,3 +59,17 @@ fn a_sync_lost_after_the_send_is_an_unknown_outcome_not_a_success() {
         vec![(1, ToplevelRequest::SetMaximized(true))]
     );
 }
+
+#[test]
+fn a_sync_that_runs_out_with_the_limit_leaves_an_unmet_state_unmet() {
+    let spent = Deadline::detached_after(1).expect("a 1 ms deadline");
+    std::thread::sleep(std::time::Duration::from_millis(5));
+    let port = FakePort::showing(vec![record(1, "Home", "thunar")])
+        .failing_refresh(ControlError::TimedOut);
+    let outcome = await_flags(&port, 1, |flags| flags.maximized, spent);
+    assert_eq!(outcome, Awaited::Unmet(record(1, "Home", "thunar").flags));
+    let holding = FakePort::showing(vec![maximized(record(1, "Home", "thunar"))])
+        .failing_refresh(ControlError::TimedOut);
+    let outcome = await_flags(&holding, 1, |flags| flags.maximized, spent);
+    assert_eq!(outcome, Awaited::Unsynced(ControlError::TimedOut));
+}
