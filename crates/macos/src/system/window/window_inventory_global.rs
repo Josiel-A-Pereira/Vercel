@@ -1,6 +1,6 @@
 use crate::system::{window::cg_window::WindowRecord, window::window_ax_state::WindowAxState};
 use agent_desktop_core::{AdapterError, ErrorCode, WindowInfo};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 use std::time::Instant;
 
 impl OwnerSnapshotView for crate::system::app::workspace_apps::WindowOwnerSnapshot {
@@ -22,6 +22,10 @@ impl OwnerSnapshotView for crate::system::app::workspace_apps::WindowOwnerSnapsh
     fn same_generation(&self, other: &Self) -> bool {
         crate::system::app::workspace_apps::WindowOwnerSnapshot::same_generation(self, other)
     }
+
+    fn owner_name(&self, pid: i32) -> Option<&str> {
+        self.owner(pid).map(|owner| owner.name.as_str())
+    }
 }
 
 pub(in crate::system) trait OwnerSnapshotView {
@@ -29,6 +33,9 @@ pub(in crate::system) trait OwnerSnapshotView {
     fn generation(&self, pid: i32) -> Option<OwnerGeneration>;
     fn frontmost_pid(&self) -> Option<i32>;
     fn same_generation(&self, other: &Self) -> bool;
+    fn owner_name(&self, _pid: i32) -> Option<&str> {
+        None
+    }
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -221,60 +228,6 @@ pub(in crate::system) fn stabilize_global_with(
     }
 }
 
-fn validate_record_generations<S: OwnerSnapshotView>(
-    records: &[WindowRecord],
-    owners: &S,
-) -> Result<(), AdapterError> {
-    for (pid, instance) in unique_process_instances(records)? {
-        let generation = owners
-            .generation(pid)
-            .ok_or_else(|| owner_churn_error(Some(pid), "owner_not_eligible"))?;
-        let matches = match generation {
-            OwnerGeneration::LaunchTime(launch_time) => {
-                crate::system::process::process_identity::instance_matches_launch_time(
-                    pid,
-                    instance,
-                    launch_time,
-                )?
-            }
-            OwnerGeneration::LiveProcess => {
-                crate::system::process::process_identity::matches_instance(pid, instance)?
-            }
-        };
-        if !matches {
-            return Err(owner_churn_error(Some(pid), "process_generation_changed"));
-        }
-    }
-    Ok(())
-}
-
-fn unique_process_instances(records: &[WindowRecord]) -> Result<Vec<(i32, &str)>, AdapterError> {
-    let mut instances = FxHashMap::default();
-    for record in records {
-        let instance = record
-            .process_instance
-            .as_deref()
-            .filter(|instance| !instance.is_empty())
-            .ok_or_else(|| owner_churn_error(Some(record.pid), "process_instance_missing"))?;
-        match instances.entry(record.pid) {
-            std::collections::hash_map::Entry::Occupied(entry) => {
-                if *entry.get() != instance {
-                    return Err(owner_churn_error(
-                        Some(record.pid),
-                        "process_instance_conflict",
-                    ));
-                }
-            }
-            std::collections::hash_map::Entry::Vacant(entry) => {
-                entry.insert(instance);
-            }
-        }
-    }
-    let mut instances = instances.into_iter().collect::<Vec<_>>();
-    instances.sort_unstable_by_key(|(pid, _)| *pid);
-    Ok(instances)
-}
-
 enum FocusJoin {
     Windows(Vec<(i32, i64)>),
     TitleAmbiguous,
@@ -370,6 +323,10 @@ fn owner_churn_error(pid: Option<i32>, phase: &str) -> AdapterError {
 fn retryable_global_error(error: &AdapterError) -> bool {
     error.code == ErrorCode::AppUnresponsive && error.is_explicitly_retryable()
 }
+
+#[path = "window_inventory_global_generation.rs"]
+mod generation;
+use generation::validate_record_generations;
 
 #[path = "window_inventory_global_timeout.rs"]
 mod timeout;
