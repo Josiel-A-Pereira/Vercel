@@ -82,11 +82,30 @@ fn resolve_target(
     }
 
     if let Some(window_id) = &args.window_id {
-        let expected_app = args
+        let expected_apps = args
             .app
             .as_deref()
-            .map(|name| crate::commands::helpers::resolve_app(Some(name), adapter, deadline))
+            .map(|name| -> Result<Vec<crate::AppInfo>, AppError> {
+                let apps = crate::system::app_lookup::exact_apps(adapter, name, None, deadline)?;
+                if apps.is_empty() {
+                    return Err(AdapterError::new(
+                        ErrorCode::AppNotFound,
+                        format!("Application '{name}' was not found with exact process identity"),
+                    )
+                    .with_suggestion("Application name as reported by list-apps")
+                    .unsent()
+                    .into());
+                }
+                for app in &apps {
+                    crate::commands::helpers::process_identity(app)?;
+                }
+                Ok(apps)
+            })
             .transpose()?;
+        let expected_app = expected_apps.as_deref().and_then(|apps| match apps {
+            [app] => Some(app),
+            _ => None,
+        });
         let filter = WindowFilter {
             focused_only: false,
             app: args.app.clone(),
@@ -109,20 +128,14 @@ fn resolve_target(
                 .with_disposition(crate::DeliverySemantics::not_delivered()),
             ));
         }
-        if let Some(app) = expected_app.as_ref() {
-            let instance = crate::commands::helpers::process_identity(app)?.instance;
+        if let Some(apps) = expected_apps.as_ref() {
             candidates.retain(|window| {
-                window.pid == app.pid
-                    && window.process_instance.as_deref() == Some(instance.as_str())
+                apps.iter().any(|app| {
+                    window.pid == app.pid && window.process_instance == app.process_instance
+                })
             });
         }
-        let win = select_unique_window(
-            candidates,
-            window_id,
-            expected_app.as_ref(),
-            adapter,
-            deadline,
-        )?;
+        let win = select_unique_window(candidates, window_id, expected_app, adapter, deadline)?;
         return Ok(ScreenshotTarget::ExactWindow(win));
     }
 

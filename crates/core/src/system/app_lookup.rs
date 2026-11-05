@@ -243,7 +243,7 @@ pub(crate) fn revalidate_app_for_mutation(
     }
 }
 
-fn exact_apps(
+pub(crate) fn exact_apps(
     adapter: &dyn PlatformAdapter,
     name: &str,
     bundle_id: Option<&str>,

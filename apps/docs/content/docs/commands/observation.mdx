@@ -202,6 +202,8 @@ agent-desktop screenshot --screen 0 screen.png
 }
 ```
 
+When multiple instances share an app name, use `--window-id` from `list-windows` to select the window. Adding `--app` restricts the window to a matching application process instance. Without a window ID, an app name that matches multiple instances returns `AMBIGUOUS_TARGET`.
+
 Errors specific to `screenshot`: `PERM_DENIED` without screen-capture permission; `INVALID_ARGS` for `--screen` with a window selector, an out-of-range index, or an unwritable `PATH`; `WINDOW_NOT_FOUND` or `APP_NOT_FOUND` for an unknown target. On Linux, a covered window on a non-compositing window manager fails with `ACTION_FAILED` and `details.reason: "covered"`, and a display capture under a compositing one returns `PLATFORM_NOT_SUPPORTED`.
 
 Platform limits: macOS needs Screen Recording permission, and Wayland asks for portal consent. See [macOS](/desktop/platforms/macos) and [Linux](/desktop/platforms/linux).
