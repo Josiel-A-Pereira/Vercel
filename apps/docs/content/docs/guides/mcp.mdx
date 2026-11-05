@@ -33,7 +33,9 @@ Each tool is one command, named `desktop_` plus the command with hyphens as unde
 
 A tool's arguments are its command's arguments, with hyphens as underscores: `snapshot --app Finder -i` is `desktop_snapshot` with `{ "app": "Finder", "interactive_only": true }`. Positional arguments use their names too, such as `ref_id` for `click`. A null argument counts as omitted.
 
-The tool list is read from the CLI's own command definitions, so it always matches the installed binary.
+The tool list is read from the CLI's own command definitions, so it always matches the installed binary. Follow the tool's `inputSchema` for JSON types and required fields. For repeatable arguments such as `args` on `desktop_launch`, pass a JSON array.
+
+`desktop_type` requires a string in `text`, and `desktop_set_value` requires a string in `value`. Use `--stdin` to read text from a pipe or file when running the CLI directly.
 
 ## Apply global flags once
 
@@ -51,7 +53,7 @@ A tool cannot pass a global flag. Commands that need a session, such as `trace` 
 
 A tool returns the command's JSON envelope as `structuredContent`, and the same JSON as text. `isError` is `true` when the envelope's `ok` is `false`, so read `error.code` and `error.disposition` exactly as you would from the CLI. A `screenshot` without an output path returns its PNG as an image block instead of base64 text.
 
-An unknown argument returns a tool error that names the accepted arguments, and a value of the wrong type returns an error that names the argument, so the model can correct the call.
+A missing required argument or a value of the wrong type returns `isError: true` with a text message naming the argument. Unknown argument errors list the accepted arguments. The server returns these errors before it starts the CLI.
 
 ## Start with the skills
 

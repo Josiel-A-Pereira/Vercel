@@ -29,6 +29,8 @@ Examples use a POSIX shell. In PowerShell, quote every ref (`'@s8f3k2p9:e1'`), b
 2. Run `agent-desktop skills get platform`. It loads the skill for the OS the binary runs on (macOS, Windows or Linux).
 3. For flags and syntax, run `agent-desktop <command> --help`. This skill does not repeat flag lists.
 
+Over MCP, use the tool's `inputSchema` for JSON types and required fields. Send `text` to `desktop_type` and `value` to `desktop_set_value` as strings.
+
 ## The loop
 
 Use `find` when you know the role or exact name. Otherwise map the app first and drill into one region.

@@ -61,7 +61,7 @@ impl Tool {
         let mut required = Vec::new();
         for arg in self.args() {
             properties.insert(property_name(arg), property(arg));
-            if arg.is_required_set() {
+            if self.requires(arg) {
                 required.push(Value::from(property_name(arg)));
             }
         }
@@ -91,7 +91,7 @@ impl Tool {
                 push_option(&mut argv, arg, key, value)?;
             }
         }
-        for arg in self.args().filter(|arg| arg.is_required_set()) {
+        for arg in self.args().filter(|arg| self.requires(arg)) {
             let key = property_name(arg);
             if arguments.get(&key).is_none_or(Value::is_null) {
                 return Err(format!("Missing required argument '{key}'"));
@@ -103,6 +103,14 @@ impl Tool {
             argv.extend(positionals.into_iter().flat_map(|(_, values)| values));
         }
         Ok(argv)
+    }
+
+    fn requires(&self, arg: &Arg) -> bool {
+        arg.is_required_set()
+            || matches!(
+                (self.command.get_name(), arg.get_id().as_str()),
+                ("type", "text") | ("set-value", "value")
+            )
     }
 
     fn args(&self) -> impl Iterator<Item = &Arg> {
