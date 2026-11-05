@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::time::{Duration, Instant};
 
 use agent_desktop_core::{AdapterError, Deadline};
@@ -6,6 +7,7 @@ use crate::system::display::display_server::{DisplayServer, session_server};
 use crate::system::menu::surfaces;
 use crate::system::process::liveness::{self, Liveness};
 use crate::system::process::process_lookup::Lookup;
+use crate::system::registry::registry_frames::RootRead;
 use crate::system::signal::Signal;
 use crate::system::signal::signal_sent::Sent;
 use crate::system::window::foreign::foreign_close_route::ForeignCloseRoute;
@@ -13,7 +15,7 @@ use crate::system::window::foreign::foreign_frame::Frame;
 use crate::system::window::foreign::foreign_link::ForeignLink;
 use crate::system::window::foreign::foreign_names::ProcessNames;
 use crate::system::window::window_op::window_op_verdict::POLL;
-use crate::system::window::window_ops::listed_of_process;
+use crate::system::window::window_ops::{listed_of_process, require_complete_frames};
 use crate::system::x11::control;
 use crate::system::x11::control::ControlRead;
 use crate::system::x11::control::control_error::ControlError;
@@ -49,6 +51,12 @@ pub(super) trait World {
         0
     }
 
+    /// Why the last windowless read is not an answer: a frame the process
+    /// left unanswered, which could be hiding a dialog.
+    fn frames_unanswered(&self) -> Result<(), AdapterError> {
+        Ok(())
+    }
+
     fn foreign_unproven(&self) -> Vec<String> {
         Vec::new()
     }
@@ -71,6 +79,21 @@ pub(super) struct Live<'a> {
     pub(super) deadline: Deadline,
     pub(super) started: Instant,
     pub(super) foreign: ForeignCloseRoute<ForeignLink>,
+    pub(super) unanswered: Cell<bool>,
+}
+
+/// The frames of a process, or a timed-out read noted in `unanswered`: an
+/// empty or short list would hide a dialog the process left unanswered.
+pub(super) fn answered_frames(
+    frames: Vec<Frame>,
+    read: RootRead,
+    unanswered: &Cell<bool>,
+) -> Result<Vec<Frame>, ControlError> {
+    unanswered.set(require_complete_frames(read).is_err());
+    if unanswered.get() {
+        return Err(ControlError::TimedOut);
+    }
+    Ok(frames)
 }
 
 impl Live<'_> {
@@ -89,18 +112,18 @@ impl Live<'_> {
             Err(_) => return ControlRead::Unavailable,
         }
         let names = ProcessNames::of(self.pid, self.name).with_instance(self.instance);
+        self.unanswered.set(false);
         let frames = || {
-            listed_of_process(self.bus, self.pid, deadline)
-                .map(|windows| {
-                    windows
-                        .into_iter()
-                        .map(|window| Frame {
-                            title: window.info.title,
-                            prompt: window.dialog || window.modal,
-                        })
-                        .collect()
+            let (windows, read) = listed_of_process(self.bus, self.pid, deadline)
+                .map_err(|_| ControlError::NoDisplay)?;
+            let frames = windows
+                .into_iter()
+                .map(|window| Frame {
+                    title: window.info.title,
+                    prompt: window.dialog || window.modal,
                 })
-                .map_err(|_| ControlError::NoDisplay)
+                .collect();
+            answered_frames(frames, read, &self.unanswered)
         };
         match self.foreign.standing(&names, frames, deadline) {
             Ok(windows) => ControlRead::Ready(windows),
@@ -132,6 +155,13 @@ impl World for Live<'_> {
 
     fn pause(&self) {
         std::thread::sleep(self.deadline.remaining().min(POLL));
+    }
+
+    fn frames_unanswered(&self) -> Result<(), AdapterError> {
+        if self.unanswered.get() {
+            require_complete_frames(RootRead::TimedOut)?;
+        }
+        Ok(())
     }
 
     fn toplevels(&self) -> ControlRead<Vec<Toplevel>> {

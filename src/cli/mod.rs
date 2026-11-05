@@ -80,9 +80,9 @@ pub(crate) enum Commands {
     ScrollTo(RefArgs),
     #[command(about = "Send a key combo: return, escape, cmd+c, shift+tab ...")]
     Press(PressArgs),
-    #[command(about = "Hold a key or modifier down")]
+    #[command(about = "Hold a key or modifier down (fails closed in stateless mode; use press)")]
     KeyDown(KeyComboArgs),
-    #[command(about = "Release a held key or modifier")]
+    #[command(about = "Release a held key or modifier (fails closed in stateless mode; use press)")]
     KeyUp(KeyComboArgs),
     #[command(about = "Move cursor to element center or coordinates (requires --headed)")]
     Hover(HoverArgs),
@@ -129,7 +129,7 @@ pub(crate) enum Commands {
     #[command(about = "List accessibility surfaces for an app (window, menu, sheet ...)")]
     ListSurfaces(ListSurfacesArgs),
     #[command(
-        about = "Open a shell surface (start-menu, taskbar, action-center ...) and return the window it presents"
+        about = "Open a shell surface (start-menu, taskbar, dock, menu-bar-extras ...) and return the window it presents, if any"
     )]
     OpenSystemSurface(OpenSystemSurfaceArgs),
     #[command(about = "List notifications from Notification Center")]
@@ -257,13 +257,6 @@ impl Commands {
 
     pub(crate) fn supports_post_action_wait(&self) -> bool {
         self.metadata().post_action_wait
-    }
-
-    #[cfg(target_os = "macos")]
-    /// Permission guidance needs the caller; session management crosses host namespaces.
-    pub(crate) fn needs_caller_process(&self) -> bool {
-        matches!(self, Self::Session(_) | Self::Batch(_))
-            || matches!(self, Self::Permissions(args) if args.guide)
     }
 
     pub(crate) fn is_mutating(&self) -> bool {

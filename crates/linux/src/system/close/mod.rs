@@ -81,6 +81,7 @@ pub(crate) fn close_app(
         deadline: lease.deadline(),
         started: Instant::now(),
         foreign: ForeignCloseRoute::default(),
+        unanswered: std::cell::Cell::new(false),
     };
     run_report(&live, app, force)
 }

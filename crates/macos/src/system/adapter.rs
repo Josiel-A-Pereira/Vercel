@@ -84,6 +84,22 @@ impl SystemOps for MacOSAdapter {
         crate::system::focus::focus_window_impl(win, lease.deadline())
     }
 
+    fn resolve_ref_focus_window(
+        &self,
+        entry: &agent_desktop_core::RefEntry,
+        deadline: Deadline,
+    ) -> Result<WindowInfo, AdapterError> {
+        crate::system::ref_focus_window::resolve(self, entry, deadline)
+    }
+
+    fn focus_app(
+        &self,
+        process: ProcessIdentity,
+        lease: &InteractionLease,
+    ) -> Result<(), AdapterError> {
+        crate::system::focus::focus_process(&process, lease.deadline())
+    }
+
     fn launch_app(
         &self,
         id: &str,
@@ -112,6 +128,21 @@ impl SystemOps for MacOSAdapter {
 
     fn supported_surfaces(&self) -> Vec<SnapshotSurface> {
         crate::system::signals::supported_surfaces_impl()
+    }
+
+    /// The Dock and the menu bar extras are always presented, so opening one
+    /// returns it without raising anything or moving the foreground, which is
+    /// why no policy floor applies.
+    fn open_system_surface(
+        &self,
+        surface: SnapshotSurface,
+        _policy: agent_desktop_core::InteractionPolicy,
+        lease: &InteractionLease,
+    ) -> Result<WindowInfo, AdapterError> {
+        crate::tree::shell_surface::resolve_surface(
+            surface,
+            crate::tree::locator_deadline::from_operation(lease.deadline())?,
+        )
     }
 
     fn capture_signal_baseline(

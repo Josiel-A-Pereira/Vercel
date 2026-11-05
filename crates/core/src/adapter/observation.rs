@@ -28,12 +28,27 @@ fn is_live_read_unsupported(err: &AdapterError) -> bool {
 }
 
 pub trait ObservationOps: Send + Sync {
-    /// Whether this resolved handle denotes a protocol object with no screen
-    /// position, rather than a native control whose geometry is unreadable.
-    /// Only headless semantic delivery can use this fact; fresh identity,
-    /// complete state and action capability are still required.
+    fn is_application_surface(&self, _surface: SnapshotSurface) -> bool {
+        false
+    }
+
+    fn focused_app(&self, _deadline: Deadline) -> Result<Option<AppInfo>, AdapterError> {
+        Err(AdapterError::not_supported("focused_app"))
+    }
+
+    /// Reports protocol targets that have no screen position without requiring a native read.
     fn is_nonspatial_target(&self, _handle: &NativeHandle) -> bool {
         false
+    }
+
+    /// Reports proven nonspatial targets, including native menus, within the observation deadline.
+    /// Semantic delivery still requires fresh identity, complete live state and action capability.
+    fn is_nonspatial_target_with_deadline(
+        &self,
+        handle: &NativeHandle,
+        _deadline: Deadline,
+    ) -> Result<bool, AdapterError> {
+        Ok(self.is_nonspatial_target(handle))
     }
 
     fn observe_tree(
@@ -133,6 +148,24 @@ pub trait ObservationOps: Send + Sync {
         _deadline: Deadline,
     ) -> Result<NativeHandle, AdapterError> {
         Err(AdapterError::not_supported("resolve_element_strict"))
+    }
+
+    /// Whether this adapter records an element token on observed nodes, so a
+    /// shallow capture can re-identify its refs without a whole-window read.
+    fn retains_element_tokens(&self) -> bool {
+        false
+    }
+
+    /// Checks platform-specific context that the saved ref's identity predicate
+    /// does not encode, against the token from the same observation that matched
+    /// it. This must not take a second live read: rooted finds and drills publish
+    /// refs from that observation. Adapters without extra context accept it.
+    fn validate_saved_ref_context(
+        &self,
+        _entry: &RefEntry,
+        _observed_token: Option<&str>,
+    ) -> Result<(), AdapterError> {
+        Ok(())
     }
 
     fn resolve_locator_anchor(
@@ -276,14 +309,16 @@ pub trait ObservationOps: Send + Sync {
 
     /// Strict receiver proof for a physical pointer move that has no element
     /// action to carry it. An adapter that can prove who receives the pointer
-    /// refuses with a `not_delivered` error when the target does not.
+    /// refuses with a `not_delivered` error when the target does not. `handle`
+    /// is the element the caller already resolved under the interaction lease,
+    /// so the adapter never re-identifies the ref by a rule of its own.
     fn confirm_pointer_receiver(
         &self,
-        entry: &RefEntry,
+        handle: &NativeHandle,
         point: crate::Point,
         deadline: Deadline,
     ) -> Result<(), AdapterError> {
-        let _ = (entry, point, deadline);
+        let _ = (handle, point, deadline);
         Ok(())
     }
 }

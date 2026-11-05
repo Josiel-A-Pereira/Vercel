@@ -99,10 +99,17 @@ fn request_close(world: &impl World, request: &Request<'_>) -> Result<bool, Adap
             return unless_gone(world, refusal::no_route(request));
         }
         ControlRead::Unavailable if world.remaining().is_zero() => {
-            return Err(not_delivered(world.timeout_error()));
+            let error = world.frames_unanswered().err();
+            return Err(not_delivered(
+                error.unwrap_or_else(|| world.timeout_error()),
+            ));
         }
         ControlRead::Unavailable => {
-            return unless_gone(world, refusal::unavailable(request));
+            let error = world.frames_unanswered().err();
+            return unless_gone(
+                world,
+                error.unwrap_or_else(|| refusal::unavailable(request)),
+            );
         }
     };
     match world.liveness() {

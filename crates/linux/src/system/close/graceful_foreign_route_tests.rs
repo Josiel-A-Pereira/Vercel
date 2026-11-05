@@ -1,9 +1,15 @@
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::time::Duration;
 
-use super::super::{Request, fake::Fake, world::World};
+use super::super::{
+    Request,
+    fake::Fake,
+    world::{World, answered_frames},
+};
 use super::close;
 use crate::system::process::{liveness::Liveness, process_lookup::Lookup};
+use crate::system::registry::registry_frames::RootRead;
 use crate::system::signal::{Signal, signal_sent::Sent};
 use crate::system::window::foreign::{
     foreign_close_route::ForeignCloseRoute,
@@ -13,6 +19,7 @@ use crate::system::window::foreign::{
     foreign_record::ToplevelRecord,
     foreign_request::ToplevelRequest,
 };
+use crate::system::window::window_ops::require_complete_frames;
 use crate::system::x11::{
     control::{ControlRead, control_error::ControlError},
     window::toplevel::Toplevel,
@@ -43,6 +50,8 @@ struct RouteWorld {
     fake: Fake,
     route: ForeignCloseRoute<MappedPort>,
     frames: Vec<Frame>,
+    read: RootRead,
+    unanswered: Cell<bool>,
 }
 
 impl World for RouteWorld {
@@ -65,10 +74,9 @@ impl World for RouteWorld {
         self.fake.pause()
     }
     fn toplevels(&self) -> ControlRead<Vec<Toplevel>> {
-        match self
-            .route
-            .standing(&thunar(), || Ok(self.frames.clone()), deadline())
-        {
+        self.unanswered.set(false);
+        let frames = || answered_frames(self.frames.clone(), self.read, &self.unanswered);
+        match self.route.standing(&thunar(), frames, deadline()) {
             Ok(windows) => ControlRead::Ready(windows),
             Err(_) => ControlRead::Unavailable,
         }
@@ -97,6 +105,12 @@ impl World for RouteWorld {
     fn has_foreign_route(&self) -> bool {
         self.route.in_use()
     }
+    fn frames_unanswered(&self) -> Result<(), AdapterError> {
+        if self.unanswered.get() {
+            require_complete_frames(RootRead::TimedOut)?;
+        }
+        Ok(())
+    }
     fn foreign_unproven(&self) -> Vec<String> {
         self.route.unproven()
     }
@@ -117,6 +131,8 @@ fn world(
             owners,
         }),
         frames,
+        read: RootRead::Read,
+        unanswered: Cell::new(false),
     }
 }
 
@@ -220,6 +236,8 @@ fn changed_list_before_close_is_revalidated_before_any_send() {
             owners: None,
         }),
         frames: vec![frame("Home", false)],
+        read: RootRead::Read,
+        unanswered: Cell::new(false),
     };
     let error = close(&scene, &request()).unwrap_err();
     assert_eq!(error.disposition, DeliverySemantics::not_delivered());
@@ -255,4 +273,19 @@ fn mapped_close_sends_to_both_same_title_windows_of_the_target() {
         scene.route.port().unwrap().inner.sent(),
         vec![(1, ToplevelRequest::Close), (2, ToplevelRequest::Close)]
     );
+}
+
+#[test]
+fn close_times_out_when_a_frame_read_ran_out_and_sends_nothing() {
+    let mut scene = world(
+        vec![record(1, "Home", "thunar"), record(2, "Save As", "thunar")],
+        vec![frame("Home", false)],
+        Some(HashMap::from([(1, 7), (2, 7)])),
+    );
+    scene.read = RootRead::TimedOut;
+    let error = close(&scene, &request()).unwrap_err();
+    assert_eq!(error.code, ErrorCode::Timeout);
+    assert_eq!(error.disposition, DeliverySemantics::not_delivered());
+    assert_eq!(error.details.unwrap()["kind"], "frames_unanswered");
+    assert!(scene.route.port().unwrap().inner.sent().is_empty());
 }
