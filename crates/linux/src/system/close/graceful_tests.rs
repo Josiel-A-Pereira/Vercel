@@ -302,29 +302,41 @@ fn a_window_that_vanished_is_not_a_failed_send() {
 }
 
 #[test]
-fn a_stale_close_target_refuses_further_sends_and_preserves_prior_delivery() {
-    for sent_first in [false, true] {
-        let mut world = Fake::new(Liveness::Alive);
-        world.windows = ControlRead::Ready(vec![window(1), window(2), window(3)]);
-        let mut results = world.closes.borrow_mut();
-        if sent_first {
-            results.push(Ok(()));
-        }
-        results.push(Err(ControlError::StaleWindow));
-        drop(results);
-        let error = close(&world, &request()).expect_err("the owner changed");
-        assert_eq!(error.code, ErrorCode::StaleRef);
-        assert_eq!(
-            error.disposition,
-            if sent_first {
-                DeliverySemantics::delivered_unverified()
-            } else {
-                DeliverySemantics::not_delivered()
-            }
-        );
-        assert_eq!(world.count("close"), if sent_first { 2 } else { 1 });
-        assert_no_signal(&world);
-    }
+fn a_stale_first_close_target_is_refused_and_nothing_is_delivered() {
+    let mut world = Fake::new(Liveness::Alive);
+    world.windows = ControlRead::Ready(vec![window(1), window(2), window(3)]);
+    world
+        .closes
+        .borrow_mut()
+        .push(Err(ControlError::StaleWindow));
+    let error = close(&world, &request()).expect_err("the owner changed");
+    assert_eq!(error.code, ErrorCode::StaleRef);
+    assert_eq!(error.disposition, DeliverySemantics::not_delivered());
+    assert_eq!(world.count("close"), 1);
+    assert_no_signal(&world);
+}
+
+#[test]
+fn a_window_that_turns_stale_after_a_delivered_close_ends_the_fan_out_and_the_exit_decides() {
+    let mut world = Fake::new(Liveness::Alive);
+    world.windows = ControlRead::Ready(vec![window(1), window(2), window(3)]);
+    *world.closes.borrow_mut() = vec![Ok(()), Err(ControlError::StaleWindow)];
+    world.exits_on_close = true;
+    close(&world, &request()).expect("the process left after the first close");
+    assert_eq!(*world.closed.borrow(), vec![1, 2]);
+    assert_no_signal(&world);
+}
+
+#[test]
+fn a_window_that_turns_stale_after_a_delivered_close_leaves_a_live_process_to_the_timeout() {
+    let mut world = Fake::new(Liveness::Alive);
+    world.windows = ControlRead::Ready(vec![window(1), window(2), window(3)]);
+    *world.closes.borrow_mut() = vec![Ok(()), Err(ControlError::StaleWindow)];
+    let error = close(&world, &request()).expect_err("the process stays");
+    assert_eq!(error.code, ErrorCode::Timeout);
+    assert_eq!(error.disposition, DeliverySemantics::delivered_unverified());
+    assert_eq!(*world.closed.borrow(), vec![1, 2]);
+    assert_no_signal(&world);
 }
 
 #[test]

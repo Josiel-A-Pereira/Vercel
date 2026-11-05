@@ -56,6 +56,7 @@ fn fan_out(
                 delivery = DeliverySemantics::delivered_unverified();
             }
             Err(ControlError::BadWindow) => {}
+            Err(ControlError::StaleWindow) if sent > 0 => break,
             Err(error @ ControlError::StaleWindow) => {
                 return Err(failure_of(world, request, error).with_disposition(delivery));
             }
