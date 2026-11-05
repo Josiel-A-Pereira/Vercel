@@ -50,6 +50,15 @@ pub(crate) fn hosted_application_pid(
     None
 }
 
+/// The process an agent addresses a top-level window by: the hosted
+/// application for a frame host frame carrying one (A26-8), otherwise the
+/// window's own owner. `list-windows`, `list-apps` and `close-app` all
+/// attribute windows through this one rule so the app name `list-windows`
+/// reports is one `close-app` can find.
+pub(crate) fn agent_facing_owner(handle: super::window_enum::WindowHandle) -> Option<ProcessId> {
+    hosted_application_pid(handle).or_else(|| super::window_identity::live_window_owner(handle))
+}
+
 /// The first child `CoreWindow` whose owning process differs from the
 /// frame's, walked in z-order through the frame's immediate children. A
 /// child whose owner cannot be read is passed over, not fatal: one raced
@@ -87,3 +96,7 @@ mod tests;
 #[cfg(test)]
 #[path = "frame_identity_settings_tests.rs"]
 mod settings_tests;
+
+#[cfg(test)]
+#[path = "frame_identity_owner_tests.rs"]
+mod owner_tests;
