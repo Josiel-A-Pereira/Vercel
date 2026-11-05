@@ -72,6 +72,7 @@ fn error_code_origin(result: AdResult) -> Option<ErrorCode> {
         AdResult::ErrPolicyDenied => ErrorCode::PolicyDenied,
         AdResult::ErrAmbiguousTarget => ErrorCode::AmbiguousTarget,
         AdResult::ErrAppUnresponsive => ErrorCode::AppUnresponsive,
+        AdResult::ErrTreeTooLarge => ErrorCode::TreeTooLarge,
     })
 }
 
@@ -94,6 +95,7 @@ fn error_code_and_ad_result_error_variants_stay_in_bijection() {
         AdResult::ErrPolicyDenied,
         AdResult::ErrAmbiguousTarget,
         AdResult::ErrAppUnresponsive,
+        AdResult::ErrTreeTooLarge,
     ] {
         let code = error_code_origin(result).expect("error variant must have an ErrorCode origin");
         assert_eq!(

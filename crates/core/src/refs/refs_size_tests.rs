@@ -10,15 +10,34 @@ fn test_serialize_with_size_check_rejects_oversized() {
     }
 
     let err = map.serialize_with_size_check().unwrap_err();
-    assert_eq!(err.code(), "INTERNAL");
-    assert!(err.to_string().contains("1MB"), "got: {err}");
+    assert_eq!(err.code(), "TREE_TOO_LARGE");
+    assert!(
+        err.to_string().contains(&MAX_REFMAP_BYTES.to_string()),
+        "got: {err}"
+    );
     let suggestion = err.suggestion().unwrap_or_default();
-    assert!(suggestion.contains("--skeleton") && suggestion.contains("find"));
+    assert!(
+        suggestion.contains("--max-depth")
+            && suggestion.contains("--skeleton")
+            && suggestion.contains("--root")
+            && suggestion.contains("find"),
+        "got: {suggestion}"
+    );
 
     let payload = crate::response::output::ErrorPayload::from_app_error(&err);
-    assert_eq!(payload.code, "INTERNAL");
+    assert_eq!(payload.code, "TREE_TOO_LARGE");
     assert!(payload.recovery.is_none());
-    assert_eq!(payload.disposition, crate::DeliverySemantics::unknown());
+    assert_eq!(
+        payload.disposition,
+        crate::DeliverySemantics::not_delivered()
+    );
+    let details = payload
+        .details
+        .expect("an oversized refmap reports its size");
+    assert_eq!(details["kind"], "refmap_too_large");
+    assert_eq!(details["limit_bytes"], MAX_REFMAP_BYTES);
+    assert!(details["serialized_bytes"].as_u64().unwrap() > MAX_REFMAP_BYTES);
+    assert_eq!(details["retryable"], true);
 }
 
 #[test]

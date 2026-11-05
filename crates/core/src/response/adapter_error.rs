@@ -372,6 +372,7 @@ mod tests {
             ErrorCode::SnapshotNotFound,
             ErrorCode::PolicyDenied,
             ErrorCode::AppUnresponsive,
+            ErrorCode::TreeTooLarge,
             ErrorCode::Internal,
         ];
         let retryable = [

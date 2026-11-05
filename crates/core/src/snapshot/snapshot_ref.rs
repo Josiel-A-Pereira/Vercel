@@ -107,17 +107,14 @@ pub fn run_from_ref_with_context(
         capture: Some(&capture_proof),
     };
 
-    let (mut tree, refmap) = store.update_existing_snapshot(
-        &active_snapshot_id,
-        &local_root_ref,
-        &entry,
-        |current| {
+    let (mut tree, refmap) = store
+        .update_existing_snapshot(&active_snapshot_id, &local_root_ref, &entry, |current| {
             current.remove_by_root_ref(&local_root_ref);
             let mut tree = ref_alloc::allocate_refs(raw_tree, current, &config)?;
             crate::snapshot::hints::add_structural_hints(&mut tree);
             Ok(tree)
-        },
-    )?;
+        })
+        .map_err(|error| crate::refs::refmap_cap::note_observed_depth(error, opts.max_depth))?;
     crate::trace::trace_artifacts::copy_refmap_if_full(
         context,
         &store,

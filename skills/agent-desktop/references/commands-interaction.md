@@ -56,6 +56,7 @@ Exit codes: `0` success, `1` structured error, `2` argument error. The `error` o
 | `INVALID_ARGS` | Bad arguments, or a protected system process was targeted for close | Check syntax |
 | `PLATFORM_NOT_SUPPORTED` | The adapter lacks this method | Use another approach |
 | `NOTIFICATION_NOT_FOUND` | Notification index or fingerprint no longer matches | List again |
+| `TREE_TOO_LARGE` | One snapshot's ref map is over its 1 MB cap | Lower `--max-depth`, or `--skeleton` then `--root`. `details` has `serialized_bytes`, `limit_bytes` and `max_depth` |
 | `INTERNAL` | Unexpected OS failure | Read `message`. Retry once only if `disposition.retry` is `safe` |
 
 `ELEMENT_NOT_FOUND` with `details.kind: "surface_absent"` and `details.complete: true` is complete absence evidence. An absent `menubar` can mean the app exposes no menu bar. For `surface: menu`, snapshot `menubar` when it exists, click its item without `--headed`, then snapshot `--surface menu`. Missing `complete`, `complete: false`, a timeout or an incomplete read is unknown, not absent. If the earlier action has `delivery_uncertain` and `retry: unsafe`, inspect the current UI before any action; do not repeat it.

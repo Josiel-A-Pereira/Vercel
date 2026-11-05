@@ -56,6 +56,7 @@ fn all_error_codes_as_str_and_serde_are_consistent() {
         (ErrorCode::SnapshotNotFound, "SNAPSHOT_NOT_FOUND"),
         (ErrorCode::PolicyDenied, "POLICY_DENIED"),
         (ErrorCode::AppUnresponsive, "APP_UNRESPONSIVE"),
+        (ErrorCode::TreeTooLarge, "TREE_TOO_LARGE"),
         (ErrorCode::Internal, "INTERNAL"),
     ];
     for (code, expected) in cases {

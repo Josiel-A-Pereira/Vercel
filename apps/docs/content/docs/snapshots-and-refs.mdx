@@ -199,7 +199,7 @@ An older snapshot stays on disk until it is pruned, and its refs keep resolving 
     <tr><th>Limit</th><th>Value</th><th>What happens</th></tr>
   </thead>
   <tbody>
-    <tr><td>Size of one ref map</td><td>1 MB (1,048,576 bytes)</td><td>The write fails with <code>INTERNAL</code>. Narrow the observation with <code>--skeleton</code>, <code>--max-depth</code>, <code>--root</code>, or a tighter <code>find</code>.</td></tr>
+    <tr><td>Size of one ref map</td><td>1 MB (1,048,576 bytes)</td><td>The write fails with <code>TREE_TOO_LARGE</code>, and <code>details</code> carries <code>serialized_bytes</code>, <code>limit_bytes</code> and the <code>max_depth</code> used. Retry with a lower <code>--max-depth</code>, <code>--skeleton</code> and then <code>--root</code>, or a tighter <code>find</code>.</td></tr>
     <tr><td>Saved snapshots per namespace</td><td>128</td><td>When a save pushes the count past 128, the oldest are removed until 96 remain. The snapshot just written is never removed.</td></tr>
   </tbody>
 </table>

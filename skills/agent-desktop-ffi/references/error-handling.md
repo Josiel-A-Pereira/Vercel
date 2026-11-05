@@ -100,6 +100,7 @@ release may add codes.
 | `AD_RESULT_ERR_POLICY_DENIED`         | -14   | Current action policy blocks this fallback |
 | `AD_RESULT_ERR_AMBIGUOUS_TARGET`      | -15   | Strict re-identification found multiple candidates; re-snapshot |
 | `AD_RESULT_ERR_APP_UNRESPONSIVE`      | -16   | Read-only liveness probe failed after an uncertain mutation |
+| `AD_RESULT_ERR_TREE_TOO_LARGE`        | -17   | One snapshot's ref map is over its 1 MB cap; narrow the observation and retry |
 
 ## Ref token validation
 

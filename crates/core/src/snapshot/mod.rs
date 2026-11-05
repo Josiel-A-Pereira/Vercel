@@ -179,7 +179,9 @@ pub fn run_with_context(
         crate::Deadline::after(timeout_ms)?,
     )?;
     let store = RefStore::for_session(context.session_id())?;
-    let snapshot_id = result.save_refmap(&store)?;
+    let snapshot_id = result
+        .save_refmap(&store)
+        .map_err(|error| crate::refs::refmap_cap::note_observed_depth(error, opts.max_depth))?;
     trace_artifacts::copy_refmap_if_full(context, &store, &snapshot_id, &result.refmap)?;
     result.bind_snapshot_id(snapshot_id);
     emit_snapshot_saved(context, &result)?;

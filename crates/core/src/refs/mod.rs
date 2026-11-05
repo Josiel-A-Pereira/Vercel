@@ -14,6 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub type RefPath = SmallVec<[usize; 8]>;
 
 pub(crate) const MAX_REFMAP_BYTES: u64 = 1_048_576;
+
 static SNAPSHOT_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 thread_local! {
@@ -165,12 +166,9 @@ impl RefMap {
     pub(crate) fn serialize_with_size_check(&self) -> Result<String, AppError> {
         self.validate()?;
         let json = serde_json::to_string(self)?;
-        if json.len() as u64 > MAX_REFMAP_BYTES {
-            return Err(crate::AdapterError::internal("RefMap exceeds 1MB size limit on write")
-                .with_suggestion(
-                    "Narrow the observation: snapshot with --skeleton, --max-depth, or --root @ref, or use find with a tighter query or --limit",
-                )
-                .into());
+        let serialized_bytes = json.len() as u64;
+        if serialized_bytes > MAX_REFMAP_BYTES {
+            return Err(refmap_cap::tree_too_large(serialized_bytes).into());
         }
         Ok(json)
     }
@@ -379,6 +377,7 @@ pub(crate) mod ref_scope;
 pub(crate) mod ref_skeleton_anchors;
 pub(crate) mod ref_source;
 pub(crate) mod ref_token;
+pub(crate) mod refmap_cap;
 pub(crate) mod refs_lock;
 pub mod refs_store;
 #[cfg(test)]
