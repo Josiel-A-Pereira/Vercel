@@ -154,6 +154,23 @@ pub(in crate::system) fn control_failure(error: ControlError, deadline: Deadline
     }
 }
 
+/// The error of a sync that failed after a request was sent: the request may
+/// well have been applied, so the outcome is unknown, never a mismatch.
+pub(in crate::system) fn sync_failure(error: ControlError, deadline: Deadline) -> AdapterError {
+    match error {
+        ControlError::TimedOut => deadline
+            .timeout_error()
+            .with_disposition(DeliverySemantics::delivered_unverified()),
+        _ => refused(
+            ErrorCode::ActionFailed,
+            "no_display",
+            "The compositor connection was lost after the request was sent, so its effect is unknown",
+        )
+        .with_suggestion(RUN_LIST_WINDOWS)
+        .with_disposition(DeliverySemantics::uncertain()),
+    }
+}
+
 #[cfg(test)]
 #[path = "foreign_refusal_tests.rs"]
 mod tests;

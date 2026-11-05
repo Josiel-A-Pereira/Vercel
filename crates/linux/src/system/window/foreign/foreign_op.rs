@@ -8,7 +8,8 @@ use super::foreign_flags::ToplevelFlags;
 use super::foreign_locate::locate;
 use super::foreign_port::ToplevelPort;
 use super::foreign_refusal::{
-    control_failure, minimize_not_applied, move_or_resize, no_window, not_applied, window_destroyed,
+    control_failure, minimize_not_applied, move_or_resize, no_window, not_applied, sync_failure,
+    window_destroyed,
 };
 use super::foreign_request::ToplevelRequest;
 use super::foreign_target::ForeignTarget;
@@ -43,6 +44,7 @@ fn send_and_verify(
         Awaited::Reached => Ok(()),
         Awaited::Gone => Err(window_destroyed()),
         Awaited::Unmet(observed) => Err(failed_readback(request, &observed)),
+        Awaited::Unsynced(error) => Err(sync_failure(error, deadline)),
     }
 }
 

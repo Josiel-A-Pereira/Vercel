@@ -6,7 +6,7 @@ use super::foreign_await::{await_flags, flags_of};
 use super::foreign_awaited::Awaited;
 use super::foreign_locate::locate;
 use super::foreign_port::ToplevelPort;
-use super::foreign_refusal::{control_failure, window_destroyed};
+use super::foreign_refusal::{control_failure, sync_failure, window_destroyed};
 use super::foreign_request::ToplevelRequest;
 use super::foreign_target::ForeignTarget;
 use crate::system::focus::focus_cause::{Cause, refusal};
@@ -36,6 +36,7 @@ pub(in crate::system) fn activate(
         Awaited::Reached => Ok(()),
         Awaited::Gone => Err(window_destroyed()),
         Awaited::Unmet(_) => Err(not_activated()),
+        Awaited::Unsynced(error) => Err(sync_failure(error, deadline)),
     }
 }
 

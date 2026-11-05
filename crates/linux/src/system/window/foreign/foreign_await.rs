@@ -13,7 +13,8 @@ pub(in crate::system) fn flags_of(port: &impl ToplevelPort, id: u32) -> Option<T
 }
 
 /// Syncs with the compositor until the toplevel's flags satisfy `holds`, the
-/// toplevel goes away, or the limit passes.
+/// toplevel goes away, a sync fails, or the limit passes. Flags are only read
+/// after a sync that succeeded.
 pub(in crate::system) fn await_flags(
     port: &impl ToplevelPort,
     id: u32,
@@ -21,12 +22,18 @@ pub(in crate::system) fn await_flags(
     limit: Deadline,
 ) -> Awaited {
     loop {
-        let synced = port.refresh(limit).is_ok();
+        if let Err(error) = port.refresh(limit) {
+            return Awaited::Unsynced(error);
+        }
         match flags_of(port, id) {
             None => return Awaited::Gone,
             Some(flags) if holds(&flags) => return Awaited::Reached,
-            Some(flags) if !synced || limit.is_expired() => return Awaited::Unmet(flags),
+            Some(flags) if limit.is_expired() => return Awaited::Unmet(flags),
             Some(_) => std::thread::sleep(POLL.min(limit.remaining())),
         }
     }
 }
+
+#[cfg(test)]
+#[path = "foreign_await_tests.rs"]
+mod tests;
