@@ -204,6 +204,15 @@ On macOS and Windows:
 - `--image` and `--pointer-image` take a PNG of at most 2 MiB and 1024 pixels per side, drawn at `--size` with the hotspot on the point the cursor targets. Relative paths resolve at `enable`. `--fill` and `--rim` conflict with `--image`. A missing or invalid image falls back to the arrow. With `--image`, `enable` draws no greeting.
 - The pointer image shows on arrival at a pressable control. Text fields keep the arrow.
 
+For a compact agent name badge, use a transparent PNG with the name pill and arrow already drawn. Start with a 64-by-64-pixel PNG whose arrow tip is at `1,1`:
+
+```bash
+agent-desktop --session "$AGENT_DESKTOP_SESSION" cursor-overlay enable \
+  --image "$HOME/cursors/agent-name.png" --hotspot 1,1 --size 0.5
+```
+
+`--hotspot X,Y` uses image points and locates the click tip; `--size` scales the whole image. The PNG name pill is static. For per-agent styles in a multi-agent session, prepend `--agent-id NAME` to `cursor-overlay enable`. See [cursor-overlay](/desktop/commands/system#cursor-overlay) for image limits and the full command reference.
+
 Windows accepts the motion settings but keeps its built-in motion.
 
 On macOS and Windows, after `type` or `set-value` lands, the overlay draws the agent's caret, a thin bar in the accent color, at the field's insertion point and leaves the element outline off. `type --interval-ms` moves the caret with each keystroke while the cursor stays put. A field that reports no insertion point keeps the outline and gets no caret. The caret goes away when the cursor sets off for somewhere else, and stays for another `type` into the same field. After `press` delivers, a caret that is showing moves to the focused field's new insertion point, or disappears when the focused element has none. `type` plays the click ripple only when its field does not already have keyboard focus.

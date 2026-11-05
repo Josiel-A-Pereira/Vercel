@@ -161,6 +161,20 @@ agent-desktop --session "$AGENT_DESKTOP_SESSION" cursor-overlay disable
 }
 ```
 
+### Use a compact custom cursor for an agent
+
+For a smaller name pill than `--label` provides, create a transparent PNG with your pointer and label baked into the image. Place the click tip at a known location in the PNG, such as `1,1` for an arrow drawn against the top-left corner. Use that point as `--hotspot`.
+
+```bash
+# The session must already be active.
+agent-desktop --session "$AGENT_DESKTOP_SESSION" cursor-overlay enable \
+  --image "$HOME/cursors/agent-name.png" --hotspot 1,1 --size 0.5
+```
+
+The hotspot is an `X,Y` coordinate in image points, not a percentage. `--size` scales both the cursor artwork and its offset from the click target. For a 64-by-64-pixel PNG with a top-left tip, start with `--hotspot 1,1`, then change the hotspot if the arrow lands away from the target. PNG images must be 2 MiB or smaller and no more than 1024 pixels per side. `--fill` and `--rim` cannot be combined with `--image`.
+
+For several named cursors in one session, start it with `session start --cursor --multi-agent` and save each agent's image using global `--agent-id NAME` with `cursor-overlay enable`. The label is part of the PNG and does not change based on the agent's current action.
+
 `rendered: false` means the setting was saved but nothing was drawn, as on Linux Wayland. With `--agent-id`, `enable` saves the style as that agent's profile. `disable` stops every cursor in the session; if teardown cannot be confirmed, the setting is still saved and the error's disposition is `delivery_uncertain`. How headed actions and the overlay interact is in [Headed mode](/desktop/guides/headed-mode#see-where-actions-land).
 
 ## trace
