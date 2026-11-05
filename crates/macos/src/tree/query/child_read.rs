@@ -323,6 +323,32 @@ mod imp {
             if !result.is_null() {
                 drop(created_cf_array(result as CFTypeRef));
             }
+            if error == accessibility_sys::kAXErrorFailure {
+                let (fallback_error, value) = crate::tree::properties::ax_ipc::copy_attribute_value(
+                    element,
+                    attribute.as_concrete_TypeRef(),
+                    deadline,
+                );
+                if fallback_error == kAXErrorSuccess && !value.is_null() {
+                    let Some(array) = created_cf_array(value) else {
+                        return Err(i32::MIN);
+                    };
+                    let total = array.len() as usize;
+                    let start = usize::try_from(index).map_err(|_| i32::MIN)?;
+                    let take_count = usize::try_from(max_values).map_err(|_| i32::MIN)?;
+                    let elements = array
+                        .into_iter()
+                        .skip(start)
+                        .take(take_count)
+                        .filter_map(|val| ax_value::retained_ax_element(&val))
+                        .collect::<Vec<_>>();
+                    let expected_slice_len = total.saturating_sub(start).min(take_count);
+                    if elements.len() != expected_slice_len {
+                        return Err(i32::MIN);
+                    }
+                    return Ok(elements);
+                }
+            }
             return Err(error);
         }
         if result.is_null() {

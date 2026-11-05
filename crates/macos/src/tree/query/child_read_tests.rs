@@ -40,6 +40,7 @@ fn unsupported_and_missing_child_attributes_are_authoritatively_absent() {
     assert!(is_absent_error(kAXErrorAttributeUnsupported));
     assert!(is_absent_error(kAXErrorNoValue));
     assert!(!is_absent_error(kAXErrorCannotComplete));
+    assert!(!is_absent_error(kAXErrorFailure));
 }
 
 #[test]

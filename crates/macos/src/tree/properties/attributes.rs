@@ -81,6 +81,26 @@ mod imp {
             if !value.is_null() {
                 drop(created_cf_array(value as CFTypeRef));
             }
+            if err == accessibility_sys::kAXErrorFailure {
+                let (fallback_err, fallback_val) =
+                    crate::tree::properties::ax_ipc::copy_attribute_value(
+                        el,
+                        cf_attr.as_concrete_TypeRef(),
+                        deadline,
+                    );
+                if fallback_err == kAXErrorSuccess && !fallback_val.is_null() {
+                    let Some(full_arr) = created_cf_array(fallback_val) else {
+                        return Err(MALFORMED_AX_VALUE);
+                    };
+                    let total = full_arr.len() as usize;
+                    let elements = ax_array_items(full_arr);
+                    if elements.len() != total {
+                        return Err(MALFORMED_AX_VALUE);
+                    }
+                    let slice = elements.into_iter().take(max_values).collect();
+                    return Ok(Some(slice));
+                }
+            }
             return if is_absent_error(err) {
                 Ok(None)
             } else {

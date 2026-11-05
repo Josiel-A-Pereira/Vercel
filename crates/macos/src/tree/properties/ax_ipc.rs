@@ -183,10 +183,18 @@ pub(crate) fn attribute_value_count(
         Ok(_) => unsafe { AXUIElementGetAttributeValueCount(element.0, attribute, &mut count) },
         Err(error) => adapter_error_to_ax(&error),
     };
-    if error != kAXErrorSuccess {
-        return Err(error);
+    if error == kAXErrorSuccess {
+        return usize::try_from(count).map_err(|_| i32::MIN);
     }
-    usize::try_from(count).map_err(|_| i32::MIN)
+    if error == kAXErrorFailure {
+        let (fallback_error, value) = copy_attribute_value(element, attribute, deadline);
+        if fallback_error == kAXErrorSuccess && !value.is_null() {
+            if let Some(array) = crate::tree::properties::cf_type::created_cf_array(value) {
+                return usize::try_from(array.len()).map_err(|_| i32::MIN);
+            }
+        }
+    }
+    Err(error)
 }
 
 #[cfg(target_os = "macos")]
