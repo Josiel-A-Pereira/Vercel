@@ -104,6 +104,11 @@ ABI. A bare `@eN` ref returns
   is null. A missing `sheet` or `menu` next to a listed kind is unknown, not
   absent. Only the Windows adapter fills it; macOS and Linux return null.
 
+- **No owner policies.** The library does not run the Dogwood owner-policy gate
+  that the CLI applies from `~/.agent-desktop/policies/`, so no call returns a
+  `dogwood_policy` refusal. A program that must honor the owner's policies
+  drives the CLI instead.
+
 - **Native handles.** `ad_find_exact` returns an `AdNativeHandle`. It re-identifies the
   element before publishing it: it raises the landed handle against the selected entry's
   recorded role, native id, name and description, and returns `AD_RESULT_ERR_STALE_REF`

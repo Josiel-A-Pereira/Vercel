@@ -221,6 +221,16 @@ impl ObservationOps for LinuxAdapter {
         crate::system::app_inventory(self.bus(), deadline)
     }
 
+    fn find_installed_app(
+        &self,
+        identifier: &str,
+        _deadline: Deadline,
+    ) -> Result<Option<agent_desktop_core::InstalledApp>, AdapterError> {
+        Ok(crate::system::launch::installed_app::find_installed_app(
+            identifier,
+        ))
+    }
+
     fn query_app_inventory(
         &self,
         query: agent_desktop_core::AppInventoryQuery<'_>,

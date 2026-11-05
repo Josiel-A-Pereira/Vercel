@@ -35,6 +35,8 @@ pub(crate) struct Cli {
     )]
     pub trace_strict: bool,
     #[command(flatten)]
+    pub policy: crate::cli_args::policy::PolicyArgs,
+    #[command(flatten)]
     pub interaction: InteractionArgs,
     #[command(flatten)]
     pub post_action_wait: PostActionWaitArgs,

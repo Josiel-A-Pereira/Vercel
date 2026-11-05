@@ -7,7 +7,7 @@ mod keyboard_mouse;
 mod notifications;
 mod observation;
 mod overlay_skipped;
-mod parse;
+pub(crate) mod parse;
 mod session;
 mod system;
 mod trace;
@@ -17,6 +17,24 @@ mod test_support;
 
 #[cfg(test)]
 mod cursor_overlay_lifecycle_tests;
+
+#[cfg(test)]
+mod policy_gate_app_identity_tests;
+
+#[cfg(test)]
+mod policy_gate_desk;
+
+#[cfg(test)]
+mod policy_gate_desk_seed;
+
+#[cfg(test)]
+mod policy_gate_global_input_tests;
+
+#[cfg(test)]
+mod policy_gate_reach_tests;
+
+#[cfg(test)]
+mod policy_gate_scenario_tests;
 
 #[cfg(test)]
 mod disposition_tests;
@@ -37,8 +55,13 @@ pub(crate) fn dispatch(
 ) -> Result<Value, AppError> {
     let read_only = !cmd.is_mutating();
     let stdin = crate::cli_args::stdin::input(&mut cmd).is_some();
+    let gate_facts = crate::command_policy::dogwood::enforce(&cmd, context, adapter)
+        .map_err(|error| disposition::settle_unknown_delivery(error, read_only))?;
     let result = dispatch_command(cmd, adapter, permission_report, context)
         .map_err(|error| disposition::settle_unknown_delivery(error, read_only));
+    if let Some(facts) = gate_facts {
+        crate::command_policy::dogwood::record(&facts, result.is_ok());
+    }
     crate::cli_args::stdin::redact_result(result, stdin)
 }
 
@@ -124,9 +147,7 @@ fn dispatch_command(
         Commands::ClipboardSet(args) => clipboard::set(args, adapter),
         Commands::ClipboardClear => commands::clipboard_clear::execute(adapter),
         Commands::Wait(args) => system::wait(args, adapter, context),
-        Commands::Status => {
-            commands::status::execute_with_report_with_context(adapter, permission_report, context)
-        }
+        Commands::Status => system::status(adapter, permission_report, context),
         Commands::Permissions(args) => system::permissions(args, adapter, permission_report),
         Commands::Version => commands::version::execute(),
         Commands::Batch(args) => crate::batch::execute(args, adapter, permission_report, context),

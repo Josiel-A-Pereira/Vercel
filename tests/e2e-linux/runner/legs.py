@@ -122,6 +122,7 @@ REGISTRY: tuple[Leg, ...] = (
     Leg('zero_bounds.files_container_raw_only', 'A zero-axis Files container gets no ref and is covered as raw geometry', 'Files', ('x11-openbox', 'x11-mutter'), ('headless',), ('atspi',), 'pass', ''),
     Leg('zero_bounds.settings_container_raw_only', 'A zero-axis Settings container gets no ref and is covered as raw geometry', 'Settings', ('x11-openbox', 'x11-mutter'), ('headless',), ('atspi',), 'pass', ''),
     Leg('zero_bounds.hidden_menu_items_not_visible', 'Hidden menu bar items read as not visible', 'Terminal', ('x11-openbox', 'x11-mutter'), ('headless',), ('atspi',), 'pass', ''),
+    Leg('policies.owner_forbid_holds', 'An owner forbid on the Calculator desktop id refuses a ref, every app spelling and a coordinate click, leaving the display untouched', 'Calculator', ('x11-openbox',), ('headless', 'headed'), ('atspi',), 'pass', ''),
     Leg('duplicates.two_processes_distinct_window_ids', 'Two Calculator processes have distinct window ids that each snapshot', 'Calculator', ('x11-openbox', 'x11-mutter'), ('headless',), ('atspi',), 'pass', ''),
     Leg('duplicates.main_menu_nodes_separate', 'Main Menu resolves its menubutton and switch as separate nodes', 'Calculator', ('x11-openbox', 'x11-mutter'), ('headless',), ('atspi',), 'pass', ''),
     Leg('toolkit_qt.refs_and_completeness', 'The first snapshot of the Qt window is complete with refs', 'Qt window', ('x11-openbox', 'x11-mutter'), ('headless',), ('applog',), 'pass', ''),

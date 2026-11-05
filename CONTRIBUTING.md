@@ -20,7 +20,7 @@ Follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 | Requirement | Notes |
 |---|---|
-| Rust toolchain | 1.89.0, pinned in `rust-toolchain.toml`. `rust-version` 1.89 is the MSRV. `rustup` installs the pinned channel. |
+| Rust toolchain | 1.95.0, pinned in `rust-toolchain.toml`. `rust-version` 1.95 is the MSRV. `rustup` installs the pinned channel. |
 | macOS 13 or later | Needed to build and run the macOS adapter (`crates/macos/`). Requires the Xcode command-line tools. |
 | Windows | Builds the Windows adapter (`crates/windows/`). Windows only. Requires the MSVC build tools. |
 | Linux | Builds the Linux adapter (`crates/linux/`). Linux only. Live tests need an AT-SPI session. See `tests/e2e-linux/README.md`. |
@@ -41,7 +41,7 @@ git config core.hooksPath .githooks
 Every platform adapter compiles only on its own OS, and the workspace names all three. An unscoped `cargo build` or `cargo test --workspace` fails on every host, so scope cargo to the host's packages. The example uses macOS. On Windows, replace `agent-desktop-macos` with `agent-desktop-windows`. On Linux, use `agent-desktop-linux`.
 
 ```bash
-HOST_PKGS=(-p agent-desktop-core -p agent-desktop-macos -p agent-desktop -p agent-desktop-ffi)
+HOST_PKGS=(-p agent-desktop-core -p agent-desktop-policy -p agent-desktop-macos -p agent-desktop -p agent-desktop-ffi)
 
 cargo build "${HOST_PKGS[@]}"                  # debug build
 cargo build --release -p agent-desktop         # release CLI; CI fails it above 15 MB
@@ -75,7 +75,7 @@ scripts/cargo-test-isolated-home.sh test "${HOST_PKGS[@]}" --lib
 CI also checks what a local run can miss:
 
 - The 15 MB limit on each shipped executable.
-- The Rust 1.89 MSRV build.
+- The Rust 1.95 MSRV build.
 - Drift between the committed header `crates/ffi/include/agent_desktop.h` and the Rust ABI. Regenerate it with `scripts/update-ffi-header.sh`, which needs cbindgen 0.29.4.
 - The `cargo-deny` policy in `deny.toml`.
 - Secret scanning, CodeQL and workflow linting.

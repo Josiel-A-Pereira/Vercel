@@ -196,7 +196,7 @@ After the core resolver chooses the element, the platform adapter lands it, and 
 | `STALE_REF` | Ref could not be re-identified in the live UI |
 | `AMBIGUOUS_TARGET` | Ref recovery matched multiple plausible targets |
 | `SNAPSHOT_NOT_FOUND` | Snapshot ID is missing or expired |
-| `POLICY_DENIED` | Physical/headed path blocked by policy |
+| `POLICY_DENIED` | Physical/headed path blocked by policy, or the command refused by the owner's Dogwood policies ([policies.md](policies.md)) |
 | `ACTION_FAILED` | Action rejected, or its observed result contradicted the request |
 | `ACTION_NOT_SUPPORTED` | The target does not expose the requested action |
 | `APP_UNRESPONSIVE` | The matching application stopped responding |
@@ -206,6 +206,23 @@ After the core resolver chooses the element, the platform adapter lands it, and 
 | `WINDOW_NOT_FOUND` | The requested window does not exist, including a `screenshot --window-id` that matches no window; the disposition is `not_delivered` |
 | `NOTIFICATION_NOT_FOUND` | The notification ID was not found |
 | `INTERNAL` | Unexpected error or caught panic |
+
+### `POLICY_DENIED` kinds
+
+`error.details.kind` tells a refusal by policy from the others. Every kind
+below is refused before anything is sent (`disposition.delivery:
+"not_delivered"`) and carries `details.retryable: false` and no `recovery`,
+because repeating the command gets the same answer.
+
+| `details.kind` | Meaning | Other `details` |
+|----------------|---------|-----------------|
+| `dogwood_policy` | A Dogwood policy layer refused the command. An empty `policies` means nothing permitted it, which includes a temporal permit whose earlier step has not happened | `layer` (the refusing layer), `policies` (deciding `@id`s), `evaluation_errors` |
+| `dogwood_policy_target_unknown` | The application the input would reach could not be determined, so policies could not judge it | |
+| `dogwood_policy_unavailable` | A policy layer failed to load or validate; mutating commands are refused until it is fixed, and `status` reports the error under `data.policies` | |
+| `swiftui_text_needs_focus` | macOS 27 or later: a SwiftUI text field takes text into the app only while focused, and the command ran headless | |
+
+A `POLICY_DENIED` without one of these kinds comes from the headless
+interaction policy or a blocked key combination.
 
 ## Exit codes
 

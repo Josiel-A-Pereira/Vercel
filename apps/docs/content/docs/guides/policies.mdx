@@ -1,0 +1,113 @@
+---
+title: Owner policies
+navTitle: Owner policies
+description: Restrict what agents may do on your machine with Dogwood policy files, judged before any command reaches the desktop.
+---
+
+Put a [Dogwood](https://github.com/dogwood-policy/dogwood-local-engine) policy file in `~/.agent-desktop/policies/` and every agent-desktop command is checked against it before it reaches the desktop. A refused command fails with `POLICY_DENIED` and nothing is delivered. With no policy files, nothing changes.
+
+```bash
+mkdir -p ~/.agent-desktop/policies
+chmod 700 ~/.agent-desktop ~/.agent-desktop/policies            # the state root must stay private
+cat > ~/.agent-desktop/policies/guardrails.dogwood <<'EOF'
+@id("allow-all")
+permit (principal, action, resource);
+
+@id("hands-off-secrets")
+forbid (principal, action in Desktop::Action::"input",
+        resource in Desktop::AppId::"com.1password.1password");
+EOF
+chmod 600 ~/.agent-desktop/policies/guardrails.dogwood
+agent-desktop status                                            # data.policies.layers[0].installed is true
+agent-desktop press cmd+v --app 1Password                       # POLICY_DENIED where 1Password is installed
+```
+
+The policies folder and each file in it must be owned by you and not writable by group or others, or agent-desktop refuses them. An edit applies to the next command. `agent-desktop status` lists every layer that applies, its files, and whether it installed, with the parse or validation error when it did not.
+
+## Layers
+
+Each policy source is a separate layer, and a command runs only if every layer allows it.
+
+<table>
+  <thead>
+    <tr><th>Layer</th><th>Source</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Owner</td><td><code>~/.agent-desktop/policies/*.dogwood</code> in your account's home directory, as the system's account records name it. Always applies, even when <code>HOME</code> or <code>AGENT_DESKTOP_HOME</code> point elsewhere.</td></tr>
+    <tr><td>State root</td><td><code>policies/</code> under <code>AGENT_DESKTOP_HOME</code>, when that relocates the state root to another folder.</td></tr>
+    <tr><td>Environment</td><td>The <code>.dogwood</code> files in <code>AGENT_DESKTOP_POLICY_DIR</code>, when it is set. It must be an absolute path.</td></tr>
+    <tr><td>Flags</td><td>Each <code>--policy FILE</code> and each <code>--policy-dir DIR</code> of the command is a layer of its own.</td></tr>
+  </tbody>
+</table>
+
+A harness can pass `--policy-dir` to tighten what its agent may do. No layer can lift another's refusal, so an agent that adds its own permit-everything `--policy` file is still bound by your folder and by the harness's directory. A layer that fails to load refuses every mutating command until it is fixed. Read-only commands still run, and the healthy layers still judge them.
+
+## Writing a policy
+
+Dogwood is a superset of Cedar: nothing is allowed unless a `permit` matches, and a `forbid` always wins over a `permit`.
+
+- **Principal**: `Desktop::Agent::"<id>"`, from `--agent-id` or `AGENT_DESKTOP_AGENT_ID`, else `default`.
+- **Action**: one per command, such as `Desktop::Action::"click"`, grouped so a rule can say `action in Desktop::Action::"input"`. The groups are `observe` (snapshot, find, get, is, wait, the `list-` commands), `capture` (screenshot, clipboard-get), `input` (every ref action such as click, right-click, type, set-value, clear, focus, select, toggle, scroll and scroll-to, plus press, hover, drag, and the mouse and key commands), `app` (launch, close-app, window commands, open-system-surface), `notifications`, and `clipboard` (clipboard-set, clipboard-clear).
+- **Resource**: the app the command reaches, `Desktop::App::"<name>"` by the name `list-apps` reports. On macOS and Linux it is also a member of `Desktop::AppId::"<id>"`, the bundle identifier or desktop id that `list-apps --app <name>` prints as `bundle_id`. Copy it exactly, or write it in lowercase; another spelling matches nothing and no error says so. Display names follow the system language, so a rule that must hold uses `resource in Desktop::AppId::"..."`. On Windows there is no id, and the name is the executable, such as `notepad.exe`. Commands that reach no app, such as `list-displays` or the clipboard commands, act on `Desktop::App::"system"`.
+- **Context**: `context.input.command`, `app`, `app_id`, `window`, `role`, `element`, `secure`, `headed`, and `mutating`. A password field has the role `textfield` and `secure` set to `true`.
+
+The app is resolved before the verdict, whatever the agent typed. `--app 1password`, `--app com.1password.1password`, a ref into its window, a click at the coordinates of its window, a click on the menu bar while it is frontmost, and a key sent while it has focus, even with no window open, are all judged as 1Password. A window-scoped command that names the app with `--app`, such as `snapshot --app Safari`, is judged against every window of that app with its title. `snapshot` and `find` on a shell surface, such as `--surface dock` or `--surface menu-bar-extras`, are judged as the shell process that hosts it, whatever `--app` names; `menu-bar-extras --app <name>` reads that app's status item and is judged as that app. A notification command is judged as the app its `--expected-app` names, and with only `--expected-title` it is refused, because a title does not say whose notification it is. `list-notifications` and `dismiss-all-notifications` without `--app` are judged as every running app. A command whose receiving app cannot be determined is refused with `details.kind: "dogwood_policy_target_unknown"`.
+
+`version`, `skills`, `status`, `permissions`, `session`, `trace`, and `cursor-overlay` are never checked. Each entry of a `batch` is checked as it runs, and so is each tool call an [`agent-desktop mcp`](/desktop/guides/mcp) server serves, under the `--policy` and `--policy-dir` flags given to `mcp`.
+
+### Rules over history
+
+A `when temporal` clause judges a command by what came before it. Every allowed command records its outcome, so this layer allows input into an app only after a snapshot of that app succeeded in the last ten minutes. It has no blanket `permit` for input: a policy like `allow-all` above would permit every input on its own, and the temporal rule would change nothing.
+
+```cedar
+@id("allow-reads")
+permit (principal, action in [Desktop::Action::"observe", Desktop::Action::"capture"], resource);
+
+@id("observe-before-act")
+permit (principal, action in Desktop::Action::"input", resource)
+when temporal {
+    formerly within 10m Desktop::Action::"snapshot"::response{ input.app: context.input.app }
+};
+```
+
+History survives restarts. Each layer keeps its own, so a rule in a `--policy-dir` layer sees only the commands that were run with that same flag. Editing a file keeps the history of every policy whose text you did not change, and so does adding a file to the folder; a policy you added or changed starts with an empty history.
+
+## A refused command
+
+```json
+{
+  "version": "2.6",
+  "ok": false,
+  "command": "press",
+  "error": {
+    "code": "POLICY_DENIED",
+    "message": "'press' on '1Password' is forbidden by policy hands-off-secrets",
+    "suggestion": "The machine owner's Dogwood policies (the state root's policies folder) refused this; no flag or variable lifts them. Report it to the user",
+    "details": {
+      "kind": "dogwood_policy",
+      "layer": "the state root's policies folder",
+      "policies": ["hands-off-secrets"],
+      "evaluation_errors": [],
+      "retryable": false
+    },
+    "disposition": { "delivery": "not_delivered", "retry": "safe" }
+  }
+}
+```
+
+A refusal carries no `recovery` strategy: repeating the command, or waiting, gets the same answer. `details.layer` names the layer that refused.
+
+<table>
+  <thead>
+    <tr><th><code>details.kind</code></th><th>Meaning</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>dogwood_policy</code></td><td>A policy refused the command. <code>details.policies</code> lists the deciding <code>@id</code>s. It is empty when nothing permitted the command, which includes a temporal permit whose earlier step has not happened yet.</td></tr>
+    <tr><td><code>dogwood_policy_target_unknown</code></td><td>The receiving app could not be determined. Act through a ref; keyboard input can instead name the app with <code>--app</code>, and a notification command with <code>--expected-app</code>.</td></tr>
+    <tr><td><code>dogwood_policy_unavailable</code></td><td>A policy layer failed to load or validate. Mutating commands are refused until it is fixed; <code>status</code> shows the error.</td></tr>
+  </tbody>
+</table>
+
+## What policies protect against
+
+Policies guard against an agent that misbehaves or is talked into a bad action through the tool it was given. They are not a sandbox: the agent runs as you, so a process with a shell can edit your policy files or run a modified binary. Only the CLI checks policies; the [C library](/desktop/ffi) does not, so give a policy-bound agent the CLI, not the library. Setting `HOME` or `AGENT_DESKTOP_HOME` does not escape them or empty their history, because your account's folder and its history are found from the system's account records. Your policies also apply to anything else that runs agent-desktop as you, such as its test suites. To make the folder harder to change by accident, lock the files with `chflags uchg` on macOS. Leave `~/.agent-desktop/policy-state/`, where history is written, unlocked.

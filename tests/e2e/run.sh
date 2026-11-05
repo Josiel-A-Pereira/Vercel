@@ -137,6 +137,9 @@ check_fixture_contention || { finish; exit 1; }
 # shellcheck source=tests/e2e/scenarios/keyboard.sh
 source "$here/scenarios/keyboard.sh"
 check_fixture_contention || { finish; exit 1; }
+# shellcheck source=tests/e2e/scenarios/policies.sh
+source "$here/scenarios/policies.sh"
+check_fixture_contention || { finish; exit 1; }
 # shellcheck source=tests/e2e/scenarios/trace_performance.sh
 source "$here/scenarios/trace_performance.sh"
 # shellcheck source=tests/e2e/scenarios/notifications.sh

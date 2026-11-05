@@ -23,7 +23,7 @@ Each platform adapter compiles only on its own OS and the workspace names all th
 the same set `.githooks/pre-commit` uses:
 
 ```bash
-HOST_PKGS=(-p agent-desktop-core -p agent-desktop-macos -p agent-desktop -p agent-desktop-ffi)
+HOST_PKGS=(-p agent-desktop-core -p agent-desktop-policy -p agent-desktop-macos -p agent-desktop -p agent-desktop-ffi)
 # Windows: replace agent-desktop-macos with agent-desktop-windows. Linux: with agent-desktop-linux.
 # An array expands to separate arguments in both bash and zsh; a plain string does not in zsh.
 
@@ -98,6 +98,7 @@ crates/core/     agent-desktop-core: PlatformAdapter trait in adapter/, shared t
 crates/macos/    agent-desktop-macos: AX API
 crates/windows/  agent-desktop-windows: UI Automation
 crates/linux/    agent-desktop-linux: AT-SPI
+crates/policy/   agent-desktop-policy: Dogwood policy gate (discovery, schema catalog, engine)
 crates/ffi/      agent-desktop-ffi: cdylib and the committed C header include/agent_desktop.h
 src/             agent-desktop binary: cli/, cli_args/, dispatch/, batch/, command_policy/,
                  diagnostic/, visual_debug/, mcp/
@@ -259,6 +260,9 @@ Every command prints one envelope. `docs/json-output.md` holds the full contract
 
 ## Testing and CI
 
+- The policy gate always reads your account's `~/.agent-desktop/policies/`, found from the system's account
+  records, so an isolated `HOME` or `AGENT_DESKTOP_HOME` does not hide it. Keep that folder empty on a machine
+  you run the tests on, or the tests run under your policies.
 - Unit tests use small purpose-built adapter stubs (see `crates/core/src/adapter/test_support.rs`). Golden JSON in
   `tests/fixtures/` guards serialization.
 - The E2E harnesses (`tests/e2e/`, `tests/e2e-windows/`, `tests/e2e-linux/`) drive the built binary against real

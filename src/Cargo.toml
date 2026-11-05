@@ -7,6 +7,7 @@ autotests = false
 
 [dependencies]
 agent-desktop-core.workspace = true
+agent-desktop-policy = { path = "../crates/policy" }
 base64.workspace = true
 clap.workspace               = true
 serde.workspace              = true
@@ -69,6 +70,10 @@ path = "tests/windows_private_file_install.rs"
 [[test]]
 name = "windows_cursor_overlay_teardown"
 path = "tests/windows_cursor_overlay_teardown.rs"
+
+[[test]]
+name = "policy_process"
+path = "tests/policy_process.rs"
 
 [lints]
 workspace = true

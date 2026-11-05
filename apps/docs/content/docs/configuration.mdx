@@ -18,6 +18,7 @@ Global flags work before or after the command name, so `agent-desktop --headed c
     <tr><td><code>--headed</code></td><td>off</td><td>Prefer physical delivery for natural input commands and allow focus and cursor side effects. The default is strict headless semantic delivery. See <a href="/desktop/guides/headed-mode">Headed mode</a>.</td></tr>
     <tr><td><code>--session ID</code></td><td>none</td><td>Select the snapshot namespace and trace. Overrides <code>AGENT_DESKTOP_SESSION</code>. See <a href="/desktop/sessions">Sessions</a>.</td></tr>
     <tr><td><code>--agent-id ID</code></td><td>none</td><td>Subagent id within the session. Overrides <code>AGENT_DESKTOP_AGENT_ID</code>. Required for desktop actions in a multi-agent session.</td></tr>
+    <tr><td><code>--policy FILE</code>, <code>--policy-dir DIR</code></td><td>none</td><td>Also enforce these Dogwood policies. Repeatable; each file and each directory is a layer of its own. A layer can only refuse more; it never lifts another. See <a href="/desktop/guides/policies">Owner policies</a>.</td></tr>
     <tr><td><code>--trace PATH</code></td><td>off</td><td>Append trace events as JSONL to this file instead of the session's trace. See <a href="/desktop/guides/traces">Traces</a>.</td></tr>
     <tr><td><code>--trace-strict</code></td><td>off</td><td>Fail when trace setup or a pre-action write fails. Requires <code>--trace</code> or a tracing session.</td></tr>
     <tr><td><code>--wait-for SELECTOR</code>, <code>-w</code></td><td>none</td><td>After the command, poll until an element matches. See <a href="#post-action-wait-flags">Post-action wait flags</a>.</td></tr>
@@ -63,6 +64,7 @@ agent-desktop snapshot --app gnome-calculator -w "button:7"
     <tr><td><code>AGENT_DESKTOP_HOME</code></td><td>Relocates the <a href="#state-root">state root</a>. Must be an absolute path.</td></tr>
     <tr><td><code>AGENT_DESKTOP_SESSION</code></td><td>Session id used when <code>--session</code> is not passed. <code>session start</code> prints the line that sets it. An empty value is <code>INVALID_ARGS</code>.</td></tr>
     <tr><td><code>AGENT_DESKTOP_AGENT_ID</code></td><td>Subagent id used when <code>--agent-id</code> is not passed.</td></tr>
+    <tr><td><code>AGENT_DESKTOP_POLICY_DIR</code></td><td>A directory of <code>.dogwood</code> files enforced as one extra policy layer. Must be an absolute path. See <a href="/desktop/guides/policies">Owner policies</a>.</td></tr>
     <tr><td><code>AGENT_DESKTOP_MACOS_HELPER_PATH</code></td><td>macOS only. Absolute path to the packaged <code>agent-desktop-macos-helper</code>. The npm launcher sets it.</td></tr>
     <tr><td><code>RUST_LOG</code></td><td>Log filter for stderr logs. A valid value replaces the default level.</td></tr>
   </tbody>
@@ -91,6 +93,8 @@ agent-desktop status                       # data.state_root shows this path
   latest_snapshot_id                  newest snapshot in the global namespace
   snapshots/
     s8f3k2p9/refmap.json              one refmap per snapshot
+  policies/*.dogwood                  owner policies, see Owner policies
+  policy-state/                       policy history, written by agent-desktop
   tmp/                                clipboard-get images outside a session
   sessions/
     run-1793352720537-17009-0/        one directory per session

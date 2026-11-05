@@ -29,7 +29,7 @@ pub(crate) fn resolve_window_for_surface(
     deadline: crate::Deadline,
 ) -> Result<WindowInfo, AppError> {
     let app_status_item = app_name.is_some() && surface == crate::SnapshotSurface::MenuBarExtras;
-    if is_shell_surface(surface) && !app_status_item {
+    if surface.is_shell() && !app_status_item {
         match adapter.resolve_shell_surface(surface, deadline) {
             Ok(window) if window_id.is_none_or(|id| window.id == id) => return Ok(window),
             Ok(_) => {}
@@ -61,24 +61,6 @@ pub(crate) fn resolve_window_for_surface(
                 surface.as_str()
             ),
         ),
-    )
-}
-
-/// Whether the surface names OS chrome rather than a window's own sub-surface:
-/// the kinds an adapter may resolve directly, with no owning application and
-/// no window in the inventory. Derived from the [`SnapshotSurface`] variant
-/// alone - never from a platform check - so the seam stays platform-neutral.
-fn is_shell_surface(surface: crate::SnapshotSurface) -> bool {
-    matches!(
-        surface,
-        crate::SnapshotSurface::StartMenu
-            | crate::SnapshotSurface::Taskbar
-            | crate::SnapshotSurface::SystemTray
-            | crate::SnapshotSurface::SystemTrayOverflow
-            | crate::SnapshotSurface::ActionCenter
-            | crate::SnapshotSurface::QuickSettings
-            | crate::SnapshotSurface::Dock
-            | crate::SnapshotSurface::MenuBarExtras
     )
 }
 

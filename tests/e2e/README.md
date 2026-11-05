@@ -95,6 +95,7 @@ helper that returns a bare `@eN`.
 | `scenarios/surfaces.sh` | Sheets, menus, drag, disclosure |
 | `scenarios/error_contract.sh` | Exit code and `error.code` envelopes an agent branches on, `batch` continue/stop/reject semantics |
 | `scenarios/keyboard.sh` | `press` key combos observed through the fixture's own text readout, blocked-combo and unknown-modifier refusals |
+| `scenarios/policies.sh` | Dogwood policies against the live fixture, headless and headed: a bundle-id forbid under every `--app` spelling, at the fixture's coordinates and on its focused field; secure-field refusal; observe-before-act from recorded history. Each verdict is checked through the fixture's own readouts |
 | `scenarios/trace_performance.sh` | Trace artifacts, redaction, timings, cleanup |
 | `scenarios/ref_churn.sh` | `STALE_REF` after the UI really changes, on a dedicated fixture process (`AGENT_DESKTOP_FIXTURE_REF_CHURN=1`) |
 | `scenarios/notifications.sh` | Real Notification Center lifecycle |

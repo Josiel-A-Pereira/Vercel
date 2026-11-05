@@ -382,6 +382,7 @@ pub(super) mod desktop_exec;
 pub(super) mod desktop_lookup;
 pub(super) mod desktop_stamp;
 pub(super) mod indexed_entry;
+pub(crate) mod installed_app;
 pub(super) mod launch_attach;
 mod launch_handoff;
 #[cfg(test)]

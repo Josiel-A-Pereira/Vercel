@@ -50,6 +50,10 @@ Run `agent-desktop skills get desktop` for the core guide. Run `agent-desktop sk
 
 Yes. It is licensed under [Apache-2.0](../LICENSE).
 
+## Can I keep an agent away from some apps?
+
+Yes. Owner policies in `~/.agent-desktop/policies/` decide which commands the CLI may run against which apps, and a refused command fails with `POLICY_DENIED` before anything is sent. A rule judges the app a command reaches, whatever name, ref or coordinate the agent used, and no flag or variable the agent passes can lift it. Policies guard against an agent misusing the tool, not against a hostile process running as you, and the C library does not check them. See [owner policies](policies.md).
+
 ## What data can contain private information?
 
 Snapshots, window titles, clipboard reads, notifications, screenshots, and command results contain the desktop content you asked to read. `--debug --screenshot PATH.html` writes a local HTML page with a screenshot and the accessibility data. Session traces redact sensitive structured fields, but they can keep evidence artifacts. Keep these files and your agent's transcripts private. Redaction does not make a screenshot safe to publish.

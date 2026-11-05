@@ -17,6 +17,7 @@ pub(crate) mod scroll;
 pub(crate) mod scroll_into_view;
 mod scroll_read;
 pub(crate) mod select;
+pub(crate) mod swiftui_text;
 pub(crate) mod toggle_state;
 pub(crate) mod type_text;
 

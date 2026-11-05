@@ -13,6 +13,26 @@ use crate::cli_args::{
     system::{PermissionsArgs, WaitArgs},
 };
 
+/// The core status report plus the policy layers that apply to the caller.
+pub(super) fn status(
+    adapter: &dyn PlatformAdapter,
+    permission_report: &PermissionReport,
+    context: &CommandContext,
+) -> Result<Value, AppError> {
+    let mut report = agent_desktop_core::commands::status::execute_with_report_with_context(
+        adapter,
+        permission_report,
+        context,
+    )?;
+    if let Some(fields) = report.as_object_mut() {
+        fields.insert(
+            "policies".to_string(),
+            crate::command_policy::dogwood_status::policy_status(context),
+        );
+    }
+    Ok(report)
+}
+
 pub(super) fn wait(
     args: WaitArgs,
     adapter: &dyn PlatformAdapter,

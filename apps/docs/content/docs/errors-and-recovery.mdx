@@ -62,7 +62,7 @@ A failed command prints an envelope with `ok: false` and exits `1` (or `2` for a
     <tr><td><code>INVALID_ARGS</code></td><td>An argument is invalid. Also returned for a bare <code>@eN</code> ref and an ended session.</td><td>Fix the input. Repeating the same arguments fails the same way.</td></tr>
     <tr><td><code>NOTIFICATION_NOT_FOUND</code></td><td>The notification index or identity no longer matches.</td><td>Run <code>list-notifications</code> again.</td></tr>
     <tr><td><code>SNAPSHOT_NOT_FOUND</code></td><td>The snapshot id is missing, pruned, or belongs to another <a href="/desktop/sessions">session</a> namespace.</td><td>Take a snapshot in the same session scope you act in, then use its refs.</td></tr>
-    <tr><td><code>POLICY_DENIED</code></td><td>Headless mode blocked a physical or headed path.</td><td>Do not switch modes to recover. See <a href="/desktop/guides/headed-mode">Headed mode</a>.</td></tr>
+    <tr><td><code>POLICY_DENIED</code></td><td>Headless mode blocked a physical or headed path, or an owner policy refused the command (<code>details.kind</code> starts with <code>dogwood_</code>).</td><td>Do not switch modes to recover. See <a href="/desktop/guides/headed-mode">Headed mode</a>. An owner refusal is final: report the policy in <code>details.policies</code>. See <a href="/desktop/guides/policies">Owner policies</a>.</td></tr>
     <tr><td><code>APP_UNRESPONSIVE</code></td><td>The application stopped responding.</td><td>Wait, take a fresh snapshot, then retry only if <code>disposition.retry</code> is <code>safe</code>.</td></tr>
     <tr><td><code>INTERNAL</code></td><td>An unexpected error.</td><td>Read <code>message</code>. Retry once only if <code>disposition.retry</code> is <code>safe</code>.</td></tr>
   </tbody>
@@ -104,7 +104,7 @@ A macOS <code>TIMEOUT</code> with <code>details.kind: "focus_verification"</code
   <tbody>
     <tr><td><code>refresh_snapshot_then_retry_original</code></td><td><code>STALE_REF</code>, <code>SNAPSHOT_NOT_FOUND</code></td><td>Take a fresh snapshot (or <code>find</code>), locate the same element, and run the original command again with the new qualified ref.</td></tr>
     <tr><td><code>inspect_state_then_retry_original</code></td><td><code>TIMEOUT</code>, <code>APP_UNRESPONSIVE</code>, and <code>STALE_REF</code> when <code>details.process_state</code> is <code>exited</code></td><td>Inspect the app first (<code>list-apps</code>, a snapshot, or a <code>wait</code>), wait <code>retry_after_ms</code> if present, then run the original command. For an exited process, launch the app again and take a new snapshot first.</td></tr>
-    <tr><td><code>request_explicit_policy_then_retry_original</code></td><td><code>POLICY_DENIED</code></td><td>Retry only after someone has explicitly chosen the policy the command needs, such as <code>--headed</code> when physical input is intended. Never switch to headed mode on your own to get past the error.</td></tr>
+    <tr><td><code>request_explicit_policy_then_retry_original</code></td><td><code>POLICY_DENIED</code></td><td>Retry only after someone has explicitly chosen the policy the command needs, such as <code>--headed</code> when physical input is intended. Never switch to headed mode on your own to get past the error. An owner-policy refusal (<code>details.kind</code> starting with <code>dogwood_</code>) carries no <code>recovery</code> at all.</td></tr>
   </tbody>
 </table>
 

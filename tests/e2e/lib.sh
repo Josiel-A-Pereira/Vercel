@@ -245,6 +245,46 @@ wait_target() {
         --predicate "$predicate" --timeout "$timeout" "$@"
 }
 
+# macOS 27 changed SwiftUI's single-line TextField: an accessibility write to
+# its value or selection reaches the app's binding only while the field has
+# keyboard focus, which headless mode never takes. The write still changes
+# the field's displayed value, so only the fixture's own readout tells.
+swiftui_text_limit() {
+    local major
+    major="$(sw_vers -productVersion 2>/dev/null | cut -d. -f1)"
+    case "$major" in ''|*[!0-9]*) return 1 ;; esac
+    [ "$major" -ge 27 ]
+}
+
+# A headless text verification that the macOS 27 limit may keep from the
+# binding: it passes as `verify` does, is skipped as the platform limit when
+# the command refused before sending (no semantic path, or the field needs
+# focus), and fails on anything else, above all a reported success the
+# readout does not show.
+verify_text() {
+    local label="$1" status="$2" expected="$3" expected_mechanism="$4" target="$5" command="$6"
+    shift 6
+    if [ -n "$MODE_FLAG" ] || ! swiftui_text_limit; then
+        verify "$label" "$status" "$expected" "$expected_mechanism" "$target" "$command" "$@"
+        return
+    fi
+    local output after
+    output="$(act_target "$target" "$command" "$@" 2>/dev/null)"
+    sleep 0.35
+    require_value after "$status"
+    if [ "$after" = "$expected" ] && [ "$(json_field "$output" ok)" = "True" ]; then
+        okmsg "$label"
+        return
+    fi
+    if [ "$(json_field "$output" error.code)" = "POLICY_DENIED" ] && \
+        [ "$(json_field "$output" error.disposition.delivery)" = "not_delivered" ] && \
+        printf '%s' "$output" | grep -qE 'supported_action|swiftui_text_needs_focus'; then
+        skipmsg "$label  [macOS 27: a SwiftUI text field takes headless text only while focused]"
+        return
+    fi
+    badmsg "$label  [after='$after' expected='$expected' ok=$(json_field "$output" ok) error=$(json_field "$output" error.code)]"
+}
+
 verify() {
     local label="$1" status="$2" expected="$3" expected_mechanism="$4" target="$5" command="$6"
     shift 6

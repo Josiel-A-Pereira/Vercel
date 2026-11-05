@@ -1,11 +1,11 @@
 [workspace]
-members         = ["crates/core", "crates/macos", "crates/windows", "crates/linux", "crates/ffi", "src"]
-default-members = ["crates/core", "crates/macos", "crates/windows", "crates/linux", "src"]
+members         = ["crates/core", "crates/policy", "crates/macos", "crates/windows", "crates/linux", "crates/ffi", "src"]
+default-members = ["crates/core", "crates/policy", "crates/macos", "crates/windows", "crates/linux", "src"]
 resolver = "2"
 
 [workspace.package]
 edition      = "2024"
-rust-version = "1.89"
+rust-version = "1.95"
 license      = "Apache-2.0"
 version      = "1.2.0"
 
@@ -29,6 +29,10 @@ unused_must_use        = "deny"
 let_underscore_drop    = "allow"
 
 [workspace.lints.clippy]
+# AdapterError-by-value is the repo's established error contract; the lint
+# arrived with the 1.95 toolchain (needed by the dogwood crates) and boxing
+# every error path is not worth the churn.
+result_large_err       = "allow"
 dbg_macro              = "deny"
 todo                   = "warn"
 needless_collect       = "warn"

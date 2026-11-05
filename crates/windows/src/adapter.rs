@@ -187,6 +187,14 @@ impl ObservationOps for WindowsAdapter {
         crate::system::app_ops::list_apps_live(deadline)
     }
 
+    fn find_installed_app(
+        &self,
+        identifier: &str,
+        _deadline: Deadline,
+    ) -> Result<Option<agent_desktop_core::InstalledApp>, AdapterError> {
+        Ok(crate::system::installed_app::find_installed_app(identifier))
+    }
+
     /// The per-process surface inventory. Window-backed surfaces carry the
     /// same `w-<hwnd>` id `list_windows` emits, so a surface id feeds the
     /// window observation path unchanged; the menu surface carries the

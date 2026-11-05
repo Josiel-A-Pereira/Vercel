@@ -45,15 +45,15 @@ jobs:
 
 
   msrv:
-    name: Rust 1.89 MSRV
+    name: Rust 1.95 MSRV
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: rustup toolchain install 1.89.0 --profile minimal
-      - run: cargo +1.89.0 check --locked -p agent-desktop-core -p agent-desktop-linux -p agent-desktop --all-targets
+      - run: rustup toolchain install 1.95.0 --profile minimal
+      - run: cargo +1.95.0 check --locked -p agent-desktop-core -p agent-desktop-policy -p agent-desktop-linux -p agent-desktop --all-targets
 
   test:
     name: Test
@@ -113,10 +113,10 @@ jobs:
         run: scripts/check-stale-ref-constructor-misuse.sh
 
       - name: Clippy
-        run: cargo clippy --locked -p agent-desktop-core -p agent-desktop-macos -p agent-desktop -p agent-desktop-ffi --all-targets -- -D warnings
+        run: cargo clippy --locked -p agent-desktop-core -p agent-desktop-policy -p agent-desktop-macos -p agent-desktop -p agent-desktop-ffi --all-targets -- -D warnings
 
-      - name: Core and macOS unit tests
-        run: scripts/cargo-test-isolated-home.sh test --locked -p agent-desktop-core -p agent-desktop-macos --lib
+      - name: Core, policy and macOS unit tests
+        run: scripts/cargo-test-isolated-home.sh test --locked -p agent-desktop-core -p agent-desktop-policy -p agent-desktop-macos --lib
 
       - name: Native cursor trail lifecycle
         run: |
@@ -253,10 +253,10 @@ jobs:
           echo "OK: core crate has no platform or async-bus dependencies on normal, build, or dev edges"
 
       - name: Clippy
-        run: cargo clippy --locked -p agent-desktop-core -p agent-desktop-linux -p agent-desktop -p agent-desktop-ffi --all-targets -- -D warnings
+        run: cargo clippy --locked -p agent-desktop-core -p agent-desktop-policy -p agent-desktop-linux -p agent-desktop -p agent-desktop-ffi --all-targets -- -D warnings
 
-      - name: Core, Linux, binary and FFI tests on a real session bus
-        run: dbus-run-session -- xvfb-run -a scripts/cargo-test-isolated-home.sh test --locked -p agent-desktop-core -p agent-desktop-linux -p agent-desktop -p agent-desktop-ffi
+      - name: Core, policy, Linux, binary and FFI tests on a real session bus
+        run: dbus-run-session -- xvfb-run -a scripts/cargo-test-isolated-home.sh test --locked -p agent-desktop-core -p agent-desktop-policy -p agent-desktop-linux -p agent-desktop -p agent-desktop-ffi
 
       - name: Build stripped release binary
         run: cargo build --locked --release -p agent-desktop
@@ -435,7 +435,7 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-win32-ui-shell-exclusion.ps1
 
       - name: Clippy
-        run: cargo clippy --locked -p agent-desktop-core -p agent-desktop-windows -p agent-desktop -p agent-desktop-ffi --all-targets -- -D warnings
+        run: cargo clippy --locked -p agent-desktop-core -p agent-desktop-policy -p agent-desktop-windows -p agent-desktop -p agent-desktop-ffi --all-targets -- -D warnings
 
       - name: Core and Windows unit tests
         id: unit_tests
@@ -461,6 +461,9 @@ jobs:
           }
           Add-Content -Path $env:GITHUB_OUTPUT -Value "lib_tests=$passed"
           Add-Content -Path $env:GITHUB_OUTPUT -Value "lib_suites=$suites"
+
+      - name: Policy crate tests
+        run: cargo test --locked -p agent-desktop-policy
 
       - name: Windows example tests
         run: cargo test --locked -p agent-desktop-windows --examples
@@ -581,7 +584,7 @@ jobs:
           restore-keys: ${{ runner.os }}-${{ runner.arch }}-cargo-
 
       - name: Clippy
-        run: cargo clippy --locked -p agent-desktop-core -p agent-desktop-windows -p agent-desktop -p agent-desktop-ffi --all-targets -- -D warnings
+        run: cargo clippy --locked -p agent-desktop-core -p agent-desktop-policy -p agent-desktop-windows -p agent-desktop -p agent-desktop-ffi --all-targets -- -D warnings
 
       - name: Core and Windows unit tests
         id: unit_tests
@@ -607,6 +610,9 @@ jobs:
           }
           Add-Content -Path $env:GITHUB_OUTPUT -Value "lib_tests=$passed"
           Add-Content -Path $env:GITHUB_OUTPUT -Value "lib_suites=$suites"
+
+      - name: Policy crate tests
+        run: cargo test --locked -p agent-desktop-policy
 
       - name: Build release binary
         run: cargo build --locked --release -p agent-desktop

@@ -52,7 +52,7 @@ gh attestation verify <downloaded-archive> --repo vercel-labs/agent-desktop
 
 ## From source
 
-You need the Rust toolchain pinned in `rust-toolchain.toml` (1.89.0). `rustup` installs it on first use. You also need a C toolchain: the Xcode command-line tools on macOS 13 or later, the MSVC build tools on Windows, or `build-essential` on Linux.
+You need the Rust toolchain pinned in `rust-toolchain.toml` (1.95.0). `rustup` installs it on first use. You also need a C toolchain: the Xcode command-line tools on macOS 13 or later, the MSVC build tools on Windows, or `build-essential` on Linux.
 
 ```bash
 git clone https://github.com/vercel-labs/agent-desktop && cd agent-desktop

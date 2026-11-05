@@ -50,7 +50,7 @@ Exit codes: `0` success, `1` structured error, `2` argument error. The `error` o
 | `WINDOW_NOT_FOUND` | No matching window | Check the name, use `list-windows` |
 | `ACTION_FAILED` | Action rejected, blocked, or contradicted by the result | Read `error.details`. A `checks[]` report names the blocking check. After delivery, read `disposition.retry` and `details.post_state` |
 | `ACTION_NOT_SUPPORTED` | Element cannot do this | Use another command |
-| `POLICY_DENIED` | A physical or headed path was blocked | Add `--headed` if physical input is intended. A dangerous key combo needs `--force` |
+| `POLICY_DENIED` | A physical or headed path was blocked, or the owner's policies refused the command (`details.kind` starts with `dogwood_`) | Add `--headed` if physical input is intended. A dangerous key combo needs `--force`. An owner refusal is final: see Owner policies in the main skill and never work around it |
 | `APP_UNRESPONSIVE` | A liveness probe also failed after an uncertain mutation | Take a fresh snapshot. Wait for recovery before you retry |
 | `TIMEOUT` | Wait or actionability condition not met | Read `error.details.kind` |
 | `INVALID_ARGS` | Bad arguments, or a protected system process was targeted for close | Check syntax |

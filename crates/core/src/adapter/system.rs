@@ -241,6 +241,19 @@ pub trait SystemOps: Send + Sync {
         Err(AdapterError::not_supported("focused_window"))
     }
 
+    /// The application window that receives pointer input at a screen point:
+    /// the topmost window containing it. `Ok(None)` means no application
+    /// window does (the desktop, a menu bar, a dock). An adapter that cannot
+    /// tell which of several windows is on top returns an error rather than
+    /// guess.
+    fn window_at_point(
+        &self,
+        _point: crate::Point,
+        _deadline: Deadline,
+    ) -> Result<Option<WindowInfo>, AdapterError> {
+        Err(AdapterError::not_supported("window_at_point"))
+    }
+
     fn press_key_for_app(
         &self,
         _process: ProcessIdentity,

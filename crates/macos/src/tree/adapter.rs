@@ -84,6 +84,21 @@ impl ObservationOps for MacOSAdapter {
         )
     }
 
+    fn list_app_identities(&self, deadline: Deadline) -> Result<Vec<AppInfo>, AdapterError> {
+        crate::system::app::workspace_apps::list_apps_inventory_until(
+            crate::tree::locator_deadline::from_operation(deadline)?,
+        )
+        .map(|inventory| inventory.apps)
+    }
+
+    fn find_installed_app(
+        &self,
+        identifier: &str,
+        _deadline: Deadline,
+    ) -> Result<Option<agent_desktop_core::InstalledApp>, AdapterError> {
+        crate::system::app::installed_app::find_installed_app(identifier)
+    }
+
     fn list_apps_inventory(
         &self,
         deadline: Deadline,

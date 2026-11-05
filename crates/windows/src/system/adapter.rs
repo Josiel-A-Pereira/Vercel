@@ -157,6 +157,14 @@ impl SystemOps for WindowsAdapter {
         Ok(windows.into_iter().next())
     }
 
+    fn window_at_point(
+        &self,
+        point: agent_desktop_core::Point,
+        deadline: Deadline,
+    ) -> Result<Option<WindowInfo>, AdapterError> {
+        crate::system::window::window_at_point::window_at_point(self, &point, deadline)
+    }
+
     /// Process liveness for the shared `ProcessState` contract. Returns the
     /// raw classification only — core's two-signal gate owns any upgrade to
     /// `APP_UNRESPONSIVE` (A21-3, A21-4).

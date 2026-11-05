@@ -1,0 +1,28 @@
+[package]
+name    = "agent-desktop-policy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+agent-desktop-core.workspace = true
+dogwood-local-engine = "1.1"
+dogwood-language     = "1.1"
+serde_json.workspace = true
+tracing.workspace    = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_System_Com",
+  "Win32_UI_Shell",
+] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

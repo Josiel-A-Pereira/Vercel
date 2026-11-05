@@ -109,10 +109,12 @@ fn run() -> ExitCode {
     if let Err(error) = cli_args::stdin::resolve_stdin_text(&mut cmd, std::io::stdin().lock()) {
         return finish(cmd_name, Err(error));
     }
-    finish(
+    let exit_code = finish(
         cmd_name,
         cli_args::stdin::redact_result(execute(cli, cmd), stdin),
-    )
+    );
+    command_policy::dogwood::release_stores();
+    exit_code
 }
 
 /// The parsed command tree: every `Commands` variant plus `mcp`, which serves them.
@@ -194,7 +196,12 @@ fn execute_with_deadline(
                 .or_else(|| std::env::var("AGENT_DESKTOP_AGENT_ID").ok());
             let mut context = context
                 .with_agent_id(agent_id)
-                .map_err(pre_dispatch_error)?;
+                .map_err(pre_dispatch_error)?
+                .with_policy_paths(agent_desktop_core::PolicyPaths {
+                    files: cli.policy.policy.clone(),
+                    dirs: cli.policy.policy_dir.clone(),
+                    env_dir: cli.policy.env_dir().map_err(pre_dispatch_error)?,
+                });
             if let Some(deadline) = deadline {
                 context = context.with_inherited_deadline(deadline);
             }

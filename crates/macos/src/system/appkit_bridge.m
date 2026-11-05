@@ -274,6 +274,83 @@ AgentDesktopBytesResult agent_desktop_copy_workspace_snapshot_json(uint8_t front
     }
 }
 
+// Resolves an identifier the way launching it would, without launching:
+// status 0 found, 1 nothing installed answers to it, 2 bad input,
+// 3 serialization failed, 4 out of memory, 5 exception.
+AgentDesktopBytesResult agent_desktop_copy_installed_app_json(
+    const char *identifier,
+    uint8_t byBundleIdentifier
+) {
+    AgentDesktopBytesResult result = {
+        .status = 5, .failureField = NULL, .failureIndex = -1,
+        .failurePID = 0, .bytes = NULL, .length = 0
+    };
+    @try {
+        @autoreleasepool {
+            NSString *query = identifier == NULL ? nil : [NSString stringWithUTF8String:identifier];
+            if (query == nil || query.length == 0) {
+                result.status = 2;
+                return result;
+            }
+            NSWorkspace *workspace = [NSWorkspace sharedWorkspace];
+            NSURL *url = nil;
+            if (byBundleIdentifier != 0) {
+                url = [workspace URLForApplicationWithBundleIdentifier:query];
+            } else {
+                NSString *path = [workspace fullPathForApplication:query];
+                if (path != nil) {
+                    url = [NSURL fileURLWithPath:path];
+                }
+            }
+            NSBundle *bundle = url == nil ? nil : [NSBundle bundleWithURL:url];
+            if (bundle == nil) {
+                result.status = 1;
+                return result;
+            }
+            NSString *name = agent_desktop_non_blank(
+                [bundle objectForInfoDictionaryKey:@"CFBundleDisplayName"]);
+            if (name == nil) {
+                name = agent_desktop_non_blank([bundle objectForInfoDictionaryKey:@"CFBundleName"]);
+            }
+            if (name == nil) {
+                name = agent_desktop_non_blank(url.URLByDeletingPathExtension.lastPathComponent);
+            }
+            if (name == nil) {
+                result.status = 1;
+                return result;
+            }
+            NSMutableDictionary *record = [@{ @"name": name } mutableCopy];
+            if (bundle.bundleIdentifier != nil) {
+                record[@"bundle_id"] = bundle.bundleIdentifier;
+            }
+            NSError *error = nil;
+            NSData *data = [NSJSONSerialization dataWithJSONObject:record options:0 error:&error];
+            if (data == nil || error != nil || data.length > 1048576) {
+                result.status = 3;
+                return result;
+            }
+            result.bytes = malloc(data.length);
+            if (result.bytes == NULL) {
+                result.status = 4;
+                return result;
+            }
+            memcpy(result.bytes, data.bytes, data.length);
+            result.length = data.length;
+            result.status = 0;
+            return result;
+        }
+    } @catch (NSException *exception) {
+        (void)exception;
+        if (result.bytes != NULL) {
+            free(result.bytes);
+            result.bytes = NULL;
+            result.length = 0;
+        }
+        result.status = 5;
+        return result;
+    }
+}
+
 void agent_desktop_free_bridge_bytes(uint8_t *bytes) {
     free(bytes);
 }

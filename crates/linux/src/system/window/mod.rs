@@ -6,6 +6,7 @@ pub(crate) mod native_group;
 #[cfg(test)]
 pub(super) mod stopped_live_tests;
 pub(super) mod stopped_windows;
+pub(super) mod window_at_point;
 pub(super) mod window_client;
 pub(crate) mod window_filter;
 pub(crate) mod window_id;

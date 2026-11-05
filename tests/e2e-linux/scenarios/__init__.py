@@ -20,6 +20,7 @@ from scenarios import observation
 from scenarios import occlusion
 from scenarios import placeholder
 from scenarios import pointer
+from scenarios import policies
 from scenarios import ref_text
 from scenarios import ref_focus
 from scenarios import ref_disclosure

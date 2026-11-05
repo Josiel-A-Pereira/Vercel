@@ -71,6 +71,25 @@ pub trait ObservationOps: Send + Sync {
         Err(AdapterError::not_supported("list_apps"))
     }
 
+    /// The name, pid and stable identifier of each running application, for
+    /// telling which application a window, ref or name belongs to. An adapter
+    /// may skip the completeness and stability checks of
+    /// [`list_apps`](Self::list_apps) to answer cheaply; nothing may act on
+    /// these records.
+    fn list_app_identities(&self, deadline: Deadline) -> Result<Vec<AppInfo>, AdapterError> {
+        self.list_apps(deadline)
+    }
+
+    /// The installed application `identifier` would launch, found without
+    /// launching it. `Ok(None)` means nothing installed answers to it.
+    fn find_installed_app(
+        &self,
+        _identifier: &str,
+        _deadline: Deadline,
+    ) -> Result<Option<crate::InstalledApp>, AdapterError> {
+        Err(AdapterError::not_supported("find_installed_app"))
+    }
+
     fn list_apps_inventory(&self, deadline: Deadline) -> Result<crate::AppInventory, AdapterError> {
         Ok(crate::AppInventory {
             apps: self.list_apps(deadline)?,

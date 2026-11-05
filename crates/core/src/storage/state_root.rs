@@ -28,6 +28,13 @@ fn validate_state_root_env_value(
     }
 }
 
+/// The state root every durable artifact lives under: `$AGENT_DESKTOP_HOME`
+/// when set (validated), otherwise `~/.agent-desktop`. Public so companion
+/// crates (the policy gate) place their state beside the ref store's.
+pub fn configured_state_root() -> Result<PathBuf, AppError> {
+    resolve_configured_state_root()
+}
+
 pub(crate) fn resolve_configured_state_root() -> Result<PathBuf, AppError> {
     let override_active = crate::refs::home_override_active();
     let env_value = std::env::var_os(AGENT_DESKTOP_HOME_ENV).map(PathBuf::from);

@@ -72,6 +72,17 @@ Action results carry `data.disposition` and errors carry `error.disposition`, ea
 
 Ref actions are headless by default. They use semantic accessibility calls and do not take focus, move the cursor, synthesize keys or use the clipboard. If no semantic path exists, the action fails closed. Use the global `--headed` flag only when the user explicitly permits physical input, such as double-click, hover, drag, or focus. Never switch to headed mode to recover from a headless failure. Raw coordinates (`--xy`) never imply focus. Which actions need `--headed` differs by OS: read the platform skill.
 
+## Owner policies
+
+The machine's owner can restrict what agent-desktop may do with Dogwood policies, and they apply to every command you run. A refusal returns `POLICY_DENIED` with `details.kind` set to one of these:
+
+- `dogwood_policy`: a policy refused the command. The message names the command and app, `details.policies` the deciding policies, and `details.layer` whose rules they are. Do not retry with another spelling of the app, its bundle id, coordinates, a different command that reaches the same app, or `--headed`. Each is judged as the same app, so a policy that refused one refuses every other it covers. Tell the user which policy refused what.
+- `dogwood_policy` with an empty `details.policies`: nothing permitted the command. A policy may permit input only after an earlier step, such as a snapshot of the same app. If you have not observed the app yet, take that snapshot and retry the command once. If it is refused again, report it.
+- `dogwood_policy_target_unknown`: the gate could not tell which app the input would reach, so it refused rather than guess. Act through an element ref. Keyboard input can instead name the app with `--app`. For `notification-action` and `dismiss-notification`, pass `--expected-app` with the app `list-notifications` reports; a title alone does not say whose notification it is.
+- `dogwood_policy_unavailable`: a policy file is broken or unreadable, so mutating commands are refused until the owner fixes it. Reads still work, and `agent-desktop status` shows the error under `data.policies`. Report it to the user.
+
+These refusals carry `details.retryable: false` and no `recovery`. `disposition.retry` is `safe` only because nothing was delivered: repeating the command gets the same answer. `--policy` and `--policy-dir` add layers of rules for a run. A layer can only refuse more: it never lifts the owner's policies. Other `POLICY_DENIED` errors, without a `dogwood_` kind, come from headless mode or a blocked key combo; see `commands-interaction`.
+
 ## References
 
 Load one only when you need it: `agent-desktop skills get desktop <reference>`.

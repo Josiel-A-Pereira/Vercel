@@ -215,6 +215,17 @@ impl SystemOps for MacOSAdapter {
         )
     }
 
+    fn window_at_point(
+        &self,
+        point: agent_desktop_core::Point,
+        deadline: Deadline,
+    ) -> Result<Option<WindowInfo>, AdapterError> {
+        crate::system::window::window_at_point::window_at_point_until(
+            &point,
+            crate::tree::locator_deadline::from_operation(deadline)?,
+        )
+    }
+
     fn press_key_for_app(
         &self,
         process: ProcessIdentity,

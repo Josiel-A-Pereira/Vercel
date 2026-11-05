@@ -164,10 +164,15 @@ pub(in crate::system) fn records_from_dictionaries(
     Ok(records)
 }
 
-fn window_dictionaries() -> Result<Vec<WindowDictionary>, AdapterError> {
+pub(in crate::system) fn window_dictionaries() -> Result<Vec<WindowDictionary>, AdapterError> {
+    dictionaries_for(window_list_options())
+}
+
+pub(in crate::system) fn dictionaries_for(
+    options: core_graphics::window::CGWindowListOption,
+) -> Result<Vec<WindowDictionary>, AdapterError> {
     use crate::tree::properties::cf_type::borrowed_cf_dictionary;
     use core_graphics::display::CGDisplay;
-    let options = window_list_options();
     let array = CGDisplay::window_list_info(options, None).ok_or_else(|| {
         inventory_error("CGWindowListCopyWindowInfo returned null instead of a window inventory")
     })?;
@@ -321,7 +326,7 @@ fn required_string_field(dict: &WindowDictionary, key: &str) -> Result<String, A
     string_field(dict, key).ok_or_else(|| missing_field_error(key))
 }
 
-fn int_field(dict: &WindowDictionary, key: &str) -> Option<i64> {
+pub(in crate::system) fn int_field(dict: &WindowDictionary, key: &str) -> Option<i64> {
     use crate::tree::properties::cf_type::borrowed_cf_number;
     use core_foundation::base::TCFType;
 
@@ -331,7 +336,7 @@ fn int_field(dict: &WindowDictionary, key: &str) -> Option<i64> {
         .and_then(|number| number.to_i64())
 }
 
-fn string_field(dict: &WindowDictionary, key: &str) -> Option<String> {
+pub(in crate::system) fn string_field(dict: &WindowDictionary, key: &str) -> Option<String> {
     use crate::tree::properties::cf_type::borrowed_cf_string;
     use core_foundation::base::TCFType;
 
@@ -341,7 +346,10 @@ fn string_field(dict: &WindowDictionary, key: &str) -> Option<String> {
         .map(|value| value.to_string())
 }
 
-fn bool_field(dict: &WindowDictionary, key: &str) -> Result<bool, AdapterError> {
+pub(in crate::system) fn bool_field(
+    dict: &WindowDictionary,
+    key: &str,
+) -> Result<bool, AdapterError> {
     use core_foundation::boolean::CFBoolean;
 
     let cf_key = CFString::new(key);
@@ -354,7 +362,7 @@ fn bool_field(dict: &WindowDictionary, key: &str) -> Result<bool, AdapterError> 
         .ok_or_else(|| invalid_field_error(key))
 }
 
-fn rect_field(dict: &WindowDictionary, key: &str) -> Option<Rect> {
+pub(in crate::system) fn rect_field(dict: &WindowDictionary, key: &str) -> Option<Rect> {
     use crate::tree::properties::cf_type::borrowed_cf_dictionary;
     use core_foundation::base::TCFType;
 
@@ -369,7 +377,7 @@ fn rect_field(dict: &WindowDictionary, key: &str) -> Option<Rect> {
     })
 }
 
-fn int_or_float_field(dict: &WindowDictionary, key: &str) -> Option<f64> {
+pub(in crate::system) fn int_or_float_field(dict: &WindowDictionary, key: &str) -> Option<f64> {
     use crate::tree::properties::cf_type::borrowed_cf_number;
     use core_foundation::base::TCFType;
 

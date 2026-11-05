@@ -41,7 +41,7 @@ pub use adapter::live_identity::LiveIdentity;
 pub use adapter::native_handle::NativeHandle;
 pub use adapter::observation::ObservationOps;
 pub use adapter::system::SystemOps;
-pub use context::{CommandContext, WaitSelector};
+pub use context::{CommandContext, WaitSelector, policy_paths::PolicyPaths};
 pub use cursor_overlay::{
     CURSOR_ARRIVAL_TIMEOUT_MS, CURSOR_HIGHLIGHT_HOLD_MS, CURSOR_IDLE_REST_MS,
     CURSOR_LABEL_REVEAL_MS, CURSOR_MOTION_BUDGET_MS, CURSOR_OVERLAY_GREETING, CURSOR_REST_FADE_MS,
@@ -118,13 +118,14 @@ pub use storage::file_lock::FileLock;
 pub use storage::private_file_ops::{
     PrivateFileOps, bounded_read, install_private_file_ops, temporary_file_name,
 };
-pub use storage::state_root::validate_state_root_env;
+pub use storage::state_root::{configured_state_root, validate_state_root_env};
 pub use system::app_info::{AppInfo, AppPresentation, app_name_matches};
 pub use system::app_inventory::AppInventory;
 pub use system::app_inventory_query::AppInventoryQuery;
 pub use system::display_info::DisplayInfo;
 pub use system::image_buffer::{ImageBuffer, MAX_PNG_INPUT_BYTES, parse_png_dimensions};
 pub use system::image_format::ImageFormat;
+pub use system::installed_app::InstalledApp;
 pub use system::operation_report::OperationReport;
 pub use system::operation_target::OperationTarget;
 pub use system::permission_report::PermissionReport;

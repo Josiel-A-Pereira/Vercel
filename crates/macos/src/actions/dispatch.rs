@@ -62,6 +62,7 @@ mod imp {
             }
 
             Action::SetValue(val) => {
+                crate::actions::swiftui_text::prepare_text_write(el, request.policy, deadline)?;
                 steps.extend(run_chain(
                     el,
                     &chain_defs::SET_VALUE_CHAIN,
@@ -82,6 +83,7 @@ mod imp {
             }
 
             Action::TypeText(text) => {
+                crate::actions::swiftui_text::prepare_text_write(el, request.policy, deadline)?;
                 steps.push(crate::actions::type_text::execute_type(
                     el,
                     text.as_str(),

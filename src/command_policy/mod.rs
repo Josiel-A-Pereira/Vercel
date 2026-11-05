@@ -1,3 +1,8 @@
+pub(crate) mod dogwood;
+mod dogwood_plan;
+pub(crate) mod dogwood_status;
+mod dogwood_target;
+
 use agent_desktop_core::{
     AdapterError, AppError, DeliverySemantics, ErrorCode, PermissionReport, refs::validate_ref_id,
 };

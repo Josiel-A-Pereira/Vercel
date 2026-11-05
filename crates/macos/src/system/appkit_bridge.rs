@@ -120,6 +120,29 @@ fn copy_workspace_snapshot_json(frontmost_only: u8) -> Result<Vec<u8>, AdapterEr
     Ok(unsafe { std::slice::from_raw_parts(bytes.0, result.length) }.to_vec())
 }
 
+/// The installed application Launch Services resolves `identifier` to, as
+/// JSON `{name, bundle_id?}`; `Ok(None)` when nothing answers to it.
+#[cfg(target_os = "macos")]
+pub(crate) fn installed_app_json(
+    identifier: &str,
+    by_bundle_id: bool,
+) -> Result<Option<Vec<u8>>, AdapterError> {
+    let Ok(identifier) = std::ffi::CString::new(identifier) else {
+        return Ok(None);
+    };
+    let result = unsafe {
+        agent_desktop_copy_installed_app_json(identifier.as_ptr(), u8::from(by_bundle_id))
+    };
+    let bytes = BridgeBytes(result.bytes);
+    match result.status {
+        0 if result.length <= MAX_BRIDGE_BYTES && !bytes.0.is_null() => Ok(Some(
+            unsafe { std::slice::from_raw_parts(bytes.0, result.length) }.to_vec(),
+        )),
+        1 | 2 => Ok(None),
+        status => Err(bridge_error("installed_app", status, false)),
+    }
+}
+
 #[cfg(target_os = "macos")]
 fn workspace_snapshot_error(result: &BytesResult) -> AdapterError {
     let field = if result.failure_field.is_null() {
@@ -215,6 +238,10 @@ unsafe extern "C" {
     fn agent_desktop_app_finished_launching(pid: i32) -> i32;
     fn agent_desktop_ensure_cocoa_multithreaded() -> u8;
     fn agent_desktop_copy_workspace_snapshot_json(frontmost_only: u8) -> BytesResult;
+    fn agent_desktop_copy_installed_app_json(
+        identifier: *const std::ffi::c_char,
+        by_bundle_identifier: u8,
+    ) -> BytesResult;
     fn agent_desktop_free_bridge_bytes(bytes: *mut u8);
 }
 
@@ -230,6 +257,14 @@ pub(crate) fn terminate(
 #[cfg(not(target_os = "macos"))]
 pub(crate) fn ensure_cocoa_multithreaded() -> Result<(), String> {
     Err("AppKit is unavailable".into())
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn installed_app_json(
+    _identifier: &str,
+    _by_bundle_id: bool,
+) -> Result<Option<Vec<u8>>, AdapterError> {
+    Err(AdapterError::not_supported("installed application lookup"))
 }
 
 #[cfg(not(target_os = "macos"))]
