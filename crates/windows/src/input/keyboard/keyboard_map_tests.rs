@@ -83,6 +83,28 @@ const MACOS_KEY_VOCABULARY: &[&str] = &[
     "f10",
     "f11",
     "f12",
+    ",",
+    ".",
+    "/",
+    ";",
+    "'",
+    "[",
+    "]",
+    "\\",
+    "-",
+    "=",
+    "`",
+    "comma",
+    "period",
+    "slash",
+    "semicolon",
+    "quote",
+    "leftbracket",
+    "rightbracket",
+    "backslash",
+    "minus",
+    "equal",
+    "grave",
 ];
 
 #[test]
@@ -200,6 +222,47 @@ fn a_scan_requiring_control_and_alt_carries_both() {
     assert!(resolved.layout_control);
     assert!(resolved.layout_alt);
     assert_eq!(resolved.layout_modifier_vks(), vec![VK_CONTROL, VK_MENU]);
+}
+
+#[test]
+fn punctuation_resolves_by_symbol_and_by_name() {
+    for (symbol, name) in PUNCTUATION {
+        assert_eq!(punctuation(&symbol.to_string()), Some(symbol));
+        assert_eq!(punctuation(name), Some(symbol));
+    }
+    assert_eq!(punctuation(",,"), None);
+    assert_eq!(punctuation("("), None);
+}
+
+#[test]
+fn a_punctuation_name_and_its_symbol_press_the_same_key() {
+    for (symbol, name) in PUNCTUATION {
+        assert_eq!(
+            resolve_key(name).expect("the name resolves"),
+            resolve_key(&symbol.to_string()).expect("the symbol resolves"),
+            "'{name}' and '{symbol}' must press the same key"
+        );
+    }
+}
+
+#[test]
+fn a_symbol_the_layout_cannot_type_is_refused_before_anything_is_sent() {
+    let error = resolve_punctuation('`', None).unwrap_err();
+
+    assert_eq!(error.code, ErrorCode::InvalidArgs);
+    assert!(error.message.contains('`'));
+    assert!(error.suggestion.is_some());
+}
+
+/// On a German layout `;` is Shift plus the comma key; the decoded scan must
+/// keep that Shift so the chord types `;` rather than `,`.
+#[test]
+fn a_symbol_the_layout_types_with_shift_carries_shift() {
+    let resolved = resolve_punctuation(';', Some(0x01BC)).expect("the layout has a key for ';'");
+
+    assert_eq!(resolved.vk, 0xBC);
+    assert!(resolved.layout_shift);
+    assert_eq!(resolved.layout_modifier_vks(), vec![VK_SHIFT]);
 }
 
 /// A named key is produced by its virtual key alone, so it carries no layout

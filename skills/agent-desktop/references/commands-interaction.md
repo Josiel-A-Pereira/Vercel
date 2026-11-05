@@ -151,6 +151,7 @@ agent-desktop press cmd+s --app "TextEdit" --wait-for "button:Save" --wait-timeo
 ```
 
 - Key names: `return`, `escape`, `tab`, `space`, `delete`, `up`, `down`, `left`, `right`, `f1` to `f12`. Modifiers: `cmd`/`meta`, `ctrl`, `alt`, `shift`, joined with `+`. Modifier names and blocked combos differ by OS. Read the platform skill.
+- On macOS and Windows, punctuation keys work as the symbol or by name: `press shift+;`, `press ctrl+backslash`. The platform skill lists the names.
 - A bare uppercase letter adds Shift: `press H` sends `shift+h`.
 - `--app` or `--window-id` targets one app. Use `--window-id` when several instances share a name and `--app` alone is `AMBIGUOUS_TARGET`. Unscoped `press` goes to the foreground app.
 - `press` reports `delivered_unverified`, because delivery does not prove the shortcut did its job. Wait for the expected effect once with `--wait-for` or `--wait-for-gone`. A timeout keeps the delivered result and is unsafe to retry blindly.

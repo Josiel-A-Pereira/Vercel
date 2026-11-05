@@ -1,0 +1,365 @@
+{
+    "numlock_toggled":  0,
+    "rows":  [
+                 {
+                     "key":  "up",
+                     "shape":  "no_flag_scan_0",
+                     "mapvk_vsc_ex":  "0x0048",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "up",
+                     "shape":  "flag_scan_0",
+                     "mapvk_vsc_ex":  "0x0048",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "up",
+                     "shape":  "flag_from_vsc_ex",
+                     "mapvk_vsc_ex":  "0x0048",
+                     "events":  2,
+                     "seen_scan":  "0x48",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "up",
+                     "shape":  "flag_forced_mapped_scan",
+                     "mapvk_vsc_ex":  "0x0048",
+                     "events":  2,
+                     "seen_scan":  "0x48",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "down",
+                     "shape":  "no_flag_scan_0",
+                     "mapvk_vsc_ex":  "0x0050",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "down",
+                     "shape":  "flag_scan_0",
+                     "mapvk_vsc_ex":  "0x0050",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "down",
+                     "shape":  "flag_from_vsc_ex",
+                     "mapvk_vsc_ex":  "0x0050",
+                     "events":  2,
+                     "seen_scan":  "0x50",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "down",
+                     "shape":  "flag_forced_mapped_scan",
+                     "mapvk_vsc_ex":  "0x0050",
+                     "events":  2,
+                     "seen_scan":  "0x50",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "left",
+                     "shape":  "no_flag_scan_0",
+                     "mapvk_vsc_ex":  "0x004B",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "left",
+                     "shape":  "flag_scan_0",
+                     "mapvk_vsc_ex":  "0x004B",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "left",
+                     "shape":  "flag_from_vsc_ex",
+                     "mapvk_vsc_ex":  "0x004B",
+                     "events":  2,
+                     "seen_scan":  "0x4B",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "left",
+                     "shape":  "flag_forced_mapped_scan",
+                     "mapvk_vsc_ex":  "0x004B",
+                     "events":  2,
+                     "seen_scan":  "0x4B",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "right",
+                     "shape":  "no_flag_scan_0",
+                     "mapvk_vsc_ex":  "0x004D",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "right",
+                     "shape":  "flag_scan_0",
+                     "mapvk_vsc_ex":  "0x004D",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "right",
+                     "shape":  "flag_from_vsc_ex",
+                     "mapvk_vsc_ex":  "0x004D",
+                     "events":  2,
+                     "seen_scan":  "0x4D",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "right",
+                     "shape":  "flag_forced_mapped_scan",
+                     "mapvk_vsc_ex":  "0x004D",
+                     "events":  2,
+                     "seen_scan":  "0x4D",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "home",
+                     "shape":  "no_flag_scan_0",
+                     "mapvk_vsc_ex":  "0x0047",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "home",
+                     "shape":  "flag_scan_0",
+                     "mapvk_vsc_ex":  "0x0047",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "home",
+                     "shape":  "flag_from_vsc_ex",
+                     "mapvk_vsc_ex":  "0x0047",
+                     "events":  2,
+                     "seen_scan":  "0x47",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "home",
+                     "shape":  "flag_forced_mapped_scan",
+                     "mapvk_vsc_ex":  "0x0047",
+                     "events":  2,
+                     "seen_scan":  "0x47",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "end",
+                     "shape":  "no_flag_scan_0",
+                     "mapvk_vsc_ex":  "0x004F",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "end",
+                     "shape":  "flag_scan_0",
+                     "mapvk_vsc_ex":  "0x004F",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "end",
+                     "shape":  "flag_from_vsc_ex",
+                     "mapvk_vsc_ex":  "0x004F",
+                     "events":  2,
+                     "seen_scan":  "0x4F",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "end",
+                     "shape":  "flag_forced_mapped_scan",
+                     "mapvk_vsc_ex":  "0x004F",
+                     "events":  2,
+                     "seen_scan":  "0x4F",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "pageup",
+                     "shape":  "no_flag_scan_0",
+                     "mapvk_vsc_ex":  "0x0049",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "pageup",
+                     "shape":  "flag_scan_0",
+                     "mapvk_vsc_ex":  "0x0049",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "pageup",
+                     "shape":  "flag_from_vsc_ex",
+                     "mapvk_vsc_ex":  "0x0049",
+                     "events":  2,
+                     "seen_scan":  "0x49",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "pageup",
+                     "shape":  "flag_forced_mapped_scan",
+                     "mapvk_vsc_ex":  "0x0049",
+                     "events":  2,
+                     "seen_scan":  "0x49",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "pagedown",
+                     "shape":  "no_flag_scan_0",
+                     "mapvk_vsc_ex":  "0x0051",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "pagedown",
+                     "shape":  "flag_scan_0",
+                     "mapvk_vsc_ex":  "0x0051",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "pagedown",
+                     "shape":  "flag_from_vsc_ex",
+                     "mapvk_vsc_ex":  "0x0051",
+                     "events":  2,
+                     "seen_scan":  "0x51",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "pagedown",
+                     "shape":  "flag_forced_mapped_scan",
+                     "mapvk_vsc_ex":  "0x0051",
+                     "events":  2,
+                     "seen_scan":  "0x51",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "forwarddelete",
+                     "shape":  "no_flag_scan_0",
+                     "mapvk_vsc_ex":  "0x0053",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "forwarddelete",
+                     "shape":  "flag_scan_0",
+                     "mapvk_vsc_ex":  "0x0053",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "forwarddelete",
+                     "shape":  "flag_from_vsc_ex",
+                     "mapvk_vsc_ex":  "0x0053",
+                     "events":  2,
+                     "seen_scan":  "0x53",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "forwarddelete",
+                     "shape":  "flag_forced_mapped_scan",
+                     "mapvk_vsc_ex":  "0x0053",
+                     "events":  2,
+                     "seen_scan":  "0x53",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "a",
+                     "shape":  "no_flag_scan_0",
+                     "mapvk_vsc_ex":  "0x001E",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "a",
+                     "shape":  "flag_scan_0",
+                     "mapvk_vsc_ex":  "0x001E",
+                     "events":  2,
+                     "seen_scan":  "0x00",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "a",
+                     "shape":  "flag_from_vsc_ex",
+                     "mapvk_vsc_ex":  "0x001E",
+                     "events":  2,
+                     "seen_scan":  "0x1E",
+                     "seen_extended":  false,
+                     "seen_injected":  true
+                 },
+                 {
+                     "key":  "a",
+                     "shape":  "flag_forced_mapped_scan",
+                     "mapvk_vsc_ex":  "0x001E",
+                     "events":  2,
+                     "seen_scan":  "0x1E",
+                     "seen_extended":  true,
+                     "seen_injected":  true
+                 }
+             ]
+}

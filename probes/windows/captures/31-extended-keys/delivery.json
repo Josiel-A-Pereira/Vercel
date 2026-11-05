@@ -1,0 +1,56 @@
+{
+    "numlock_toggled":  0,
+    "modifiers_left_down":  [
+
+                            ],
+    "rows":  [
+                 {
+                     "case":  "shift_down_twice",
+                     "extended_flag_sent":  false,
+                     "skipped":  false,
+                     "skip_reason":  null,
+                     "selection_length":  12,
+                     "arrow_keydowns":  2,
+                     "arrow_keydowns_marked_extended":  0,
+                     "shift_held_at_every_arrow":  true,
+                     "unmarked_shift_events":  0,
+                     "foreground_after":  true
+                 },
+                 {
+                     "case":  "shift_down_twice",
+                     "extended_flag_sent":  true,
+                     "skipped":  false,
+                     "skip_reason":  null,
+                     "selection_length":  12,
+                     "arrow_keydowns":  2,
+                     "arrow_keydowns_marked_extended":  2,
+                     "shift_held_at_every_arrow":  true,
+                     "unmarked_shift_events":  0,
+                     "foreground_after":  true
+                 },
+                 {
+                     "case":  "shift_end",
+                     "extended_flag_sent":  false,
+                     "skipped":  false,
+                     "skip_reason":  null,
+                     "selection_length":  4,
+                     "arrow_keydowns":  1,
+                     "arrow_keydowns_marked_extended":  0,
+                     "shift_held_at_every_arrow":  true,
+                     "unmarked_shift_events":  0,
+                     "foreground_after":  true
+                 },
+                 {
+                     "case":  "shift_end",
+                     "extended_flag_sent":  true,
+                     "skipped":  false,
+                     "skip_reason":  null,
+                     "selection_length":  4,
+                     "arrow_keydowns":  1,
+                     "arrow_keydowns_marked_extended":  1,
+                     "shift_held_at_every_arrow":  true,
+                     "unmarked_shift_events":  0,
+                     "foreground_after":  true
+                 }
+             ]
+}

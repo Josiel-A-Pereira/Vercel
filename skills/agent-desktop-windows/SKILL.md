@@ -62,6 +62,13 @@ observation, actions and capture there fail or return nothing.
   `win+x`, `win+e`, `ctrl+shift+esc` and their modifier supersets are refused
   without `--force`. In combos, `cmd` and `meta` are the Windows key, so
   `meta+c` is a shell shortcut. Write `ctrl+c` to copy.
+- **Punctuation keys work in combos**, as the symbol (`,` `.` `/` `;` `'` `[`
+  `]` `\` `-` `=` `` ` ``) or by name (`comma`, `period`, `slash`,
+  `semicolon`, `quote`, `leftbracket`, `rightbracket`, `backslash`, `minus`,
+  `equal`, `grave`). Each is sent with the key and modifiers that type it in
+  the active keyboard layout, so `press shift+;` types `:` on a US layout. A
+  symbol the layout has no key for is `INVALID_ARGS` and nothing is sent. To
+  type text into an app with no accessibility tree, press it key by key.
 - **`type` needs `--headed`.** It is keystroke synthesis through `SendInput`,
   so a strict-headless `type` returns `POLICY_DENIED`. Use `set-value`, or pass
   `--headed`. It ends `delivered_unverified` (`verification_scope:

@@ -13,6 +13,13 @@
 //! back to the fixed ASCII-derived virtual-key code (numerically identical
 //! to `VkKeyScanW`'s answer on a US layout) when the layout has no key that
 //! produces the requested character at all.
+//!
+//! Punctuation keys are the same eleven macOS accepts, named either by the
+//! symbol (`;`) or by its name (`semicolon`). They resolve through
+//! `VkKeyScanW` too, carrying any modifier the layout needs to produce the
+//! symbol, but have no layout-independent fallback: the `VK_OEM_*` codes are
+//! positions on a US keyboard, so a layout with no key for the symbol is
+//! refused with nothing sent rather than pressing whatever sits there.
 
 use agent_desktop_core::{AdapterError, ErrorCode};
 
@@ -116,14 +123,77 @@ const LAYOUT_SHIFT: u8 = 0x01;
 const LAYOUT_CONTROL: u8 = 0x02;
 const LAYOUT_ALT: u8 = 0x04;
 
+const PUNCTUATION: [(char, &str); 11] = [
+    (',', "comma"),
+    ('.', "period"),
+    ('/', "slash"),
+    (';', "semicolon"),
+    ('\'', "quote"),
+    ('[', "leftbracket"),
+    (']', "rightbracket"),
+    ('\\', "backslash"),
+    ('-', "minus"),
+    ('=', "equal"),
+    ('`', "grave"),
+];
+
 pub(crate) fn resolve_key(key: &str) -> Result<ResolvedKey, AdapterError> {
     if let Some(vk) = named_key_vk(key) {
         return Ok(ResolvedKey::bare(vk));
+    }
+    if let Some(symbol) = punctuation(key) {
+        return resolve_punctuation(symbol, imp::vk_key_scan(symbol));
     }
     if let Some(resolved) = character_key(key) {
         return Ok(resolved);
     }
     Err(unknown_key_error(key))
+}
+
+fn punctuation(key: &str) -> Option<char> {
+    PUNCTUATION
+        .iter()
+        .find(|(symbol, name)| *name == key || key.chars().eq(std::iter::once(*symbol)))
+        .map(|(symbol, _)| *symbol)
+}
+
+/// Takes the `VkKeyScanW` answer as an argument so the refusal is testable
+/// on a layout that has a key for every symbol.
+fn resolve_punctuation(symbol: char, scan: Option<i16>) -> Result<ResolvedKey, AdapterError> {
+    scan.map(resolved_from_scan).ok_or_else(|| {
+        AdapterError::new(
+            ErrorCode::InvalidArgs,
+            format!("No key types '{symbol}' in the active keyboard layout"),
+        )
+        .with_suggestion(
+            "Nothing was sent; switch to a keyboard layout that has this key, or use 'type' on an element",
+        )
+    })
+}
+
+/// Whether a physical keyboard sends this virtual key with the `E0` prefix.
+///
+/// `SendInput` marks a key extended only when the caller sets
+/// `KEYEVENTF_EXTENDEDKEY`, and an unmarked arrow, Home, End, Page Up,
+/// Page Down or Delete reaches the target as its numeric keypad twin, which
+/// some applications (Java/Swing among them) bind differently from the
+/// dedicated key. The set is fixed here because `MapVirtualKeyW` with
+/// `MAPVK_VK_TO_VSC_EX` reports no `E0` prefix for these keys: it returns
+/// `0x0050` for `VK_DOWN`, the keypad scan code (A31-1).
+pub(crate) fn is_extended_key(vk: u16) -> bool {
+    matches!(
+        vk,
+        VK_PRIOR
+            | VK_NEXT
+            | VK_END
+            | VK_HOME
+            | VK_LEFT
+            | VK_UP
+            | VK_RIGHT
+            | VK_DOWN
+            | VK_DELETE
+            | VK_LWIN
+    )
 }
 
 fn named_key_vk(key: &str) -> Option<u16> {
@@ -203,7 +273,9 @@ fn fallback_ascii_vk(character: char) -> u16 {
 fn unknown_key_error(key: &str) -> AdapterError {
     AdapterError::new(ErrorCode::InvalidArgs, format!("Unknown key: '{key}'")).with_suggestion(
         "Valid keys: a-z, 0-9, return, escape, tab, space, delete, forwarddelete, home, end, \
-         pageup, pagedown, left, right, up, down, cmd, shift, alt, ctrl, f1-f12",
+         pageup, pagedown, left, right, up, down, cmd, shift, alt, ctrl, f1-f12, and \
+         , . / ; ' [ ] \\ - = ` (or comma, period, slash, semicolon, quote, leftbracket, \
+         rightbracket, backslash, minus, equal, grave)",
     )
 }
 

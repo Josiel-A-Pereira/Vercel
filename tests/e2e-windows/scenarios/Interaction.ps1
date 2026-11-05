@@ -107,6 +107,7 @@ function Invoke-InteractionScenario {
             'headed-double-click', 'headed-triple-click', 'headed-right-click-then-choose', 'headed-hover',
             'headed-drag', 'headed-type', 'headed-press-app',
             'press-ctrl-a-backspace-clears-text', 'press-shift-tab-moves-focus',
+            'press-punctuation-by-symbol-and-name', 'press-navigation-keys-arrive-extended',
             'press-return-activates-focused-button', 'press-blocked-combo-refused',
             'interaction-scroll-to-visibility', 'interaction-horizontal-scroll-to-containment', 'interaction-focus-refused-headless', 'interaction-focus-headed-oracle'
         ))

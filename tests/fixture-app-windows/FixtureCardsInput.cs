@@ -13,7 +13,7 @@ namespace AgentDeskFixtureApp
         {
             GroupBox card = CardLayout.AddCard(owner, cursor, "Text input", 130);
 
-            TextBox textInput = new TextBox();
+            KeyReportingTextBox textInput = new KeyReportingTextBox();
             FixtureIdentity.Assign(textInput, "text-input");
             textInput.Location = new Point(16, CardLayout.RowY(0));
             textInput.Width = 200;
@@ -35,6 +35,12 @@ namespace AgentDeskFixtureApp
             secureInput.Location = new Point(16, CardLayout.RowY(1));
             secureInput.Width = 200;
             card.Controls.Add(secureInput);
+
+            TextBox keyReport = FixtureStatus.Create("key-report");
+            keyReport.Location = new Point(226, CardLayout.RowY(1));
+            keyReport.Width = 200;
+            card.Controls.Add(keyReport);
+            textInput.Report = keyReport;
 
             TextBox multilineInput = new TextBox();
             FixtureIdentity.Assign(multilineInput, "multiline-input");
