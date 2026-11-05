@@ -2,6 +2,8 @@ use super::*;
 use clap::Parser;
 use clap::error::ErrorKind;
 
+use crate::cli::Commands;
+
 fn sample(schema: &Value) -> Value {
     let item = if schema["type"] == "array" {
         &schema["items"]
@@ -165,6 +167,42 @@ fn flag_shaped_values_stay_values_and_never_become_flags() {
         panic!("type");
     };
     assert_eq!(typed.text.as_deref(), Some(hostile));
+}
+
+#[test]
+fn launch_options_preserve_array_order_and_reject_wrong_types() {
+    let tool = tool_at(&["launch"]);
+    let input = json!({
+        "app": "example",
+        "args": ["--headed", "argument with spaces", ""],
+        "timeout": 2500
+    });
+    let arguments = input.as_object().unwrap();
+    let cli = parse(&tool, arguments).unwrap();
+    assert!(!cli.interaction.headed);
+    let Some(Commands::Launch(launch)) = cli.command else {
+        panic!("launch");
+    };
+    assert_eq!(launch.args, ["--headed", "argument with spaces", ""]);
+    assert_eq!(launch.timeout, 2500);
+
+    for (key, value, expected) in [
+        ("args", json!("--headed"), "an array of string values"),
+        (
+            "args",
+            json!(["--headed", false]),
+            "an array of string values",
+        ),
+        ("timeout", json!("2500"), "a JSON integer"),
+        ("timeout", json!(2.5), "a JSON integer"),
+    ] {
+        let mut wrong = arguments.clone();
+        wrong.insert(key.into(), value);
+        assert_eq!(
+            tool.argv(&wrong).unwrap_err(),
+            format!("Argument '{key}' must be {expected}")
+        );
+    }
 }
 
 #[test]

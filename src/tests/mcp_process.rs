@@ -64,6 +64,25 @@ fn mcp_rejects_missing_required_arguments_before_shifting_positionals() {
 }
 
 #[test]
+fn mcp_rejects_arrays_and_booleans_in_string_arguments() {
+    let responses = serve(
+        &[
+            call(
+                1,
+                "desktop_skills_get",
+                json!({ "name": ["desktop", "workflows"] }),
+            ),
+            call(2, "desktop_skills_get", json!({ "name": false })),
+        ],
+        &[],
+    );
+    assert_eq!(responses.len(), 2);
+    for response in &responses {
+        assert_argument_error(response, "Argument 'name' must be a JSON string");
+    }
+}
+
+#[test]
 fn mcp_tool_calls_run_the_cli_command_and_return_its_envelope() {
     let responses = serve(
         &[
