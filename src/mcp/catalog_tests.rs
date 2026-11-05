@@ -33,12 +33,19 @@ fn every_schema_property_is_accepted_by_the_cli_parser() {
     let mut checked = 0;
     for tool in tools() {
         let definition = tool.definition();
-        let properties = definition["inputSchema"]["properties"]
-            .as_object()
-            .expect("properties")
-            .clone();
-        for (key, schema) in &properties {
-            let mut arguments = Map::new();
+        let schema = &definition["inputSchema"];
+        let properties = schema["properties"].as_object().expect("properties");
+        let required = schema["required"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|key| {
+                let key = key.as_str().expect("required property name");
+                (key.to_owned(), sample(&properties[key]))
+            })
+            .collect::<Map<_, _>>();
+        for (key, schema) in properties {
+            let mut arguments = required.clone();
             arguments.insert(key.clone(), sample(schema));
             let Err(error) = parse(&tool, &arguments) else {
                 checked += 1;
@@ -63,6 +70,16 @@ fn every_schema_property_is_accepted_by_the_cli_parser() {
 #[test]
 fn every_tool_runs_the_command_it_is_named_after() {
     for tool in tools() {
+        let definition = tool.definition();
+        if let Some(name) = definition["inputSchema"]["required"][0].as_str() {
+            assert_eq!(
+                tool.argv(&Map::new()).unwrap_err(),
+                format!("Missing required argument '{name}'"),
+                "{}",
+                tool.name
+            );
+            continue;
+        }
         let error = match parse(&tool, &Map::new()) {
             Ok(cli) => {
                 let command = cli.command.expect("a command");

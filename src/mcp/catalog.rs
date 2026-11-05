@@ -88,6 +88,12 @@ impl Tool {
                 push_option(&mut argv, arg, key, value)?;
             }
         }
+        for arg in self.args().filter(|arg| arg.is_required_set()) {
+            let key = property_name(arg);
+            if arguments.get(&key).is_none_or(Value::is_null) {
+                return Err(format!("Missing required argument '{key}'"));
+            }
+        }
         if !positionals.is_empty() {
             positionals.sort_by_key(|(index, _)| *index);
             argv.push("--".to_string());

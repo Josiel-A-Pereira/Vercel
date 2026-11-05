@@ -37,6 +37,32 @@ fn call(id: i64, name: &str, arguments: Value) -> Value {
             "params": { "name": name, "arguments": arguments } })
 }
 
+fn assert_argument_error(response: &Value, message: &str) {
+    let result = &response["result"];
+    assert_eq!(result["isError"], true, "{response}");
+    assert_eq!(result["content"][0]["text"], message);
+    assert!(result.get("structuredContent").is_none(), "{response}");
+}
+
+#[test]
+fn mcp_rejects_missing_required_arguments_before_shifting_positionals() {
+    let responses = serve(
+        &[
+            call(1, "desktop_skills_get", json!({ "reference": "desktop" })),
+            call(
+                2,
+                "desktop_skills_get",
+                json!({ "name": null, "reference": "desktop" }),
+            ),
+        ],
+        &[],
+    );
+    assert_eq!(responses.len(), 2);
+    for response in &responses {
+        assert_argument_error(response, "Missing required argument 'name'");
+    }
+}
+
 #[test]
 fn mcp_tool_calls_run_the_cli_command_and_return_its_envelope() {
     let responses = serve(
