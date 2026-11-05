@@ -1,5 +1,6 @@
 use super::*;
 use std::cell::Cell;
+use std::time::{Duration, Instant};
 
 #[test]
 fn select_descent_stops_reading_children_at_the_depth_cap() {
@@ -91,4 +92,47 @@ fn uncertain_collection_selection_never_falls_back_to_press() {
         assert_eq!(result.unwrap_err().disposition, disposition);
         assert_eq!(presses.get(), 0);
     }
+}
+
+#[test]
+fn a_menu_that_is_already_present_returns_without_waiting() {
+    let start = Instant::now();
+
+    let present = poll_for_menu(Duration::from_secs(5), || Ok(true)).unwrap();
+
+    assert!(present);
+    assert!(start.elapsed() < Duration::from_millis(200));
+}
+
+#[test]
+fn a_menu_that_appears_within_the_grace_is_reported() {
+    let mut reads = 0;
+
+    let present = poll_for_menu(Duration::from_millis(500), || {
+        reads += 1;
+        Ok(reads >= 3)
+    })
+    .unwrap();
+
+    assert!(present);
+    assert_eq!(reads, 3);
+}
+
+#[test]
+fn a_menu_that_never_appears_ends_at_the_grace() {
+    let start = Instant::now();
+
+    let present = poll_for_menu(Duration::from_millis(120), || Ok(false)).unwrap();
+
+    assert!(!present);
+    assert!(start.elapsed() >= Duration::from_millis(120));
+}
+
+#[test]
+fn a_read_that_fails_propagates_instead_of_reading_as_absence() {
+    let result = poll_for_menu(Duration::from_millis(120), || {
+        Err(AdapterError::timeout("menu surface unavailable"))
+    });
+
+    assert!(result.is_err());
 }

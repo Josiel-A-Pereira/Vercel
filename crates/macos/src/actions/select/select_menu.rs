@@ -5,6 +5,9 @@ use crate::tree::AXElement;
 
 const MAX_SELECT_NODES: usize = 2_048;
 const MAX_SELECT_DEPTH: u8 = 8;
+const MENU_OPEN_GRACE: std::time::Duration = std::time::Duration::from_millis(1_000);
+const MENU_OPEN_POLL: std::time::Duration = std::time::Duration::from_millis(20);
+const MENU_CLEANUP_BUDGET_MS: u64 = 2_000;
 
 pub(crate) fn select_from_menu(
     element: &AXElement,
@@ -21,7 +24,7 @@ pub(crate) fn select_from_menu(
         .with_suggestion("Dismiss the open menu and retry select."));
     }
     let exposes_value = crate::tree::copy_value_typed(element, deadline).is_some();
-    let delivered = open_menu(element, deadline)?;
+    let delivered = open_menu(element, pid, deadline)?;
     if !delivered {
         return Err(AdapterError::new(
             ErrorCode::ActionNotSupported,
@@ -36,7 +39,7 @@ pub(crate) fn select_from_menu(
         }
         Ok(verified) => Ok(verified),
         Err(error) => {
-            let _ = crate::actions::ax_helpers::try_ax_action_or_err(element, "AXCancel", deadline);
+            dismiss_open_menu(element, pid);
             Err(error.with_disposition(DeliverySemantics::delivered_unverified()))
         }
     }
@@ -98,13 +101,52 @@ pub(crate) fn select_collection_item(
     select_collection_candidate(&candidate, deadline)
 }
 
-fn open_menu(element: &AXElement, deadline: Deadline) -> Result<bool, AdapterError> {
-    prepare(element, deadline)?;
-    if crate::actions::ax_helpers::try_ax_action_or_err(element, "AXShowMenu", deadline)? {
-        return Ok(true);
+/// Press opens the control's own menu on AppKit and on Chromium. Show-menu is
+/// the fallback because a Chromium web control answers it with the page
+/// context menu instead of the popup the caller asked for.
+fn open_menu(element: &AXElement, pid: i32, deadline: Deadline) -> Result<bool, AdapterError> {
+    for action in ["AXPress", "AXShowMenu"] {
+        prepare(element, deadline)?;
+        if !crate::actions::ax_helpers::try_ax_action_or_err(element, action, deadline)? {
+            continue;
+        }
+        if poll_for_menu(MENU_OPEN_GRACE, || Ok(menu_root(pid, deadline)?.is_some()))? {
+            return Ok(true);
+        }
     }
-    prepare(element, deadline)?;
-    crate::actions::ax_helpers::try_ax_action_or_err(element, "AXPress", deadline)
+    Ok(false)
+}
+
+fn poll_for_menu(
+    grace: std::time::Duration,
+    mut present: impl FnMut() -> Result<bool, AdapterError>,
+) -> Result<bool, AdapterError> {
+    let grace_end = std::time::Instant::now() + grace;
+    loop {
+        if present()? {
+            return Ok(true);
+        }
+        if std::time::Instant::now() >= grace_end {
+            return Ok(false);
+        }
+        std::thread::sleep(MENU_OPEN_POLL);
+    }
+}
+
+/// A menu left open refuses every later select on the same app, so a failed
+/// attempt closes the menu it opened. The cleanup runs after the action's own
+/// deadline has usually run out, so it gets a short budget of its own.
+fn dismiss_open_menu(element: &AXElement, pid: i32) {
+    let Ok(cleanup) = Deadline::detached_after(MENU_CLEANUP_BUDGET_MS) else {
+        return;
+    };
+    if let Ok(Some(menu)) = menu_root(pid, cleanup)
+        && crate::actions::ax_helpers::try_ax_action_or_err(&menu, "AXCancel", cleanup)
+            .is_ok_and(|delivered| delivered)
+    {
+        return;
+    }
+    let _ = crate::actions::ax_helpers::try_ax_action_or_err(element, "AXCancel", cleanup);
 }
 
 fn select_open_menu_item(
@@ -120,6 +162,13 @@ fn select_open_menu_item(
                 "The target process changed while selecting a menu item",
             ));
         }
+        if deadline.is_expired() {
+            return Err(deadline.timeout_error().with_details(serde_json::json!({
+                "kind": "select_menu_item_not_found",
+                "requested_chars": value.chars().count(),
+                "complete": false,
+            })));
+        }
         if let Some(menu) = menu_root(pid, deadline)?
             && let Some(candidate) =
                 find_named_descendant(&menu, value, deadline, SelectSearch::MenuItem)?
@@ -130,13 +179,6 @@ fn select_open_menu_item(
             } else {
                 wait_for_menu_to_close(pid, deadline)
             };
-        }
-        if deadline.is_expired() {
-            return Err(deadline.timeout_error().with_details(serde_json::json!({
-                "kind": "select_menu_item_not_found",
-                "requested_chars": value.chars().count(),
-                "complete": false,
-            })));
         }
         let pause = deadline.remaining_slice(std::time::Duration::from_millis(25))?;
         std::thread::sleep(pause.min(std::time::Duration::from_millis(25)));
