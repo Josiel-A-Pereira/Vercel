@@ -33,23 +33,32 @@ struct BytesResult {
 /// identity is conflicting evidence. NSWorkspace reports no launch date for
 /// a process it did not start, and the bridge passes that absence
 /// separately, so any present value — epoch, negative, or infinite — keeps
-/// the same refusal rule the direct comparison applied.
+/// the same refusal rule the direct comparison applied. A login item can
+/// report a launch date more than 5 s off libproc, so a disagreement is only a
+/// conflict when the pid no longer carries the expected libproc start time.
 #[cfg(target_os = "macos")]
 pub(crate) fn termination_launch_time_conflict(
+    pid: i32,
     expected: f64,
     observed: f64,
     present: bool,
 ) -> bool {
-    present && (observed - expected).abs() > MAX_LAUNCH_TIME_DELTA_SECONDS
+    present
+        && (observed - expected).abs() > MAX_LAUNCH_TIME_DELTA_SECONDS
+        && !crate::system::process::process_identity::ProcessIdentity::capture(pid)
+            .ok()
+            .flatten()
+            .is_some_and(|live| live.launch_time_seconds() == expected)
 }
 
 #[cfg(target_os = "macos")]
 extern "C" fn termination_launch_time_conflict_ffi(
+    pid: i32,
     expected: f64,
     observed: f64,
     present: bool,
 ) -> bool {
-    std::panic::catch_unwind(|| termination_launch_time_conflict(expected, observed, present))
+    std::panic::catch_unwind(|| termination_launch_time_conflict(pid, expected, observed, present))
         .unwrap_or(true)
 }
 
@@ -200,7 +209,7 @@ unsafe extern "C" {
         pid: i32,
         expected_launch_time: f64,
         force: u8,
-        launch_time_conflict: extern "C" fn(f64, f64, bool) -> bool,
+        launch_time_conflict: extern "C" fn(i32, f64, f64, bool) -> bool,
     ) -> TerminateResult;
     fn agent_desktop_app_finished_launching(pid: i32) -> i32;
     fn agent_desktop_ensure_cocoa_multithreaded() -> u8;
@@ -232,6 +241,8 @@ pub(crate) fn workspace_snapshot_json() -> Result<Vec<u8>, AdapterError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const NO_PROCESS: i32 = 999_999;
 
     #[cfg(target_os = "macos")]
     #[test]
@@ -293,11 +304,13 @@ mod tests {
     #[test]
     fn absent_launch_date_never_conflicts_with_termination() {
         assert!(!termination_launch_time_conflict(
+            NO_PROCESS,
             1_700_000_000.25,
             0.0,
             false
         ));
         assert!(!termination_launch_time_conflict(
+            NO_PROCESS,
             1_700_000_000.25,
             1_700_000_006.0,
             false
@@ -309,25 +322,62 @@ mod tests {
     fn present_launch_date_keeps_the_five_second_refusal() {
         let expected = 1_700_000_000.25;
 
-        assert!(termination_launch_time_conflict(expected, 0.0, true));
-        assert!(termination_launch_time_conflict(expected, -4.0, true));
         assert!(termination_launch_time_conflict(
+            NO_PROCESS, expected, 0.0, true
+        ));
+        assert!(termination_launch_time_conflict(
+            NO_PROCESS, expected, -4.0, true
+        ));
+        assert!(termination_launch_time_conflict(
+            NO_PROCESS,
             expected,
             f64::INFINITY,
             true
         ));
         assert!(termination_launch_time_conflict(
+            NO_PROCESS,
             expected,
             1_700_000_006.0,
             true
         ));
-        assert!(!termination_launch_time_conflict(expected, expected, true));
         assert!(!termination_launch_time_conflict(
+            NO_PROCESS, expected, expected, true
+        ));
+        assert!(!termination_launch_time_conflict(
+            NO_PROCESS,
             expected,
             1_700_000_005.25,
             true
         ));
-        assert!(!termination_launch_time_conflict(expected, f64::NAN, true));
+        assert!(!termination_launch_time_conflict(
+            NO_PROCESS,
+            expected,
+            f64::NAN,
+            true
+        ));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn skewed_launch_date_passes_only_while_the_live_instance_matches() {
+        let pid = i32::try_from(std::process::id()).expect("test pid fits macOS pid_t");
+        let expected = crate::system::process::process_identity::ProcessIdentity::capture(pid)
+            .unwrap()
+            .expect("current process identity")
+            .launch_time_seconds();
+
+        assert!(!termination_launch_time_conflict(
+            pid,
+            expected,
+            expected - 9.0,
+            true
+        ));
+        assert!(termination_launch_time_conflict(
+            pid,
+            expected + 1.0,
+            expected - 9.0,
+            true
+        ));
     }
 
     #[cfg(target_os = "macos")]

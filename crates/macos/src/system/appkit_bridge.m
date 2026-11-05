@@ -12,6 +12,7 @@ typedef struct {
 } AgentDesktopTerminateResult;
 
 typedef bool (*AgentDesktopLaunchTimeConflict)(
+    int32_t pid,
     double expectedLaunchTime,
     double observedLaunchTime,
     bool launchDatePresent
@@ -64,7 +65,7 @@ AgentDesktopTerminateResult agent_desktop_terminate_application(
             double observedLaunchTime =
                 launchDatePresent ? launchDate.timeIntervalSince1970 : 0.0;
             if (launchTimeConflict == NULL ||
-                launchTimeConflict(expectedLaunchTime, observedLaunchTime, launchDatePresent)) {
+                launchTimeConflict(pid, expectedLaunchTime, observedLaunchTime, launchDatePresent)) {
                 result.status = 5;
                 return result;
             }
