@@ -60,8 +60,10 @@ fn source_app_matches(
     title: Option<&str>,
     inventory_names: impl FnOnce() -> Result<Vec<String>, AdapterError>,
 ) -> Result<bool, AdapterError> {
-    if let Some(title) = title.filter(|title| !title.trim().is_empty()) {
-        return Ok(agent_desktop_core::app_name_matches(title, expected));
+    if let Some(title) = title.filter(|title| !title.trim().is_empty())
+        && agent_desktop_core::app_name_matches(title, expected)
+    {
+        return Ok(true);
     }
     Ok(inventory_names()?
         .iter()
@@ -115,23 +117,56 @@ mod tests {
     }
 
     #[test]
-    fn readable_title_never_reads_inventory() {
-        for (title, matches) in [("fIXTURE", true), ("Other", false)] {
-            assert_eq!(
-                source_app_matches("Fixture", Some(title), || {
-                    panic!("readable AXTitle must not read inventory")
-                })
-                .unwrap(),
-                matches
+    fn matching_title_never_reads_inventory() {
+        assert!(
+            source_app_matches("Fixture", Some("fIXTURE"), || {
+                panic!("matching AXTitle must not read inventory")
+            })
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn short_title_matches_cg_owner_name_for_same_pid() {
+        let records = [
+            (7, "Microsoft Word"),
+            (9, "한컴오피스 한글"),
+            (8, "Other PID"),
+        ];
+        for (pid, title, expected) in [
+            (7, "Word", "Microsoft Word"),
+            (9, "한글", "한컴오피스 한글"),
+        ] {
+            assert!(
+                source_app_matches(expected, Some(title), || Ok(source_names_for_pid(
+                    pid, records
+                )))
+                .unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn mismatched_title_rejects_names_outside_the_same_pid() {
+        let records = [(7, "Microsoft Word"), (8, "Other PID")];
+        for expected in ["Other PID", "Workspace Display Name"] {
+            assert!(
+                !source_app_matches(expected, Some("Word"), || Ok(source_names_for_pid(
+                    7, records
+                )))
+                .unwrap()
             );
         }
     }
 
     #[test]
     fn inventory_read_error_propagates() {
-        let error = source_app_matches("Fixture", None, || Err(AdapterError::timeout("inventory")))
-            .unwrap_err();
-        assert_eq!(error.code, agent_desktop_core::ErrorCode::Timeout);
-        assert_eq!(error.message, "inventory");
+        for title in [None, Some("Other")] {
+            let error =
+                source_app_matches("Fixture", title, || Err(AdapterError::timeout("inventory")))
+                    .unwrap_err();
+            assert_eq!(error.code, agent_desktop_core::ErrorCode::Timeout);
+            assert_eq!(error.message, "inventory");
+        }
     }
 }
