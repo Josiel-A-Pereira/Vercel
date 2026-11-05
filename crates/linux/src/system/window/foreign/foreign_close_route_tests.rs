@@ -314,3 +314,17 @@ fn releasing_the_route_forgets_what_the_last_read_proved_and_doubted() {
     assert!(evidence.unproven.is_empty() && evidence.dialogs.is_empty());
     assert!(evidence.selected.is_empty() && evidence.frames.is_empty());
 }
+
+#[test]
+fn a_close_after_the_process_instance_changed_is_stale_and_sends_nothing() {
+    let route = ForeignCloseRoute::over(FakePort::showing(vec![record(1, "Home", "thunar")]));
+    route
+        .standing(
+            &thunar().with_instance("not-the-instance-of-any-process"),
+            || frames(&["Home"]),
+            deadline(),
+        )
+        .expect("a read");
+    assert_eq!(route.close(1, deadline()), Err(ControlError::StaleWindow));
+    assert!(route.port().expect("a port").sent().is_empty());
+}

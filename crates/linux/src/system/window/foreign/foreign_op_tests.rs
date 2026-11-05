@@ -3,7 +3,7 @@ use agent_desktop_core::{AdapterError, DeliverySemantics, ErrorCode};
 use super::*;
 use crate::system::window::foreign::foreign_fake::{
     FakePort, activated, cause, deadline, fullscreen, hyprland, ignores, maximized, minimized,
-    record, target, vanishes,
+    record, target, thunar, vanishes,
 };
 use crate::system::window::foreign::foreign_record::ToplevelRecord;
 use crate::system::x11::control::control_error::ControlError;
@@ -187,4 +187,36 @@ fn a_failed_flush_is_uncertain_and_not_verified() {
     let port = FakePort::showing(vec![home()]).failing_send(ControlError::SendFailed);
     let error = run(&port, WindowOp::Maximize).unwrap_err();
     assert_eq!(error.disposition, DeliverySemantics::uncertain());
+}
+
+fn bogus_instance_target() -> ForeignTarget<'static> {
+    ForeignTarget {
+        title: "Home",
+        names: thunar().with_instance("not-the-instance-of-any-process"),
+    }
+}
+
+#[test]
+fn locate_refuses_a_stale_process_instance_and_sends_nothing() {
+    let port = FakePort::showing(vec![home()]);
+    let error = locate(&port, &bogus_instance_target(), deadline()).unwrap_err();
+    assert_eq!(error.code, ErrorCode::StaleRef);
+    assert_eq!(error.disposition, DeliverySemantics::not_delivered());
+    assert!(port.sent().is_empty());
+}
+
+#[test]
+fn send_and_verify_refuses_a_stale_process_instance_and_sends_nothing() {
+    let port = FakePort::showing(vec![home()]);
+    let error = send_and_verify(
+        &port,
+        1,
+        ToplevelRequest::SetMaximized(true),
+        deadline(),
+        &bogus_instance_target(),
+    )
+    .unwrap_err();
+    assert_eq!(error.code, ErrorCode::StaleRef);
+    assert_eq!(error.disposition, DeliverySemantics::not_delivered());
+    assert!(port.sent().is_empty());
 }
