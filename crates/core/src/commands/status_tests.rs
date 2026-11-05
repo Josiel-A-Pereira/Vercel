@@ -109,3 +109,23 @@ fn status_surfaces_artifacts_mode_for_active_session() {
 
     assert_eq!(value["artifacts"], "full");
 }
+
+#[test]
+fn status_reports_none_ref_count_when_latest_snapshot_is_missing() {
+    let _guard = crate::refs::refs_test_support::HomeGuard::new();
+    let store = RefStore::for_session(None).unwrap();
+    store.set_latest("missing_snapshot_123").unwrap();
+
+    let report = PermissionReport {
+        accessibility: PermissionState::Granted,
+        screen_recording: PermissionState::Granted,
+        automation: PermissionState::NotRequired,
+    };
+
+    let value =
+        execute_with_report_with_context(&DeniedAdapter, &report, &CommandContext::default())
+            .unwrap();
+
+    assert_eq!(value["snapshot_id"], "missing_snapshot_123");
+    assert!(value["ref_count"].is_null());
+}

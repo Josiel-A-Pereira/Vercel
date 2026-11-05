@@ -1,5 +1,5 @@
 use crate::{
-    AppError, PermissionReport,
+    AppError, ErrorCode, PermissionReport,
     adapter::PlatformAdapter,
     commands::permissions::{self, PermissionsArgs},
     context::CommandContext,
@@ -24,7 +24,11 @@ pub fn execute_with_report_with_context(
     let store = RefStore::for_session(context.session_id())?;
     let snapshot_id = store.latest_snapshot_id()?;
     let ref_count = match snapshot_id.as_deref() {
-        Some(snapshot_id) => Some(store.load_snapshot(snapshot_id)?.len()),
+        Some(snapshot_id) => match store.load_snapshot(snapshot_id) {
+            Ok(snapshot) => Some(snapshot.len()),
+            Err(err) if err.code() == ErrorCode::SnapshotNotFound.as_str() => None,
+            Err(err) => return Err(err),
+        },
         None => None,
     };
     let session_id = context.session_id().map(str::to_string);
