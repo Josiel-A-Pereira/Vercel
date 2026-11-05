@@ -7,6 +7,7 @@ use agent_desktop_core::{AdapterError, Deadline, DeliverySemantics, ErrorCode};
 use crate::system::bus::bus_process::owner_process_id;
 use crate::system::bus::session_bus::SessionBus;
 use crate::system::display::display_env::DisplayEnv;
+use crate::system::display::display_probe::unix_table;
 use crate::system::display::display_server::{DisplayServer, session_server};
 use crate::system::process::process_facts;
 use crate::system::process::process_lookup::Lookup;
@@ -52,7 +53,7 @@ fn socket_of(server: DisplayServer) -> Result<PathBuf, AdapterError> {
 }
 
 fn listening_inodes(socket: &std::path::Path) -> Result<HashSet<String>, AdapterError> {
-    let table = std::fs::read_to_string("/proc/net/unix").map_err(|_| unknown())?;
+    let table = unix_table();
     let path = socket.to_str().ok_or_else(unknown)?;
     let abstract_path = format!("@{path}");
     let inodes: HashSet<String> = table
