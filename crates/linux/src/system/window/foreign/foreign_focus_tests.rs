@@ -118,3 +118,23 @@ fn a_failed_flush_leaves_the_outcome_uncertain() {
     assert_eq!(cause(&error), "send_failed");
     assert_eq!(error.disposition, DeliverySemantics::uncertain());
 }
+
+#[test]
+fn a_same_titled_window_of_another_process_is_never_activated() {
+    use crate::system::window::foreign::foreign_names::ProcessNames;
+    use crate::system::window::foreign::foreign_target::ForeignTarget;
+    let port = FakePort::showing(vec![
+        record(1, "Home", "zzqqxx"),
+        record(2, "Home", "targettool-viewer"),
+    ]);
+    let target = ForeignTarget {
+        title: "Home",
+        names: ProcessNames::from_names(vec!["targettool".to_owned()]),
+    };
+    let _ = activate(&port, &target, deadline());
+    assert!(
+        !port.sent().contains(&(2, ToplevelRequest::Activate)),
+        "the decoy window was activated: {:?}",
+        port.sent()
+    );
+}

@@ -32,6 +32,8 @@ mod foreign_tracked;
 #[cfg(test)]
 pub(in crate::system) mod foreign_fake;
 #[cfg(test)]
+mod foreign_live_review_tests;
+#[cfg(test)]
 mod foreign_live_rig;
 #[cfg(test)]
 mod foreign_live_tests;

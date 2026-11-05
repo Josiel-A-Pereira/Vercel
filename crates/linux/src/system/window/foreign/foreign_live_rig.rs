@@ -15,6 +15,10 @@ const FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../tests/e2e-linux/apps/foreign_window.py"
 );
+pub(super) const DIALOG_FIXTURE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/e2e-linux/apps/foreign_dialog4.py"
+);
 
 /// Refuses to run unless the session is an isolated nested Hyprland the
 /// caller named: the tests focus, maximize and close real windows.
@@ -219,6 +223,31 @@ impl Scene {
             .launched
             .spawn("python3", &[&script, title, "--app-id", app_id]);
         self.shown(pid, title)
+    }
+
+    /// A fixture run as a script named `program`, so its process names
+    /// are that word and the interpreter's, whatever the fixture is called.
+    pub(super) fn program_window(
+        &mut self,
+        fixture: &str,
+        program: &str,
+        title: &str,
+        extra: &[&str],
+    ) -> Shown {
+        let dir = std::env::temp_dir().join(nonce(program));
+        std::fs::create_dir_all(&dir).expect("a scratch directory");
+        let script = dir.join(program);
+        std::fs::copy(fixture, &script).expect("the fixture copies");
+        self.scratch.push(dir);
+        let script = script.to_string_lossy().into_owned();
+        let mut args = vec![script.as_str(), title];
+        args.extend_from_slice(extra);
+        let pid = self.launched.spawn("python3", &args);
+        self.shown(pid, title)
+    }
+
+    pub(super) fn plain_fixture() -> &'static str {
+        FIXTURE
     }
 
     fn shown(&self, pid: u32, title: &str) -> Shown {
