@@ -5,6 +5,7 @@ use agent_desktop_core::{
 use crate::tree::AXElement;
 
 const MAX_SCROLL_AMOUNT: u32 = 1_000;
+const CONTENT_TOLERANCE: f64 = 0.5;
 
 pub(crate) fn ax_scroll(
     element: &AXElement,
@@ -26,8 +27,15 @@ pub(crate) fn ax_scroll(
         if perform_repeated_action(&bar, increment_action, amount, deadline)? {
             return Ok((StepMechanism::SemanticApi, false));
         }
+        let content_before = crate::actions::scroll_read::content_origin(target, deadline)?;
         if try_value_shift(&bar, direction, amount, deadline)? {
-            return Ok((StepMechanism::SemanticApi, true));
+            let content_after = crate::actions::scroll_read::content_origin(target, deadline)
+                .map_err(value_write_unverified)?;
+            return match content_moved(content_before, content_after) {
+                Some(true) => Ok((StepMechanism::SemanticApi, true)),
+                Some(false) => Err(content_unmoved()),
+                None => Ok((StepMechanism::SemanticApi, false)),
+            };
         }
         if try_sub_elements(&bar, direction, amount, deadline)? {
             return Ok((StepMechanism::SemanticApi, false));
@@ -195,6 +203,27 @@ fn value_shift_verified(current: f64, observed: f64, direction: &Direction) -> b
         Direction::Down | Direction::Right => observed > current + f64::EPSILON,
         Direction::Up | Direction::Left => observed < current - f64::EPSILON,
     }
+}
+
+fn content_moved(
+    before: Option<agent_desktop_core::Point>,
+    after: Option<agent_desktop_core::Point>,
+) -> Option<bool> {
+    let (before, after) = (before?, after?);
+    Some(
+        (after.x - before.x).abs() > CONTENT_TOLERANCE
+            || (after.y - before.y).abs() > CONTENT_TOLERANCE,
+    )
+}
+
+fn content_unmoved() -> AdapterError {
+    value_write_unverified(
+        AdapterError::new(
+            ErrorCode::ActionFailed,
+            "Scrollbar AXValue changed but the scrolled content did not move",
+        )
+        .with_details(serde_json::json!({ "kind": "scroll_content_unmoved" })),
+    )
 }
 
 fn missing_value_after_write() -> AdapterError {

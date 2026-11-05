@@ -46,7 +46,7 @@ macOS and Windows scroll through native accessibility paths headless. On Linux, 
 }
 ```
 
-A delivered scroll is usually `delivered_unverified`. Take a fresh snapshot before you act on elements that were offscreen, because scrolling changes positions and a repeated scroll moves the view again. For a canvas or custom surface with no scroll action, use [`mouse-wheel`](/desktop/commands/mouse#mouse-wheel).
+A delivered scroll is usually `delivered_unverified`. On macOS, a headless scroll that moves the scroll bar by setting its value is `delivered_verified` only when the scrolled content moved too. If the bar takes the new value but the content stays put, for example because the content already fits the view, `scroll` fails with `ACTION_FAILED`, `details.kind: "scroll_content_unmoved"` and `delivered_unverified`. Take a fresh snapshot before you act on elements that were offscreen, because scrolling changes positions and a repeated scroll moves the view again. For a canvas or custom surface with no scroll action, use [`mouse-wheel`](/desktop/commands/mouse#mouse-wheel).
 
 Platform limits: Linux needs `--headed` and X11. See [macOS](/desktop/platforms/macos), [Windows](/desktop/platforms/windows), and [Linux](/desktop/platforms/linux).
 

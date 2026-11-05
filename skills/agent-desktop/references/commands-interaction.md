@@ -138,7 +138,7 @@ agent-desktop scroll @s8f3k2p9:e1 --direction down --amount 3
 agent-desktop scroll-to @s8f3k2p9:e8
 ```
 
-- `scroll` moves a scroll area. Headless uses native scroll paths, but on Linux `scroll` is physical wheel input and needs `--headed` and X11 (see the Linux skill). Headed sends a physical wheel gesture where possible. With no safe mechanism it returns a structured error.
+- `scroll` moves a scroll area. Headless uses native scroll paths, but on Linux `scroll` is physical wheel input and needs `--headed` and X11 (see the Linux skill). Headed sends a physical wheel gesture where possible. With no safe mechanism it returns a structured error. On macOS, `ACTION_FAILED` with `details.kind: "scroll_content_unmoved"` means the scroll bar moved but the content did not, often because it already fits the view.
 - `scroll-to` brings an element into view. Success means a re-read found it visible. It needs a ref. When only `bounds` exist, scroll the container with `scroll` or use `--headed mouse-wheel`.
 - `mouse-wheel --x --y [--dx] [--dy]` posts a raw wheel event at a screen point. Use it for canvases and custom scroll surfaces with no accessibility scroll action.
 
