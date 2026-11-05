@@ -76,7 +76,7 @@ The CLI looks for the helper in its own directory, so move the two together.
 
 **Linux** needs Ubuntu 24.04 or later on x86_64 or aarch64, with a glibc 2.35 floor. Ubuntu 22.04's AT-SPI bridge aborts on `Action.GetActions`. Run the CLI inside the user's graphical session, with `at-spi2-core` installed. A TTY, an SSH shell, or a container without that session's bus, display, and runtime environment sees no apps. `agent-desktop status` activates and checks the accessibility bus. An empty `supported_surfaces` list means the bus did not answer.
 
-Keys need XTEST on X11 and GNOME Mutter RemoteDesktop on Wayland. The Wayland clipboard needs `wl-clipboard`. For the rest, run `agent-desktop skills get platform` on the Linux machine.
+Keys need XTEST on X11. On Wayland they need GNOME Mutter RemoteDesktop or, on KDE Plasma, KWin's EIS input service and `libxkbcommon`. The Wayland clipboard needs `wl-clipboard`. For the rest, run `agent-desktop skills get platform` on the Linux machine.
 
 ## Platform notes
 
