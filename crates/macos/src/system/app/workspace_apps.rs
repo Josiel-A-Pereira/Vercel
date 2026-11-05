@@ -1,10 +1,8 @@
 use agent_desktop_core::{AdapterError, AppInfo, AppInventory, ErrorCode};
 use serde::Deserialize;
 use std::time::Instant;
-
 const MAX_SNAPSHOT_BYTES: usize = 1024 * 1024;
 const MAX_FIELD_BYTES: usize = 16 * 1024;
-
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ActivationPolicy {
@@ -157,6 +155,16 @@ fn has_alias(bundle_id: &Option<String>, executable: &Option<String>, identifier
         .into_iter()
         .flatten()
         .any(|alias| alias.eq_ignore_ascii_case(identifier))
+}
+
+pub(crate) fn focused_owner_until(deadline: Instant) -> Result<Option<WindowOwner>, AdapterError> {
+    ensure_before_deadline(deadline)?;
+    crate::system::cocoa_runtime::ensure_cocoa_multithreaded()?;
+    let bytes = crate::system::appkit_bridge::focused_snapshot_json()?;
+    ensure_before_deadline(deadline)?;
+    let snapshot = window_owner_snapshot_from_json(&bytes, deadline)?;
+    require_complete(&snapshot.skipped)?;
+    Ok(snapshot.frontmost().cloned())
 }
 
 pub(crate) fn window_owner_snapshot_until(
