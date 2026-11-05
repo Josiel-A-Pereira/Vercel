@@ -12,8 +12,10 @@ fn wayland_missing() -> AdapterError {
         "Displays cannot be listed on this Wayland session",
     )
     .with_suggestion(
-        "Run under GNOME, whose compositor answers the Mutter DisplayConfig \
-         interface; no other Wayland display source is measured",
+        "Neither the Mutter DisplayConfig interface nor the wl_output and \
+         xdg_output protocols answered. Run under a compositor that offers \
+         xdg-output, such as GNOME, KDE, Sway or Hyprland, and check that \
+         WAYLAND_DISPLAY names a running compositor",
     )
 }
 
@@ -153,20 +155,23 @@ pub(crate) fn decide_x11(
     decide(server, Some(monitors?), mutter.unwrap_or(None))
 }
 
-/// The displays of a Wayland session as Mutter lists them, with no look at the
-/// environment: a caller that already chose the Wayland route asks here.
+/// The displays of a Wayland session, with no look at the environment: a
+/// caller that already chose the Wayland route asks here. Mutter answers
+/// first; where it does not, the `wl_output` and `xdg_output` protocols are
+/// read from the compositor socket.
 pub(crate) fn list_wayland_displays(deadline: Deadline) -> Result<Vec<DisplayInfo>, AdapterError> {
-    decide(
-        DisplayServer::Wayland,
-        None,
-        display_mutter::logical_monitors(deadline)?,
-    )
+    let logical = match display_mutter::logical_monitors(deadline)? {
+        Some(logical) => Some(logical),
+        None => display_wayland::logical_monitors(deadline)?,
+    };
+    decide(DisplayServer::Wayland, None, logical)
 }
 
 /// Lists the session's displays. On X11 the monitor list comes from RandR
 /// and Mutter's `DisplayConfig` supplies each monitor's scale where it
-/// answers; on Wayland Mutter is the only measured source and a session
-/// without it is `PLATFORM_NOT_SUPPORTED`.
+/// answers; on Wayland Mutter is tried first, then the `wl_output` and
+/// `xdg_output` protocols, and a session where neither answers is
+/// `PLATFORM_NOT_SUPPORTED`.
 pub(crate) fn list_displays(deadline: Deadline) -> Result<Vec<DisplayInfo>, AdapterError> {
     match session_server() {
         DisplayServer::Wayland => list_wayland_displays(deadline),
@@ -199,4 +204,9 @@ pub(super) mod display_probe;
 pub(crate) mod display_reach;
 pub(crate) mod display_server;
 pub(crate) mod display_unavailable;
+pub(super) mod display_wayland;
+pub(super) mod display_wayland_assemble;
+pub(super) mod display_wayland_record;
+pub(super) mod display_wayland_state;
 pub(crate) mod route;
+pub(crate) mod wayland_link;

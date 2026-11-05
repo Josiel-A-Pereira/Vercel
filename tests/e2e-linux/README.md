@@ -173,6 +173,19 @@ python3 -I tests/e2e-linux/runner/cancel.py "$suite/x11-mutter.ready.json" \
 
 `cancel.py` checks the marker, exact `runner/main.py` command, user and start token before sending SIGTERM through a Linux PID descriptor. A changed or exited generation is refused. The final check waits until the runtime directory is absent and no process environment references it. Run these commands together in one local shell. The next run sweeps abandoned sessions whose recorded runner has exited.
 
+## Foreign toplevel live tests
+
+The `#[ignore]` tests matched by `foreign_live` in `crates/linux/src/system/window/foreign/foreign_live_tests.rs` drive real windows through `zwlr_foreign_toplevel_manager_v1`. They are measured on Hyprland only. Never run them in a desktop you are using: they focus, maximize, minimize and close windows.
+
+They refuse to start unless `AGENT_DESKTOP_ISOLATED_HYPRLAND=1`, `XDG_CURRENT_DESKTOP=Hyprland`, a non-empty `HYPRLAND_INSTANCE_SIGNATURE` and an `XDG_RUNTIME_DIR` other than `/run/user/<uid>` are set.
+
+They need an isolated nested Hyprland with its own runtime directory, session bus and AT-SPI bus, a headless output, system `python3` with PyGObject and GTK3, and `wtype`. Build the test binary outside that session, then run it inside:
+
+```sh
+AGENT_DESKTOP_ISOLATED_HYPRLAND=1 XDG_CURRENT_DESKTOP=Hyprland PATH=/usr/bin:$PATH \
+  <test-binary> --ignored --test-threads=1 foreign_live
+```
+
 ## Portable self-tests
 
 These need no Linux session. `AGENT_DESKTOP_E2E_SKIP_LIVE=1` skips the checks that need a live session, as CI does:

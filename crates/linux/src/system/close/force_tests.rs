@@ -102,3 +102,32 @@ fn force_never_sends_a_close_request() {
     assert_eq!(world.count("close"), 0);
     assert_eq!(world.count("toplevels"), 0);
 }
+
+#[test]
+fn the_foreign_route_changes_nothing_in_a_forced_close() {
+    let mut world = Fake::new(Liveness::Alive);
+    world.wayland = true;
+    world.foreign = true;
+    world.contested = 2;
+    world.dialog_after = Some(Duration::ZERO);
+    world.exits_on_term = true;
+    assert!(close(&world, &request()).expect("closes"));
+    assert_eq!(world.count("term"), 1);
+    assert_eq!(world.count("kill"), 0);
+    assert_eq!(world.count("toplevels"), 0);
+    assert_eq!(world.count("close"), 0);
+    assert!(world.closed.borrow().is_empty());
+}
+
+#[test]
+fn a_forced_close_of_a_process_that_ignores_term_still_ends_in_kill_on_the_foreign_route() {
+    let mut world = Fake::new(Liveness::Alive);
+    world.wayland = true;
+    world.foreign = true;
+    world.dialog_after = Some(Duration::ZERO);
+    world.exits_on_kill = true;
+    assert!(close(&world, &request()).expect("closes"));
+    assert_eq!(world.count("term"), 1);
+    assert_eq!(world.count("kill"), 1);
+    assert_eq!(world.count("close"), 0);
+}

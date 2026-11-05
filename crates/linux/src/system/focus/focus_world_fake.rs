@@ -55,6 +55,8 @@ pub(super) struct World {
     pub(super) menu_open: bool,
     pub(super) app_frame_active: bool,
     pub(super) twins: Option<Twins>,
+    pub(super) foreign: Option<Result<(), AdapterError>>,
+    pub(super) foreign_calls: Cell<u32>,
 }
 
 pub(super) fn facts() -> ProcessFacts {
@@ -115,6 +117,8 @@ impl World {
             menu_open: false,
             app_frame_active: false,
             twins: None,
+            foreign: None,
+            foreign_calls: Cell::new(0),
         }
     }
 
@@ -223,6 +227,11 @@ impl FocusWorld for World {
 
     fn overview_open(&self) -> Option<bool> {
         self.overview
+    }
+
+    fn foreign_focus(&self, _win: &WindowInfo) -> Option<Result<(), AdapterError>> {
+        self.foreign_calls.set(self.foreign_calls.get() + 1);
+        self.foreign.clone()
     }
 
     fn modal_over(&self, _client: u32) -> Option<String> {

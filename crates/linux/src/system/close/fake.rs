@@ -66,6 +66,9 @@ pub(super) struct Fake {
     pub(super) second_dialog_after: Option<Duration>,
     pub(super) nested_after: Option<Duration>,
     pub(super) gone_after: Option<Duration>,
+    pub(super) contested: usize,
+    pub(super) foreign: bool,
+    pub(super) closed: RefCell<Vec<u32>>,
 }
 
 impl Fake {
@@ -92,6 +95,9 @@ impl Fake {
             second_dialog_after: None,
             nested_after: None,
             gone_after: None,
+            contested: 0,
+            foreign: false,
+            closed: RefCell::new(Vec::new()),
         }
     }
 
@@ -177,8 +183,9 @@ impl World for Fake {
         }
     }
 
-    fn request_close(&self, _window: u32) -> Result<(), ControlError> {
+    fn request_close(&self, window: u32) -> Result<(), ControlError> {
         self.note("close");
+        self.closed.borrow_mut().push(window);
         let result = {
             let mut results = self.closes.borrow_mut();
             if results.is_empty() {
@@ -223,5 +230,13 @@ impl World for Fake {
 
     fn timeout_error(&self) -> AdapterError {
         AdapterError::timeout("Operation exceeded its deadline")
+    }
+
+    fn contested_windows(&self) -> usize {
+        self.contested
+    }
+
+    fn has_foreign_route(&self) -> bool {
+        self.foreign
     }
 }

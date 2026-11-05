@@ -9,31 +9,23 @@ use serde_json::Value;
 use self::hold::{
     confirm_rectangle, give_back_place, holds_place, is_resize, move_client, remember_place,
 };
+use self::live::Live;
 use self::owner::{ensure_owned_after, ensure_owned_before};
 use self::refuse::{no_client, refused, unreadable, unsupported_session, write_failed};
-use self::window_place::PlaceStore;
 use super::window_client::{ClientWorld, client_of};
 use super::window_op::window_op_shadow::{Shadow, to_client, to_visible, visible_of};
 use super::window_op::window_op_verdict::{
     POLL, POSITION_TOLERANCE, SETTLE_BUDGET, Verdict, judge, observed_of, requested, unverified,
 };
-use crate::system::display::display_server::{DisplayServer, session_server};
+use crate::system::SharedBus;
 use crate::system::focus::focus_cause::Cause;
-use crate::system::focus::focus_window::FocusWorld;
-use crate::system::focus::focus_world::LiveWorld as FrameWorld;
-use crate::system::focus::restore_minimized::{Lifted, lift, still_hidden};
+use crate::system::focus::restore_minimized::{Lifted, still_hidden};
 use crate::system::process::process_lookup::Lookup;
+use crate::system::x11::X11Client;
+use crate::system::x11::control::ControlRead;
 use crate::system::x11::control::control_error::ControlError;
-use crate::system::x11::control::control_send::{WindowWrite, write_window};
-use crate::system::x11::control::window_facts::{WindowFacts, read_facts};
-use crate::system::x11::control::{ControlRead, xwayland_clients};
-use crate::system::x11::stacking::stacking_source::StackingSource;
-use crate::system::x11::twin_tie::Twins;
-use crate::system::x11::{DisplayReader, X11Client, X11State};
-use crate::system::{
-    SharedBus, list_displays,
-    process::{proc_stat, process_facts},
-};
+use crate::system::x11::control::control_send::WindowWrite;
+use crate::system::x11::control::window_facts::WindowFacts;
 use crate::tree::Extents;
 
 const CONFIRM_PAUSE: Duration = Duration::from_millis(120);
@@ -55,96 +47,11 @@ trait OpWorld: ClientWorld {
     fn overview_open(&self) -> Option<bool>;
     fn displays(&self) -> Vec<Rect>;
     fn on_wayland(&self) -> bool;
+    /// Applies the operation through the compositor's toplevel manager, or
+    /// `None` when the session has no such manager.
+    fn foreign_op(&self, win: &WindowInfo, op: &WindowOp) -> Option<Result<bool, AdapterError>>;
     fn remember(&self, win: &WindowInfo, client: u32, rectangle: Option<Extents>);
     fn remembered(&self, win: &WindowInfo, client: u32) -> Option<Extents>;
-}
-
-struct Live<'a> {
-    frame: FrameWorld<'a>,
-    owner: agent_desktop_core::ProcessIdentity,
-    deadline: Deadline,
-}
-
-impl ClientWorld for Live<'_> {
-    fn global_position(&self) -> bool {
-        self.frame.global_position()
-    }
-
-    fn twins(&self, win: &WindowInfo) -> Option<Twins> {
-        self.frame.twins(win)
-    }
-}
-
-impl OpWorld for Live<'_> {
-    fn lookup(&self, pid: u32) -> Lookup {
-        process_facts::lookup(pid)
-    }
-
-    fn stopped(&self, pid: u32) -> bool {
-        proc_stat::is_stopped(pid)
-    }
-
-    fn clients(&self) -> ControlRead<Vec<X11Client>> {
-        match session_server() {
-            DisplayServer::X11(_) => match DisplayReader.clients_within(self.deadline) {
-                X11State::Ready { clients, .. } => ControlRead::Ready(clients),
-                X11State::NoWindowManager => ControlRead::NoManager,
-                X11State::Unavailable => ControlRead::Unavailable,
-            },
-            DisplayServer::Wayland => xwayland_clients(self.deadline),
-            DisplayServer::Unavailable(..) => ControlRead::Unavailable,
-        }
-    }
-
-    fn active_client(&self) -> Option<u32> {
-        self.frame.active()
-    }
-
-    fn on_wayland(&self) -> bool {
-        session_server() == DisplayServer::Wayland
-    }
-
-    fn facts(&self, client: u32) -> ControlRead<WindowFacts> {
-        read_facts(client, &self.owner, self.deadline)
-    }
-
-    fn write(&self, client: u32, write: &WindowWrite) -> Result<(), ControlError> {
-        write_window(client, write, &self.owner, self.deadline)
-    }
-
-    fn lift(&self, client: u32) -> Result<Lifted, AdapterError> {
-        lift(client, &self.owner, self.deadline)
-    }
-
-    fn overview_open(&self) -> Option<bool> {
-        self.frame.overview_open()
-    }
-
-    fn remember(&self, win: &WindowInfo, client: u32, rectangle: Option<Extents>) {
-        let (Some(store), Some(instance)) = (
-            PlaceStore::in_runtime_dir(),
-            win.process_instance.as_deref(),
-        ) else {
-            return;
-        };
-        match rectangle {
-            Some(place) => {
-                let alive = |pid: u32, instance: &str| matches!(process_facts::lookup(pid), Lookup::Found(facts) if facts.instance == instance);
-                let _ = store.save(client, win.pid.get(), instance, place, &alive);
-            }
-            None => store.forget(client, instance),
-        }
-    }
-
-    fn remembered(&self, win: &WindowInfo, client: u32) -> Option<Extents> {
-        PlaceStore::in_runtime_dir()?.load(client, win.process_instance.as_deref()?)
-    }
-
-    fn displays(&self) -> Vec<Rect> {
-        list_displays(self.deadline)
-            .map(|displays| displays.into_iter().map(|display| display.bounds).collect())
-            .unwrap_or_default()
-    }
 }
 
 fn locate(world: &impl OpWorld, win: &WindowInfo) -> Result<(u32, Shadow), AdapterError> {
@@ -167,6 +74,14 @@ fn locate(world: &impl OpWorld, win: &WindowInfo) -> Result<(u32, Shadow), Adapt
         .find(|client| client.id == id)
         .map_or((0, 0, 0, 0), |client| client.shadow);
     Ok((id, shadow))
+}
+
+fn is_wayland_session(error: &AdapterError) -> bool {
+    error
+        .details
+        .as_ref()
+        .and_then(|details| details["cause"].as_str())
+        == Some(Cause::WaylandSession.as_str())
 }
 
 fn settle(
@@ -306,14 +221,23 @@ fn dispatch(
     win: &WindowInfo,
     op: &WindowOp,
     deadline: Deadline,
-) -> Result<Option<Value>, AdapterError> {
+) -> Result<(Option<Value>, bool), AdapterError> {
     let write = requested(op)?;
     ensure_owned_before(world, win)?;
     if world.stopped(win.pid.get()) {
         return Err(AdapterError::app_unresponsive(&win.app)
             .with_disposition(DeliverySemantics::not_delivered()));
     }
-    let (client, shadow) = locate(world, win)?;
+    let (client, shadow) = match locate(world, win) {
+        Ok(located) => located,
+        Err(error) if is_wayland_session(&error) => {
+            return match world.foreign_op(win, op) {
+                Some(done) => done.map(|sent| (None, sent)),
+                None => Err(error),
+            };
+        }
+        Err(error) => return Err(error),
+    };
     if deadline.is_expired() {
         return Err(deadline
             .timeout_error()
@@ -323,12 +247,17 @@ fn dispatch(
         Some(write) => apply(world, win, client, &to_client(write, shadow), deadline),
         None => restore(world, win, client, deadline),
     };
-    done.map(|()| match op {
-        WindowOp::Resize { .. } => world
-            .facts(client)
-            .ready()
-            .map(|facts| visible_of(observed_of(Some(&facts)), shadow)),
-        _ => None,
+    done.map(|()| {
+        (
+            match op {
+                WindowOp::Resize { .. } => world
+                    .facts(client)
+                    .ready()
+                    .map(|facts| visible_of(observed_of(Some(&facts)), shadow)),
+                _ => None,
+            },
+            true,
+        )
     })
     .map_err(|error| to_visible(error, shadow))
 }
@@ -340,13 +269,23 @@ fn run(
     deadline: Deadline,
 ) -> Result<OperationReport, AdapterError> {
     let dispatched = dispatch(world, win, op, deadline);
-    let observed = dispatched.as_ref().ok().cloned().flatten();
+    let observed = dispatched
+        .as_ref()
+        .ok()
+        .and_then(|(value, _)| value.clone());
+    let satisfied = dispatched.as_ref().is_ok_and(|(_, sent)| !sent);
     let mut report = OperationReport::from_window_dispatch(
         win,
         op,
         super::window_report::window_readback(op),
         dispatched.map(drop),
     )?;
+    if satisfied {
+        return Ok(OperationReport::satisfied_without_delivery(
+            report.result.action,
+            report.target,
+        ));
+    }
     if let (Some(observed), Some(Value::Object(details))) =
         (observed, report.result.details.as_mut())
     {
@@ -363,26 +302,13 @@ pub(crate) fn window_op(
 ) -> Result<OperationReport, AdapterError> {
     OperationTarget::for_window(win)?;
     let deadline = lease.deadline();
-    let frame = FrameWorld::new(bus, win, deadline)
-        .map_err(|error| error.with_disposition(DeliverySemantics::not_delivered()))?;
-    let owner = agent_desktop_core::ProcessIdentity::new(
-        win.pid,
-        win.process_instance.clone().unwrap_or_default(),
-    );
-    run(
-        &Live {
-            frame,
-            owner,
-            deadline,
-        },
-        win,
-        &op,
-        deadline,
-    )
+    run(&Live::new(bus, win, deadline)?, win, &op, deadline)
 }
 
 #[path = "window_op_hold.rs"]
 mod hold;
+#[path = "window_op_live.rs"]
+mod live;
 #[path = "window_op_owner.rs"]
 mod owner;
 #[path = "window_op_refuse.rs"]
