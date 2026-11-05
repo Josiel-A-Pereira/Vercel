@@ -115,6 +115,8 @@ Retry a failed command only when `error.disposition.retry` is `safe`. See [JSON 
 
 ### MCP
 
+MCP support was added after v1.1.0. Run `agent-desktop mcp --help` before configuring a client. If the subcommand is unrecognized, [build from `main`](https://agent-browser.dev/desktop/installation#build-from-source) to use MCP.
+
 `agent-desktop mcp` serves every command as an MCP tool over stdio. A tool is named after its command (`desktop_snapshot`, `desktop_click`, `desktop_session_start`), takes that command's arguments, and returns its JSON envelope:
 
 ```json
