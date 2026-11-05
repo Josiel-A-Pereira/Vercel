@@ -99,6 +99,17 @@ impl ForeignLink {
     }
 }
 
+/// The answer when the mapping global exists but the compositor's client list
+/// cannot be read: no toplevel has a proven owner, so every one is unproven
+/// instead of falling back to the title and app id heuristic.
+fn unreadable_clients(expired: bool) -> Result<Option<HashMap<u32, u32>>, ControlError> {
+    if expired {
+        Err(ControlError::TimedOut)
+    } else {
+        Ok(Some(HashMap::new()))
+    }
+}
+
 impl ToplevelPort for ForeignLink {
     fn refresh(&self, deadline: Deadline) -> Result<(), ControlError> {
         let mut queue = self.queue.borrow_mut();
@@ -119,11 +130,7 @@ impl ToplevelPort for ForeignLink {
             return Ok(None);
         };
         let Some(clients) = foreign_hypr_ipc::clients(deadline) else {
-            return if deadline.is_expired() {
-                Err(ControlError::TimedOut)
-            } else {
-                Ok(None)
-            };
+            return unreadable_clients(deadline.is_expired());
         };
         let mut queue = self.queue.borrow_mut();
         let mut state = self.state.borrow_mut();
@@ -186,5 +193,28 @@ impl ToplevelPort for ForeignLink {
         self.connection
             .flush()
             .map_err(|_| ControlError::SendFailed)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::system::window::foreign::foreign_fake::record;
+    use crate::system::window::foreign::foreign_names::ProcessNames;
+    use crate::system::window::foreign::foreign_proof::{Proof, prove_owned};
+
+    #[test]
+    fn an_unreadable_client_list_with_the_mapping_global_proves_nothing() {
+        let owners = unreadable_clients(false).unwrap();
+        assert!(owners.is_some());
+        let names = ProcessNames::from_names(vec!["thunar".to_owned()]);
+        let proof = prove_owned(
+            "Home",
+            &names,
+            &[record(1, "Home", "thunar")],
+            owners.as_ref(),
+        );
+        assert!(matches!(proof, Proof::Unrelated(_)), "{proof:?}");
+        assert!(unreadable_clients(true).is_err());
     }
 }
