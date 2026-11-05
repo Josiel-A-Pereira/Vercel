@@ -290,6 +290,9 @@ compositor without the protocol are unchanged: `ACTION_NOT_SUPPORTED`, cause
 - `maximize` is `delivered_verified` from the compositor's state. `restore`
   undoes it and is `delivered_unverified`, as on X11. If the requested state
   already holds, the operation sends nothing and returns `not_delivered`.
+  A compositor rule can swallow the request: Omarchy's Hyprland config sets
+  `suppress_event = "maximize"`, and there `maximize` and `restore` end
+  `ACTION_FAILED`. Do not retry; the compositor will refuse every time.
 - `minimize`: Hyprland takes the request and changes nothing. The command ends
   `ACTION_FAILED`, cause `minimize_not_applied`, `delivered_unverified`, and the
   window stays on screen. Operate the window from the compositor's own controls.
@@ -302,6 +305,11 @@ compositor without the protocol are unchanged: `ACTION_NOT_SUPPORTED`, cause
   because that would answer it: answer it with a click, and the app exits. A
   second `close-app` while a prompt is open is `dialog_pending`,
   `not_delivered`. `close-app --force` still sends signals.
+  One case is not recognised: a prompt that is a plain window, with no dialog
+  role and no parent. Hyprland 0.56.2 sends no `parent` for any toplevel, so a
+  second `close-app` in a new invocation cannot tell such a prompt from a second
+  main window and closes it again. Run `list-windows` first, and answer the
+  prompt instead of calling `close-app` twice.
 
 The foreign toplevel protocol names an app ID and a title, but no process.
 When Hyprland's toplevel mapping protocol and IPC socket are both available,
@@ -312,8 +320,22 @@ same-title windows of the target process make a single-window operation
 `AMBIGUOUS_TARGET`, cause `ambiguous_window`; graceful `close-app` can close
 both. A prompt frame blocks the close even when it has no mapped toplevel.
 
-Without the mapping protocol or IPC, discovery uses the exact title and an app
-ID related to the process's names. This is a heuristic, not proof of ownership.
+- The PID must equal the target's. A window whose owner is a different process
+  is not controlled, so a sandboxed app (Flatpak, snap) or a launcher wrapper
+  whose window belongs to another PID ends `WINDOW_NOT_FOUND`, cause
+  `window_not_mapped`, and nothing is sent.
+- On Hyprland, when the mapping protocol is offered but the IPC client list
+  cannot be read, no window has a proven owner and every window ends
+  `ACTION_FAILED`, cause `toplevel_identity_unproven`. It never falls back to
+  the title and app ID heuristic. Window control there needs
+  `HYPRLAND_INSTANCE_SIGNATURE` and `XDG_RUNTIME_DIR` in the environment of the
+  agent-desktop process, with the instance's `.socket.sock` under
+  `$XDG_RUNTIME_DIR/hypr/<signature>/`. A shell started outside the session
+  (ssh, cron, a service) often lacks them: export both, then retry.
+
+On a compositor without the mapping protocol, or without Hyprland's IPC, discovery
+uses the exact title and an app ID related to the process's names. This is a
+heuristic, not proof of ownership.
 When another toplevel shares the title and its ownership is unproven, the
 operation returns `ACTION_FAILED`, cause `toplevel_identity_unproven`, with the
 observed app IDs. Two related candidates return `AMBIGUOUS_TARGET`, cause
