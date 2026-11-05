@@ -25,7 +25,7 @@ pub(crate) trait Probe {
     fn x11(&self, display: &str) -> Reach;
 }
 
-fn wayland_socket(env: &DisplayEnv, name: &str) -> Option<PathBuf> {
+pub(crate) fn wayland_socket(env: &DisplayEnv, name: &str) -> Option<PathBuf> {
     if name.starts_with('/') {
         return Some(PathBuf::from(name));
     }
