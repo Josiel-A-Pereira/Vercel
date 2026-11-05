@@ -13,6 +13,8 @@ agent-desktop launch "Obsidian" --cdp
 
 `launch` returns once the process runs. The identifier differs by OS: the examples use macOS display names, and the platform skill names the form for its OS. By default it attaches to a running instance. `--no-attach` starts a fresh instance instead of attaching: on Windows it returns `ACTION_FAILED` if a matching app is already running; on macOS it launches a second instance alongside the running one. For an `--arg` value that starts with `-`, use `--arg=<value>`.
 
+`--arg` and `--env` reach only a process this call starts. The attach path returns the running instance without starting anything, so the arguments are never applied: `launch "Google Chrome" --arg "https://example.com"` returns `ok: true`, reports the existing window and adds no tab. Use `--no-attach` for a fresh instance, or open the target outside the app (macOS: `open "<url>"`) and observe the window instead.
+
 The process running and the app showing a window are separate facts:
 
 ```json
