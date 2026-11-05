@@ -268,7 +268,7 @@ pub trait SystemOps: Send + Sync {
             .with_suggestion(if policy.is_headed() {
                 "Ensure the named window remains active before retrying; a sibling window or another application's menu can hold the keyboard"
             } else {
-                "Retry with --headed so the named window is brought forward first, or name the active window"
+                "Name the active window explicitly, or use a semantic ref action. --headed can take keyboard focus from the user; enable it only with explicit consent."
             })
             .with_details(serde_json::json!({
                 "check": "window_active",

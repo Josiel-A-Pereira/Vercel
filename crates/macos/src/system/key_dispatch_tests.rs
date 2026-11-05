@@ -82,7 +82,8 @@ fn a_missing_focused_element_names_both_recovery_routes() {
         .suggestion
         .expect("the error carries a recovery suggestion");
     assert!(suggestion.contains("--headed"), "{suggestion}");
-    assert!(suggestion.contains("--surface menubar"), "{suggestion}");
+    assert!(suggestion.contains("may take focus"), "{suggestion}");
+    assert!(suggestion.find("--surface menubar") < suggestion.find("--headed"), "{suggestion}");
 }
 
 #[test]
