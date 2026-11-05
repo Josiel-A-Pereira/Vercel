@@ -2,6 +2,8 @@ use super::*;
 use clap::Parser;
 use clap::error::ErrorKind;
 
+use crate::cli::Commands;
+
 fn sample(schema: &Value) -> Value {
     let item = if schema["type"] == "array" {
         &schema["items"]
@@ -33,12 +35,19 @@ fn every_schema_property_is_accepted_by_the_cli_parser() {
     let mut checked = 0;
     for tool in tools() {
         let definition = tool.definition();
-        let properties = definition["inputSchema"]["properties"]
-            .as_object()
-            .expect("properties")
-            .clone();
-        for (key, schema) in &properties {
-            let mut arguments = Map::new();
+        let schema = &definition["inputSchema"];
+        let properties = schema["properties"].as_object().expect("properties");
+        let required = schema["required"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|key| {
+                let key = key.as_str().expect("required property name");
+                (key.to_owned(), sample(&properties[key]))
+            })
+            .collect::<Map<_, _>>();
+        for (key, schema) in properties {
+            let mut arguments = required.clone();
             arguments.insert(key.clone(), sample(schema));
             let Err(error) = parse(&tool, &arguments) else {
                 checked += 1;
@@ -63,6 +72,16 @@ fn every_schema_property_is_accepted_by_the_cli_parser() {
 #[test]
 fn every_tool_runs_the_command_it_is_named_after() {
     for tool in tools() {
+        let definition = tool.definition();
+        if let Some(name) = definition["inputSchema"]["required"][0].as_str() {
+            assert_eq!(
+                tool.argv(&Map::new()).unwrap_err(),
+                format!("Missing required argument '{name}'"),
+                "{}",
+                tool.name
+            );
+            continue;
+        }
         let error = match parse(&tool, &Map::new()) {
             Ok(cli) => {
                 let command = cli.command.expect("a command");
@@ -148,6 +167,42 @@ fn flag_shaped_values_stay_values_and_never_become_flags() {
         panic!("type");
     };
     assert_eq!(typed.text.as_deref(), Some(hostile));
+}
+
+#[test]
+fn launch_options_preserve_array_order_and_reject_wrong_types() {
+    let tool = tool_at(&["launch"]);
+    let input = json!({
+        "app": "example",
+        "args": ["--headed", "argument with spaces", ""],
+        "timeout": 2500
+    });
+    let arguments = input.as_object().unwrap();
+    let cli = parse(&tool, arguments).unwrap();
+    assert!(!cli.interaction.headed);
+    let Some(Commands::Launch(launch)) = cli.command else {
+        panic!("launch");
+    };
+    assert_eq!(launch.args, ["--headed", "argument with spaces", ""]);
+    assert_eq!(launch.timeout, 2500);
+
+    for (key, value, expected) in [
+        ("args", json!("--headed"), "an array of string values"),
+        (
+            "args",
+            json!(["--headed", false]),
+            "an array of string values",
+        ),
+        ("timeout", json!("2500"), "a JSON integer"),
+        ("timeout", json!(2.5), "a JSON integer"),
+    ] {
+        let mut wrong = arguments.clone();
+        wrong.insert(key.into(), value);
+        assert_eq!(
+            tool.argv(&wrong).unwrap_err(),
+            format!("Argument '{key}' must be {expected}")
+        );
+    }
 }
 
 #[test]

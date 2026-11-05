@@ -61,7 +61,7 @@ impl Tool {
         let mut required = Vec::new();
         for arg in self.args() {
             properties.insert(property_name(arg), property(arg));
-            if arg.is_required_set() {
+            if self.requires(arg) {
                 required.push(Value::from(property_name(arg)));
             }
         }
@@ -83,9 +83,18 @@ impl Tool {
                 .find(|arg| property_name(arg) == *key)
                 .ok_or_else(|| self.unknown_argument(key))?;
             if arg.is_positional() {
-                positionals.push((arg.get_index().unwrap_or(usize::MAX), scalars(key, value)?));
+                positionals.push((
+                    arg.get_index().unwrap_or(usize::MAX),
+                    scalars(arg, key, value)?,
+                ));
             } else {
                 push_option(&mut argv, arg, key, value)?;
+            }
+        }
+        for arg in self.args().filter(|arg| self.requires(arg)) {
+            let key = property_name(arg);
+            if arguments.get(&key).is_none_or(Value::is_null) {
+                return Err(format!("Missing required argument '{key}'"));
             }
         }
         if !positionals.is_empty() {
@@ -94,6 +103,14 @@ impl Tool {
             argv.extend(positionals.into_iter().flat_map(|(_, values)| values));
         }
         Ok(argv)
+    }
+
+    fn requires(&self, arg: &Arg) -> bool {
+        arg.is_required_set()
+            || matches!(
+                (self.command.get_name(), arg.get_id().as_str()),
+                ("type", "text") | ("set-value", "value")
+            )
     }
 
     fn args(&self) -> impl Iterator<Item = &Arg> {
@@ -157,7 +174,7 @@ fn push_option(argv: &mut Vec<String>, arg: &Arg, key: &str, value: &Value) -> R
             argv.extend((0..count).map(|_| flag.clone()));
         }
         _ => {
-            for scalar in scalars(key, value)? {
+            for scalar in scalars(arg, key, value)? {
                 argv.push(format!("{flag}={scalar}"));
             }
         }
@@ -165,22 +182,37 @@ fn push_option(argv: &mut Vec<String>, arg: &Arg, key: &str, value: &Value) -> R
     Ok(())
 }
 
-fn scalars(key: &str, value: &Value) -> Result<Vec<String>, String> {
-    let items = match value {
-        Value::Array(items) => items.iter().collect(),
-        other => vec![other],
+fn scalars(arg: &Arg, key: &str, value: &Value) -> Result<Vec<String>, String> {
+    let kind = json_type(arg);
+    let multiple = takes_multiple_values(arg);
+    let wrong_type = || {
+        if multiple {
+            format!("Argument '{key}' must be an array of {kind} values")
+        } else {
+            format!("Argument '{key}' must be a JSON {kind}")
+        }
+    };
+    let items = if multiple {
+        value.as_array().map(Vec::as_slice).ok_or_else(wrong_type)?
+    } else {
+        std::slice::from_ref(value)
     };
     items
-        .into_iter()
-        .map(|item| match item {
-            Value::String(text) => Ok(text.clone()),
-            Value::Number(number) => Ok(number.to_string()),
-            Value::Bool(flag) => Ok(flag.to_string()),
-            _ => Err(format!(
-                "Argument '{key}' must be a string, number, boolean or an array of them"
-            )),
-        })
+        .iter()
+        .map(|item| scalar(kind, item).ok_or_else(wrong_type))
         .collect()
+}
+
+fn scalar(kind: &str, item: &Value) -> Option<String> {
+    match (kind, item) {
+        ("string", Value::String(text)) => Some(text.clone()),
+        ("boolean", Value::Bool(flag)) => Some(flag.to_string()),
+        ("number", Value::Number(number)) => Some(number.to_string()),
+        ("integer", Value::Number(number)) if number.is_i64() || number.is_u64() => {
+            Some(number.to_string())
+        }
+        _ => None,
+    }
 }
 
 fn property(arg: &Arg) -> Value {
@@ -217,15 +249,18 @@ fn value_schema(arg: &Arg) -> Value {
             item["default"] = typed;
         }
     }
-    let multiple = matches!(arg.get_action(), ArgAction::Append)
-        || arg
-            .get_num_args()
-            .is_some_and(|range| range.max_values() > 1);
-    if multiple {
+    if takes_multiple_values(arg) {
         json!({ "type": "array", "items": item })
     } else {
         item
     }
+}
+
+fn takes_multiple_values(arg: &Arg) -> bool {
+    matches!(arg.get_action(), ArgAction::Append)
+        || arg
+            .get_num_args()
+            .is_some_and(|range| range.max_values() > 1)
 }
 
 fn json_type(arg: &Arg) -> &'static str {

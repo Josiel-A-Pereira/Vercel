@@ -37,6 +37,81 @@ fn call(id: i64, name: &str, arguments: Value) -> Value {
             "params": { "name": name, "arguments": arguments } })
 }
 
+fn assert_argument_error(response: &Value, message: &str) {
+    let result = &response["result"];
+    assert_eq!(result["isError"], true, "{response}");
+    assert_eq!(result["content"][0]["text"], message);
+    assert!(result.get("structuredContent").is_none(), "{response}");
+}
+
+#[test]
+fn mcp_rejects_missing_required_arguments_before_shifting_positionals() {
+    let responses = serve(
+        &[
+            call(1, "desktop_skills_get", json!({ "reference": "desktop" })),
+            call(
+                2,
+                "desktop_skills_get",
+                json!({ "name": null, "reference": "desktop" }),
+            ),
+        ],
+        &[],
+    );
+    assert_eq!(responses.len(), 2);
+    for response in &responses {
+        assert_argument_error(response, "Missing required argument 'name'");
+    }
+}
+
+#[test]
+fn mcp_rejects_arrays_and_booleans_in_string_arguments() {
+    let responses = serve(
+        &[
+            call(
+                1,
+                "desktop_skills_get",
+                json!({ "name": ["desktop", "workflows"] }),
+            ),
+            call(2, "desktop_skills_get", json!({ "name": false })),
+        ],
+        &[],
+    );
+    assert_eq!(responses.len(), 2);
+    for response in &responses {
+        assert_argument_error(response, "Argument 'name' must be a JSON string");
+    }
+}
+
+#[test]
+fn mcp_text_actions_advertise_and_require_inline_values() {
+    let responses = serve(
+        &[
+            json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }),
+            call(2, "desktop_type", json!({ "ref_id": "@e1" })),
+            call(
+                3,
+                "desktop_set_value",
+                json!({ "ref_id": "@e1", "value": null }),
+            ),
+        ],
+        &[],
+    );
+    assert_eq!(responses.len(), 3);
+    let tools = responses[0]["result"]["tools"].as_array().unwrap();
+    for (index, name, field) in [
+        (1, "desktop_type", "text"),
+        (2, "desktop_set_value", "value"),
+    ] {
+        let tool = tools.iter().find(|tool| tool["name"] == name).unwrap();
+        let required = tool["inputSchema"]["required"].as_array().unwrap();
+        assert!(required.iter().any(|key| key == field), "{tool}");
+        assert_argument_error(
+            &responses[index],
+            &format!("Missing required argument '{field}'"),
+        );
+    }
+}
+
 #[test]
 fn mcp_tool_calls_run_the_cli_command_and_return_its_envelope() {
     let responses = serve(
