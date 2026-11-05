@@ -47,12 +47,38 @@ export const startCursor = (label) => {
 
 export const stopCursor = () => cli("cursor-overlay", "disable");
 
+const OVERLAY_TYPES = new Set(["sheet", "alert", "menu", "popover"]);
+
+/**
+ * Asks the CLI which surfaces are currently open for the given app. Returns
+ * the overlay surface type string when one is open, an empty string when
+ * list-surfaces succeeds but no overlay is open, or null when list-surfaces
+ * is unavailable or fails. The empty-string vs null distinction lets callers
+ * skip the tree-role fallback when the CLI has already given an authoritative
+ * answer of "nothing open".
+ *
+ * On Windows the closed system menu sits in every window tree with role
+ * "menu" but is never reported by list-surfaces while it is closed, so this
+ * call is the only reliable way to distinguish a closed from an open menu.
+ */
+const querySurface = (app) => {
+  const result = cli("list-surfaces", "--app", app);
+  if (!result.ok) return null;
+  const surface = result.data?.surfaces?.find?.((s) => OVERLAY_TYPES.has(s.type));
+  return surface?.type ?? "";
+};
+
 /**
  * A window is read shallowly until the policy asks to go deeper, so a document
  * holding thousands of elements costs the same first look as a panel holding
  * thirty. A region cut off by that shallow read still reports how much it holds,
  * which is what makes it worth drilling into. A sheet or menu owns the screen
  * while it is up, so it is read instead of the window behind it.
+ *
+ * The overlay surface is determined by list-surfaces first, which is
+ * authoritative: on Windows the closed system menu appears in the tree with
+ * role "menu" but list-surfaces only reports it while a menu is actually open.
+ * overlayRole() is kept as a fallback for when list-surfaces is unavailable.
  */
 export const observe = (app, root, windowId = null) => {
   const scope = windowId ? ["--app", app, "--window-id", windowId] : ["--app", app];
@@ -66,7 +92,8 @@ export const observe = (app, root, windowId = null) => {
   }
   if (!snap.ok && snap.error?.code !== "WINDOW_NOT_FOUND") snap = cli(...base, "--max-depth", "4");
   if (!snap.ok) throw unreadable("the screen", snap.error);
-  const surface = root ? null : overlayRole(snap.data.tree);
+  const queried = root ? null : querySurface(app);
+  const surface = queried !== null ? (queried || null) : overlayRole(snap.data.tree);
   if (surface) {
     const scoped = cli("snapshot", ...scope, "--surface", surface, "-i", "--compact", "--include-bounds");
     if (scoped.ok && windowId && outsideWindow(scoped.data, windowId)) {

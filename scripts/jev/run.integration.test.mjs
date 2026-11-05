@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -19,7 +19,7 @@ const args = process.argv.slice(2);
 const mode = process.env.JEV_TEST_MODE;
 appendFileSync(process.env.JEV_TEST_LOG, JSON.stringify({command,args})+'\\n');
 const error = (code, retry='unsafe', delivery='delivery_uncertain') =>
-  ({ok:false,error:{code,message:'試験の失敗',disposition:{retry,delivery}}});
+  ({ok:false,error:{code,message:'Φ⌐ªΘ¿ôπü«σñ▒µòù',disposition:{retry,delivery}}});
 let result = {ok:true,data:{disposition:{delivery:'delivered_verified',retry:'unsafe'}}};
 const clicked = () => require('node:fs').readFileSync(process.env.JEV_TEST_LOG,'utf8').includes('"command":"click"');
 if (command === 'snapshot' && mode === 'window_closed' && clicked()) result = error('WINDOW_NOT_FOUND','safe','not_delivered');
@@ -38,36 +38,45 @@ else if (command === 'snapshot') {
   let id = pinned;
   if (surfaced && mode === 'surface_other') id = 'w-other';
   if (rooted && mode === 'root_other') id = 'w-other';
-  const window = surfaced && mode === 'surface_noid' ? {title:'試験'} : {title:'試験',id};
+  const window = surfaced && mode === 'surface_noid' ? {title:'Φ⌐ªΘ¿ô'} : {title:'Φ⌐ªΘ¿ô',id};
   const sheet = mode.startsWith('surface') && !surfaced ? [{role:'sheet',children:[]}] : [];
   result = {ok:true,data:{window,tree:{
     role:'window',children:[
-      {ref_id:'@s1:e1',role:'button',name:mode==='sequence'&&actions.length>=1?suppliedInputs[1]:'試験ボタン',available_actions:['Click']},
-      {ref_id:'@s1:e2',role:'textfield',name:'試験欄',value:process.env.JEV_ACT_TEST?'PRIVATE-ACT-SCREEN-VALUE-4583':mode==='sequence'?written:'',available_actions:['SetValue']},
-      ...sheet
+      {ref_id:'@s1:e1',role:'button',name:mode==='sequence'&&actions.length>=1?suppliedInputs[1]:'Φ⌐ªΘ¿ôπâ£πé┐πâ│',available_actions:['Click']},
+      {ref_id:'@s1:e2',role:'textfield',name:'Φ⌐ªΘ¿ôµ¼ä',value:process.env.JEV_ACT_TEST?'PRIVATE-ACT-SCREEN-VALUE-4583':mode==='sequence'?written:'',available_actions:['SetValue']},
+      ...sheet,
+      ...(mode === 'closed_menu' ? [{role:'menu',name:'システム',children:[{role:'menuitem',name:'移動'}]}] : [])
     ]}}};
+}
+if (command === 'list-surfaces') {
+  const surfaces = mode === 'open_menu'
+    ? [{id:'w-default',title:'試験',type:'window'},{id:'m-1',title:'',type:'menu',item_count:3}]
+    : mode.startsWith('surface')
+    ? [{id:'w-default',title:'試験',type:'window'},{id:'s-1',title:'シート',type:'sheet'}]
+    : [{id:'w-default',title:'試験',type:'window'}];
+  result = {ok:true,data:{pid:1234,surfaces}};
 }
 if (command === 'click' && mode === 'click_error') result=error('ACTION_FAILED');
 if (command === 'set-value') result= mode==='unsafe_type'
   ? error('TIMEOUT') : mode==='old_binary'
-  ? {ok:false,error:{code:'ACTION_NOT_SUPPORTED',message:'古い'}}
+  ? {ok:false,error:{code:'ACTION_NOT_SUPPORTED',message:'σÅñπüä'}}
   : ['direct_type','sequence'].includes(mode)
   ? {ok:true,data:{disposition:{delivery:'delivered_verified'},post_state:{value:args.at(-1)},details:{value:args.at(-1)},steps:[{value:args.at(-1)}]}}
   : error('ACTION_NOT_SUPPORTED','safe','not_delivered');
 if (command === 'focus' && mode==='focus_error') result=error('ACTION_FAILED','unsafe','not_delivered');
 if (command === 'press' && mode==='press_error') result=error('ACTION_FAILED');
-if (command === 'clipboard-get') result={ok:true,data:{text:'元の文字'}};
-if (command === 'clipboard-set' && mode==='clipboard_error' && args[0]==='試験')
+if (command === 'clipboard-get') result={ok:true,data:{text:'σàâπü«µûçσ¡ù'}};
+if (command === 'clipboard-set' && mode==='clipboard_error' && args[0]==='Φ⌐ªΘ¿ô')
   result=error('COPY_FAILED','safe','not_delivered');
 if (command === 'get') {
   const reads = require('node:fs').readFileSync(process.env.JEV_TEST_LOG,'utf8').split('\\n')
     .filter(l => l.includes('"command":"get"')).length;
   result = mode==='get_error' ? error('ACTION_FAILED','unsafe','not_delivered')
-    : {ok:true,data:{value:mode==='paste_wrong'?'違う文字':mode==='paste_late'&&reads<3?'':process.env.JEV_TEST_INPUT}};
+    : {ok:true,data:{value:mode==='paste_wrong'?'Θüòπüåµûçσ¡ù':mode==='paste_late'&&reads<3?'':process.env.JEV_TEST_INPUT}};
 }
 console.log(JSON.stringify(result));
 `;
-for (const command of ["snapshot", "click", "set-value", "focus", "clipboard-get", "clipboard-set", "press", "get"]) {
+for (const command of ["snapshot", "list-surfaces", "click", "set-value", "focus", "clipboard-get", "clipboard-set", "press", "get"]) {
   writeFileSync(join(directory, command), fake);
 }
 writeFileSync(preload, `
@@ -83,7 +92,7 @@ globalThis.fetch=async (_url,options)=>{
   if (['destructive','risk_safe'].includes(mode)) {
     appendFileSync(process.env.JEV_TEST_LOG,JSON.stringify({command:'goal',args:[body.state.goal]})+'\\n');
   }
-  const operation=['destructive','risk_safe'].includes(mode)?(calls===1?'CLICK':'DONE'):mode==='direct_type'?(calls===1?'TYPE_TEXT':'DONE'):mode==='sequence'?({1:'TYPE_TEXT',2:'CLICK',3:'TYPE_TEXT',4:'CLICK'}[calls]??'DONE'):mode==='wait'?(calls<=3?'WAIT':'DONE'):mode==='closed_top'?'WAIT':(mode==='done'||mode.startsWith('surface')||mode.endsWith('_other'))?'DONE':
+  const operation=['destructive','risk_safe'].includes(mode)?(calls===1?'CLICK':'DONE'):mode==='direct_type'?(calls===1?'TYPE_TEXT':'DONE'):mode==='sequence'?({1:'TYPE_TEXT',2:'CLICK',3:'TYPE_TEXT',4:'CLICK'}[calls]??'DONE'):mode==='wait'?(calls<=3?'WAIT':'DONE'):mode==='closed_top'?'WAIT':(mode==='done'||mode.startsWith('surface')||mode.endsWith('_other')||mode==='closed_menu'||mode==='open_menu')?'DONE':
     mode==='blocked'?'BLOCKED':mode==='click_error'||mode==='window_closed'?'CLICK':(mode==='paste_correct'||mode==='paste_late')&&calls>1?'DONE':'TYPE_TEXT';
   if (mode==='sequence') appendFileSync(process.env.JEV_TEST_LOG,JSON.stringify({command:'request',body})+'\\n');
   const answers={};
@@ -115,7 +124,7 @@ globalThis.fetch=async (_url,options)=>{
 const act = (mode, extra = []) => {
   writeFileSync(log, "");
   const result = spawnSync(process.execPath, ["--import", pathToFileURL(actPreload).href, actEntry,
-    "--app", "試験アプリ", "--bin", process.execPath, ...extra, "試験ボタンを押す"], {
+    "--app", "Φ⌐ªΘ¿ôπéóπâùπâ¬", "--bin", process.execPath, ...extra, "Φ⌐ªΘ¿ôπâ£πé┐πâ│πéÆµè╝πüÖ"], {
     cwd: directory,
     encoding: "utf8",
     timeout: 10000,
@@ -126,11 +135,11 @@ const act = (mode, extra = []) => {
   return { ...result, commands, out: result.stdout.trim() ? JSON.parse(result.stdout) : null };
 };
 
-const run = (mode, extra = [], input = "試験") => {
+const run = (mode, extra = [], input = "Φ⌐ªΘ¿ô") => {
   const inputs = Array.isArray(input) ? input : [input];
   writeFileSync(log, "");
   const result = spawnSync(process.execPath, ["--import", pathToFileURL(preload).href, entry,
-    "--app", "試験アプリ", ...inputs.flatMap(value => ["--text", value]), ...extra, "試験を完了する"], {
+    "--app", "Φ⌐ªΘ¿ôπéóπâùπâ¬", ...inputs.flatMap(value => ["--text", value]), ...extra, "Φ⌐ªΘ¿ôπéÆσ«îΣ║åπüÖπéï"], {
     cwd: directory,
     encoding: "utf8",
     timeout: 10000,
@@ -150,7 +159,7 @@ try {
   assert.match(confirmed.stop.stop, /^confirm: hard to undo/);
   assert.equal(confirmed.commands.filter(c => c.command === "risk").length, 1);
   assert.equal(confirmed.commands.some(c => c.command === "click"), false);
-  assert.deepEqual(confirmed.commands.find(c => c.command === "goal").args, ["試験を完了する"]);
+  assert.deepEqual(confirmed.commands.find(c => c.command === "goal").args, ["Φ⌐ªΘ¿ôπéÆσ«îΣ║åπüÖπéï"]);
   const defaultRisk = run("destructive");
   assert.equal(defaultRisk.status, 0);
   assert.equal(defaultRisk.commands.some(c => c.command === "risk"), false);
@@ -162,7 +171,7 @@ try {
   const actConfirmed = act("destructive", ["--execute", "--confirm-destructive"]);
   assert.equal(actConfirmed.status, 1);
   assert.equal(actConfirmed.out.decision, "confirm");
-  assert.equal(actConfirmed.out.intent, "試験ボタンを押す");
+  assert.equal(actConfirmed.out.intent, "Φ⌐ªΘ¿ôπâ£πé┐πâ│πéÆµè╝πüÖ");
   assert.equal(actConfirmed.commands.some(c => c.command === "click"), false);
   for (const [mode, extra] of [["destructive", []], ["risk_safe", ["--confirm-destructive"]]]) {
     const allowed = act(mode, ["--execute", ...extra]);
@@ -171,7 +180,7 @@ try {
     assert.equal(allowed.commands.filter(c => c.command === "click").length, 1);
   }
   const started = performance.now();
-  await execute({ app: "試験アプリ" }, "WAIT", null, null, null);
+  await execute({ app: "Φ⌐ªΘ¿ôπéóπâùπâ¬" }, "WAIT", null, null, null);
   assert.ok(performance.now() - started >= 230, "WAIT actually waits");
 
   const waited = run("wait");
@@ -308,7 +317,7 @@ try {
   for (const bad of ["abc", "Infinity", "-1"]) {
     writeFileSync(log, "");
     const refused = spawnSync(process.execPath, ["--import", pathToFileURL(preload).href, entry,
-      "--app", "試験アプリ", "--text", "試験", "試験を完了する"], { cwd: directory, encoding: "utf8", timeout: 10000,
+      "--app", "Φ⌐ªΘ¿ôπéóπâùπâ¬", "--text", "Φ⌐ªΘ¿ô", "Φ⌐ªΘ¿ôπéÆσ«îΣ║åπüÖπéï"], { cwd: directory, encoding: "utf8", timeout: 10000,
       env: { ...process.env, JEV_VERIFY_MS: bad, TYPESAFE_API_KEY: "fixture", AGENT_DESKTOP_BIN: process.execPath,
         JEV_TEST_MODE: "paste_wrong", JEV_TEST_LOG: log } });
     assert.notEqual(refused.status, 0, `JEV_VERIFY_MS=${bad} is refused`);
@@ -318,7 +327,7 @@ try {
 
   for (const tail of [["--window-id"], ["--window-id", "--cursor"]]) {
     const extra = tail;
-    const usage = spawnSync(process.execPath, [entry, "--app", "試験アプリ", "試験", ...extra],
+    const usage = spawnSync(process.execPath, [entry, "--app", "Φ⌐ªΘ¿ôπéóπâùπâ¬", "Φ⌐ªΘ¿ô", ...extra],
       { encoding: "utf8", env: { ...process.env, TYPESAFE_API_KEY: "fixture" } });
     assert.equal(usage.status, 2, extra.join(" "));
     assert.match(usage.stderr, /needs a value/);
@@ -349,6 +358,21 @@ try {
   assert.equal(pasted.status, 0);
   assert.equal(pasted.commands.filter(command => command.command === "press").length, 1);
   assert.equal(pasted.events[0].turn.delivery, "delivered_verified");
+
+  const closedMenu = run("closed_menu");
+  assert.equal(closedMenu.status, 0, "a closed system menu node in the tree does not trigger the surface path");
+  assert.equal(closedMenu.stop.screen.surface, "window", "surface stays window when list-surfaces reports no open menu");
+  assert.equal(closedMenu.commands.some(command => command.args && command.args.includes("--surface")), false,
+    "snapshot is never re-read with --surface when no menu is open per list-surfaces");
+  assert.ok(closedMenu.commands.some(command => command.command === "list-surfaces"),
+    "list-surfaces is called to authoritatively check for open overlays");
+
+  const openMenu = run("open_menu");
+  assert.equal(openMenu.status, 0, "an actually open menu reported by list-surfaces is read as a surface");
+  assert.equal(openMenu.stop.screen.surface, "menu", "surface is menu when list-surfaces confirms one is open");
+  assert.ok(openMenu.commands.some(command => command.args && command.args.includes("--surface")),
+    "snapshot is re-read with --surface when list-surfaces confirms a menu is open");
+
   console.log("ok");
 } finally {
   rmSync(directory, { recursive: true, force: true });
