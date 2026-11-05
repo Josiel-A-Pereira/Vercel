@@ -319,13 +319,21 @@ fn success_drains_and_refusal_is_private() {
     assert_eq!(&events[events.len() - 2..], ["down:61", "stop"]);
 
     let outside = tap(0x0100_4f60);
-    let error =
-        send_chunks(&[outside.to_vec()], &mut || Ok(()), live()).expect_err("layout refuses");
+    let error = send_via(&[outside.to_vec()], &mut || Ok(()), live(), |_| {
+        Ok(None::<VkLink>)
+    })
+    .expect_err("layout refuses");
     assert_eq!(error.code, ErrorCode::ActionNotSupported);
     assert_eq!(error.disposition, DeliverySemantics::not_delivered());
     let rendered = format!("{error:?}");
     assert!(!rendered.contains("4f60") && !rendered.contains("你"));
 
-    let empty = send_chunks(&[], &mut || Ok(()), live()).expect("empty input is a no-op");
+    let probed = std::cell::Cell::new(false);
+    let empty = send_via(&[], &mut || Ok(()), live(), |_| {
+        probed.set(true);
+        Ok(None::<VkLink>)
+    })
+    .expect("empty input is a no-op");
+    assert!(!probed.get(), "empty input must not probe the compositor");
     assert_eq!(empty.delivered_events, 0);
 }

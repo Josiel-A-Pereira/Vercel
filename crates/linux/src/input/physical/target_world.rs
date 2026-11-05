@@ -12,6 +12,7 @@ use crate::input::keyboard::keymap::Keymap;
 use crate::input::keyboard::keysym_step::KeysymStep;
 use crate::input::plan::Plan;
 use crate::system::SharedBus;
+use crate::system::window::active_watch::ActiveWatch;
 use crate::tree::AtspiElement;
 
 /// The desktop observations and input used by each physical leg.
@@ -29,6 +30,27 @@ pub(crate) trait PhysicalWorld {
         element: &AtspiElement,
         deadline: Deadline,
     ) -> Result<Option<bool>, AdapterError>;
+    /// The compositor's own verdict on the element's frame, where the session
+    /// lists its windows: `None` when it does not, so the frame's `ACTIVE`
+    /// state stays the whole proof.
+    fn compositor_active(
+        &self,
+        _element: &AtspiElement,
+        _deadline: Deadline,
+    ) -> Result<Option<bool>, AdapterError> {
+        Ok(None)
+    }
+    /// Pins the toplevel the compositor calls activated for the element's
+    /// frame, so a later check asks about that toplevel whatever its title
+    /// becomes. `None` when the session lists no windows. Opened once, after
+    /// the first check has passed and before any key is sent.
+    fn compositor_watch(
+        &self,
+        _element: &AtspiElement,
+        _deadline: Deadline,
+    ) -> Result<Option<Box<dyn ActiveWatch>>, AdapterError> {
+        Ok(None)
+    }
     fn bounds(
         &self,
         element: &AtspiElement,
@@ -148,6 +170,34 @@ impl PhysicalWorld for LiveWorld<'_> {
             return Ok(None);
         };
         crate::input::physical::frame_active::frame_active(self.bus, frame, deadline)
+    }
+
+    fn compositor_active(
+        &self,
+        element: &AtspiElement,
+        deadline: Deadline,
+    ) -> Result<Option<bool>, AdapterError> {
+        if !matches!(self.backend()?, Backend::Wayland) {
+            return Ok(None);
+        }
+        let Some(frame) = element.frame() else {
+            return Ok(None);
+        };
+        crate::input::physical::frame_active::compositor_active(self.bus, frame, deadline)
+    }
+
+    fn compositor_watch(
+        &self,
+        element: &AtspiElement,
+        deadline: Deadline,
+    ) -> Result<Option<Box<dyn ActiveWatch>>, AdapterError> {
+        if !matches!(self.backend()?, Backend::Wayland) {
+            return Ok(None);
+        }
+        let Some(frame) = element.frame() else {
+            return Ok(None);
+        };
+        crate::input::physical::frame_active::compositor_watch(self.bus, frame, deadline)
     }
 
     fn bounds(

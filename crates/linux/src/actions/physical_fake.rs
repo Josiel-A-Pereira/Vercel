@@ -1,5 +1,6 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
+use std::rc::Rc;
 use std::time::Duration;
 
 use agent_desktop_core::{
@@ -9,15 +10,43 @@ use agent_desktop_core::{
 use crate::input::backend::Backend;
 use crate::input::delivery::Delivery;
 use crate::input::delivery::Gate;
+use crate::input::delivery_channel::DeliveryChannel;
 use crate::input::keyboard::keymap::Keymap;
 use crate::input::keyboard::keysym_step::KeysymStep;
 use crate::input::physical::target_world::PhysicalWorld;
 use crate::input::plan::Plan;
+use crate::system::window::active_watch::ActiveWatch;
 use crate::tree::AtspiElement;
+
+/// What a pinned compositor watch answers, one scripted read per question
+/// (`None` is a link failure); the last read repeats.
+#[derive(Default)]
+pub(crate) struct WatchScript {
+    reads: RefCell<VecDeque<Option<bool>>>,
+    asked: Cell<usize>,
+}
+
+struct FakeWatch(Rc<WatchScript>);
+
+impl ActiveWatch for FakeWatch {
+    fn active(&self, _deadline: Deadline) -> Result<bool, AdapterError> {
+        self.0.asked.set(self.0.asked.get() + 1);
+        let mut reads = self.0.reads.borrow_mut();
+        let read = if reads.len() > 1 {
+            reads.pop_front().flatten()
+        } else {
+            reads.front().copied().flatten()
+        };
+        read.ok_or_else(|| AdapterError::new(ErrorCode::ActionFailed, "watch link failed"))
+    }
+}
 
 pub(crate) struct FakeWorld {
     pub(crate) backend: Backend,
+    pub(crate) channel: DeliveryChannel,
     pub(crate) reads: RefCell<VecDeque<Option<bool>>>,
+    pub(crate) compositor: RefCell<VecDeque<Option<bool>>>,
+    pub(crate) watch: Option<Rc<WatchScript>>,
     pub(crate) focus_reads: RefCell<VecDeque<bool>>,
     pub(crate) bounds: Option<Rect>,
     pub(crate) log: RefCell<Vec<String>>,
@@ -37,9 +66,16 @@ impl FakeWorld {
     }
 
     fn on(backend: Backend) -> Self {
+        let channel = match backend {
+            Backend::X11(_) => DeliveryChannel::Xtest,
+            Backend::Wayland => DeliveryChannel::RemoteDesktop,
+        };
         Self {
             backend,
+            channel,
             reads: RefCell::new(VecDeque::from([Some(true)])),
+            compositor: RefCell::default(),
+            watch: None,
             focus_reads: RefCell::new(VecDeque::from([true])),
             bounds: Some(Rect {
                 x: 100.0,
@@ -55,9 +91,32 @@ impl FakeWorld {
         }
     }
 
+    pub(crate) fn through(mut self, channel: DeliveryChannel) -> Self {
+        self.channel = channel;
+        self
+    }
+
     pub(crate) fn active_script(self, reads: &[Option<bool>]) -> Self {
         *self.reads.borrow_mut() = reads.iter().copied().collect();
         self
+    }
+
+    pub(crate) fn compositor_script(self, reads: &[Option<bool>]) -> Self {
+        *self.compositor.borrow_mut() = reads.iter().copied().collect();
+        self
+    }
+
+    /// A compositor that offers a pinned watch answering `reads`.
+    pub(crate) fn watch_script(mut self, reads: &[Option<bool>]) -> Self {
+        self.watch = Some(Rc::new(WatchScript {
+            reads: RefCell::new(reads.iter().copied().collect()),
+            asked: Cell::new(0),
+        }));
+        self
+    }
+
+    pub(crate) fn watch_asked(&self) -> usize {
+        self.watch.as_ref().map_or(0, |script| script.asked.get())
     }
 
     pub(crate) fn with_bounds(mut self, bounds: Option<Rect>) -> Self {
@@ -98,6 +157,7 @@ impl FakeWorld {
         }
         Ok(Delivery {
             delivered_events: delivered,
+            channel: self.channel,
         })
     }
 }
@@ -141,6 +201,32 @@ impl PhysicalWorld for FakeWorld {
         } else {
             reads.front().copied().flatten()
         })
+    }
+
+    fn compositor_active(
+        &self,
+        _element: &AtspiElement,
+        _deadline: Deadline,
+    ) -> Result<Option<bool>, AdapterError> {
+        self.note("read_compositor");
+        let mut reads = self.compositor.borrow_mut();
+        Ok(if reads.len() > 1 {
+            reads.pop_front().flatten()
+        } else {
+            reads.front().copied().flatten()
+        })
+    }
+
+    fn compositor_watch(
+        &self,
+        _element: &AtspiElement,
+        _deadline: Deadline,
+    ) -> Result<Option<Box<dyn ActiveWatch>>, AdapterError> {
+        self.note("open_watch");
+        Ok(self
+            .watch
+            .as_ref()
+            .map(|script| Box::new(FakeWatch(script.clone())) as Box<dyn ActiveWatch>))
     }
 
     fn bounds(

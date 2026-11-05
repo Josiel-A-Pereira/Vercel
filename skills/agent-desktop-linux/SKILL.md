@@ -40,7 +40,7 @@ Observation and semantic actions need no helper tool.
 | Wheel scrolling | `scroll`, `mouse-wheel` | Physical wheel input; X11 and `--headed` only |
 | Pointer gestures | `double-click`, `triple-click`, `hover`, `drag` | `--headed`, X11 only. On Wayland the pointer cannot be aimed and these refuse with `ACTION_NOT_SUPPORTED` |
 | Focus | `focus` | Needs `--headed` for the focus permission. Calls AT-SPI `Component.GrabFocus` on a focusable node that is not yet `focused`, not the pointer, and verifies the state; a GTK4 app rejects the call, so `focus` ends `ACTION_FAILED` `grab_focus_rejected` there and `focus-window` is the way to focus its window |
-| Keyboard and mouse | `press`, `mouse-click`, `mouse-move`, `mouse-wheel` | `press` and text keys work on X11 and capability-detected Mutter Wayland sessions; pointer commands are X11 and `--headed`. See `references/display-servers-and-input.md` |
+| Keyboard and mouse | `press`, `mouse-click`, `mouse-move`, `mouse-wheel` | `press` and text keys work on X11, on capability-detected Mutter Wayland sessions and, measured on Hyprland 0.56.2, on Wayland compositors that offer `zwp_virtual_keyboard_manager_v1`; pointer commands are X11 and `--headed`. See `references/display-servers-and-input.md` |
 | Held input | `key-down`, `key-up`, `mouse-down`, `mouse-up` | Fail closed on every platform: on Linux, `key-down` and `key-up` with `ACTION_NOT_SUPPORTED`; `mouse-down` and `mouse-up` with `POLICY_DENIED` headless and `ACTION_NOT_SUPPORTED` with `--headed` |
 | App and window | `launch`, `close-app`, `list-windows`, `list-apps`, `focus-window`, `move-window`, `resize-window`, `minimize`, `maximize`, `restore` | Launch and listing work on X11 and Wayland. Window control and graceful close need an X11 client, or a Wayland compositor that offers `zwlr_foreign_toplevel_manager_v1`, measured on Hyprland: there `focus-window`, `maximize`, `restore` and `close-app` work, `minimize` is refused when the compositor ignores it, and `move-window` and `resize-window` are `ACTION_NOT_SUPPORTED`. GNOME stays `wayland_session`. See `references/windows-and-lifecycle.md` |
 | Displays | `list-displays` | Works on X11 and Wayland. On Wayland, GNOME answers through Mutter `DisplayConfig`; other compositors answer through `wl_output` and xdg-output, which is measured on Hyprland. Wayland has no primary output, so the one at logical (0,0) is marked primary, else the left-most then top-most. See `references/display-servers-and-input.md` |
@@ -177,7 +177,8 @@ cursor; on Wayland none is drawn.
   `not_delivered` refusal (Windows works the other way round). On Wayland, headed
   pointer commands and a headed `select` refuse at once with
   `ACTION_NOT_SUPPORTED`, cause `wayland_session`; a headed `type` needs the
-  Mutter RemoteDesktop capability. `references/display-servers-and-input.md`
+  Mutter RemoteDesktop capability or the compositor's virtual keyboard.
+  `references/display-servers-and-input.md`
   has the full rules.
 - `select` tries the semantic route first and the pointer second; the pointer
   route needs an explicit `--headed` request on X11. A Qt combo's semantic
@@ -207,7 +208,9 @@ cursor; on Wayland none is drawn.
   null. It receives keys only under `--headed`.
 - In key combos `cmd` and `meta` are the Super key. Key names are the macOS and
   Windows names plus X keysym names. `press` takes mapped keys only; `type`
-  handles characters the layout cannot produce.
+  handles characters the layout cannot produce. Through the Hyprland virtual
+  keyboard the compositor's own bindings see the keys: a bound chord such as a
+  Super combination is consumed and the app receives nothing.
 - Window ops act on X11 clients, or on a compositor with the foreign toplevel
   protocol (measured on Hyprland); on GNOME, `focus-window` and headed scoped
   `press` require an X11 session. Headless scoped `press` requires live target focus on either

@@ -20,9 +20,14 @@ pub(super) const DIALOG_FIXTURE: &str = concat!(
     "/../../tests/e2e-linux/apps/foreign_dialog4.py"
 );
 
+const KEY_FIXTURE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/e2e-linux/apps/key_log_window.py"
+);
+
 /// Refuses to run unless the session is an isolated nested Hyprland the
 /// caller named: the tests focus, maximize and close real windows.
-pub(super) fn require_isolated_hyprland() {
+pub(crate) fn require_isolated_hyprland() {
     assert_eq!(
         std::env::var("AGENT_DESKTOP_ISOLATED_HYPRLAND").as_deref(),
         Ok("1"),
@@ -45,24 +50,24 @@ pub(super) fn require_isolated_hyprland() {
     );
 }
 
-pub(super) fn deadline(ms: u64) -> Deadline {
+pub(crate) fn deadline(ms: u64) -> Deadline {
     Deadline::after(ms).expect("a deadline builds")
 }
 
-pub(super) fn lease() -> InteractionLease {
+pub(crate) fn lease() -> InteractionLease {
     acquire(deadline(15_000)).expect("the interaction lease is free")
 }
 
 /// A client as the compositor's own IPC reports it, read apart from the
 /// product's route.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Client {
-    pub(super) class: String,
-    pub(super) title: String,
-    pub(super) pid: u64,
-    pub(super) shown: (bool, bool),
-    pub(super) fullscreen: (i64, i64),
-    pub(super) recency: i64,
+pub(crate) struct Client {
+    pub(crate) class: String,
+    pub(crate) title: String,
+    pub(crate) pid: u64,
+    pub(crate) shown: (bool, bool),
+    pub(crate) fullscreen: (i64, i64),
+    pub(crate) recency: i64,
 }
 
 fn client_of(entry: &serde_json::Value) -> Client {
@@ -85,7 +90,7 @@ fn client_of(entry: &serde_json::Value) -> Client {
 
 /// Every client of the isolated compositor, ordered by process and title so
 /// two reads of an unchanged desktop are equal.
-pub(super) fn clients() -> Vec<Client> {
+pub(crate) fn clients() -> Vec<Client> {
     let output = Command::new("hyprctl")
         .args(["clients", "-j"])
         .output()
@@ -100,14 +105,14 @@ pub(super) fn clients() -> Vec<Client> {
     all
 }
 
-pub(super) fn clients_of(pid: u32) -> Vec<Client> {
+pub(crate) fn clients_of(pid: u32) -> Vec<Client> {
     clients()
         .into_iter()
         .filter(|client| client.pid == u64::from(pid))
         .collect()
 }
 
-pub(super) fn active_title() -> String {
+pub(crate) fn active_title() -> String {
     clients()
         .into_iter()
         .find(|client| client.recency == 0)
@@ -116,13 +121,13 @@ pub(super) fn active_title() -> String {
 }
 
 /// A window the test launched, with its process identity.
-pub(super) struct Shown {
-    pub(super) pid: u32,
-    pub(super) window: WindowInfo,
+pub(crate) struct Shown {
+    pub(crate) pid: u32,
+    pub(crate) window: WindowInfo,
 }
 
 impl Shown {
-    pub(super) fn app(&self) -> AppInfo {
+    pub(crate) fn app(&self) -> AppInfo {
         AppInfo {
             name: self.window.app.clone(),
             pid: self.window.pid,
@@ -132,16 +137,16 @@ impl Shown {
         }
     }
 
-    pub(super) fn gone(&self) -> bool {
+    pub(crate) fn gone(&self) -> bool {
         let token = self.window.process_instance.as_deref().unwrap_or_default();
         liveness(self.pid, token) == Liveness::Gone
     }
 
-    pub(super) fn wait_gone(&self) -> bool {
+    pub(crate) fn wait_gone(&self) -> bool {
         until(|| self.gone())
     }
 
-    pub(super) fn answer_prompt(&self) {
+    pub(crate) fn answer_prompt(&self) {
         let status = Command::new("kill")
             .args(["-USR1", &self.pid.to_string()])
             .status()
@@ -150,7 +155,7 @@ impl Shown {
     }
 }
 
-pub(super) fn until(mut condition: impl FnMut() -> bool) -> bool {
+pub(crate) fn until(mut condition: impl FnMut() -> bool) -> bool {
     let started = Instant::now();
     while started.elapsed() < Duration::from_secs(5) {
         if condition() {
@@ -163,16 +168,16 @@ pub(super) fn until(mut condition: impl FnMut() -> bool) -> bool {
 
 /// Everything one test starts. Dropping it ends every process, also when the
 /// test failed half way.
-pub(super) struct Scene {
+pub(crate) struct Scene {
     launched: Launched,
     keyboard: Option<Child>,
     scratch: Vec<PathBuf>,
-    pub(super) bus: SharedBus,
+    pub(crate) bus: SharedBus,
     unique: String,
 }
 
 impl Scene {
-    pub(super) fn start(label: &str) -> Self {
+    pub(crate) fn start(label: &str) -> Self {
         require_isolated_hyprland();
         Self {
             launched: Launched::bare(),
@@ -184,14 +189,14 @@ impl Scene {
     }
 
     /// A title no other window of the run has.
-    pub(super) fn title(&self, part: &str) -> String {
+    pub(crate) fn title(&self, part: &str) -> String {
         format!("{}-{part}", self.unique)
     }
 
     /// Gives the isolated seat a keyboard, which a toolkit needs before it
     /// reports any of its windows focused. The virtual keyboard lives as long
     /// as the helper that holds it.
-    pub(super) fn with_keyboard(&mut self) {
+    pub(crate) fn with_keyboard(&mut self) {
         let helper = Command::new("wtype")
             .args(["-M", "shift", "-s", "600000", "-m", "shift"])
             .stdin(Stdio::null())
@@ -203,16 +208,48 @@ impl Scene {
         std::thread::sleep(Duration::from_millis(500));
     }
 
-    pub(super) fn window(&mut self, title: &str, extra: &[&str]) -> Shown {
+    pub(crate) fn window(&mut self, title: &str, extra: &[&str]) -> Shown {
         let mut args = vec![FIXTURE, title];
         args.extend_from_slice(extra);
         let pid = self.launched.spawn("python3", &args);
         self.shown(pid, title)
     }
 
+    /// Gives the isolated seat a keyboard that sends nothing and holds no key
+    /// or modifier, so a window can be focused with a keyboard present while
+    /// the typing under test is the only input.
+    pub(crate) fn with_idle_keyboard(&mut self) {
+        let helper = Command::new("wtype")
+            .args(["-s", "600000", "a"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("wtype is installed: it gives the isolated seat a keyboard");
+        self.keyboard = Some(helper);
+        std::thread::sleep(Duration::from_millis(500));
+    }
+
+    /// A path inside a scratch directory the scene removes when it ends.
+    pub(crate) fn scratch_file(&mut self, name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(nonce("keys"));
+        std::fs::create_dir_all(&dir).expect("a scratch directory");
+        let file = dir.join(name);
+        self.scratch.push(dir);
+        file
+    }
+
+    /// The key-logging text entry fixture: `args` are its extra flags.
+    pub(crate) fn key_window(&mut self, title: &str, log: &str, args: &[&str]) -> Shown {
+        let mut all = vec![KEY_FIXTURE, title, log];
+        all.extend_from_slice(args);
+        let pid = self.launched.spawn("python3", &all);
+        self.shown(pid, title)
+    }
+
     /// A window of another program: the same fixture under another file name,
     /// so none of its process names relates to the first program's app id.
-    pub(super) fn other_program_window(&mut self, title: &str, app_id: &str) -> Shown {
+    pub(crate) fn other_program_window(&mut self, title: &str, app_id: &str) -> Shown {
         let dir = std::env::temp_dir().join(nonce("other-program"));
         std::fs::create_dir_all(&dir).expect("a scratch directory");
         let script = dir.join("other_program.py");
@@ -250,7 +287,7 @@ impl Scene {
         FIXTURE
     }
 
-    fn shown(&self, pid: u32, title: &str) -> Shown {
+    pub(crate) fn shown(&self, pid: u32, title: &str) -> Shown {
         let started = Instant::now();
         let everything = WindowFilter {
             focused_only: false,

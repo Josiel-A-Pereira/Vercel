@@ -6,6 +6,7 @@ use agent_desktop_core::{
 use crate::input::backend::Backend;
 use crate::input::deliver::{ensure_budget, ensure_keyboard_policy};
 use crate::input::delivery::Gate;
+use crate::input::delivery_channel::DeliveryChannel;
 use crate::input::physical::frame_active::ActiveGate;
 use crate::input::physical::target_world::PhysicalWorld;
 use crate::tree::AtspiElement;
@@ -34,28 +35,28 @@ pub(crate) fn target_steps(
         }
     };
     gate()?;
-    let operation = match action {
+    let (channel, operation) = match action {
         Action::TypeText(text) => {
-            match &backend {
+            let delivery = match &backend {
                 Backend::X11(_) => {
                     let map = world.keymap(deadline)?;
                     let plans = crate::input::keyboard::text_plan::plan_text(&map, text)?;
-                    world.send_plans(plans, &mut gate, deadline)?;
+                    world.send_plans(plans, &mut gate, deadline)?
                 }
                 Backend::Wayland => {
                     let chunks = crate::input::keyboard::text_plan::plan_text_keysyms(text);
-                    world.send_keysyms(&chunks, &mut gate, deadline)?;
+                    world.send_keysyms(&chunks, &mut gate, deadline)?
                 }
-            }
-            "type_text"
+            };
+            (delivery.channel, "type_text")
         }
         Action::PressKey(combo) => {
-            send_combo(world, &backend, combo, &mut gate, deadline)?;
-            "press_key"
+            let channel = send_combo(world, &backend, combo, &mut gate, deadline)?;
+            (channel, "press_key")
         }
         _ => return Err(AdapterError::not_supported(action.name())),
     };
-    Ok(vec![physical_step(&backend, operation)])
+    Ok(vec![physical_step(channel, operation)])
 }
 
 pub(crate) fn press_key_global_steps(
@@ -65,8 +66,8 @@ pub(crate) fn press_key_global_steps(
 ) -> Result<Vec<ActionStep>, AdapterError> {
     ensure_budget(deadline)?;
     let backend = world.backend()?;
-    send_combo(world, &backend, combo, &mut || Ok(()), deadline)?;
-    Ok(vec![physical_step(&backend, "press_key")])
+    let channel = send_combo(world, &backend, combo, &mut || Ok(()), deadline)?;
+    Ok(vec![physical_step(channel, "press_key")])
 }
 
 /// Presses a chord for one process under the caller's focus gate. The gate
@@ -83,10 +84,10 @@ pub(crate) fn press_for_process(
     ensure_budget(deadline)?;
     let backend = world.backend()?;
     gate().map_err(|error| worded_for(error, policy, &backend))?;
-    send_combo(world, &backend, combo, gate, deadline)?;
+    let channel = send_combo(world, &backend, combo, gate, deadline)?;
     Ok(ActionResult::from_execution(
         &Action::PressKey(combo.clone()),
-        vec![physical_step(&backend, "press_key")],
+        vec![physical_step(channel, "press_key")],
     ))
 }
 
@@ -107,7 +108,7 @@ fn worded_for(
     let (message, suggestion) = if matches!(backend, Backend::Wayland) {
         (
             "The target application's active window could not be confirmed, so no key was sent",
-            "On Wayland, bring the target window to the front yourself, then use global press without --app, --window-id or --headed; global keys go to the focused window and automatic activation is unavailable",
+            "On Wayland, bring the target window to the front yourself, then retry; --headed activates it for you only where the compositor offers window control (such as Hyprland), not on GNOME. Or use global press without --app, --window-id or --headed, which sends to the focused window",
         )
     } else if policy.allow_focus_steal {
         (
@@ -131,29 +132,23 @@ fn send_combo(
     combo: &KeyCombo,
     gate: Gate<'_>,
     deadline: Deadline,
-) -> Result<(), AdapterError> {
-    match backend {
+) -> Result<DeliveryChannel, AdapterError> {
+    let delivery = match backend {
         Backend::X11(_) => {
             let map = world.keymap(deadline)?;
             let plan = crate::input::keyboard::key_plan::plan_combo(&map, combo)?;
-            world.send_plans(vec![plan], gate, deadline)?;
+            world.send_plans(vec![plan], gate, deadline)?
         }
         Backend::Wayland => {
             let keys = crate::input::keyboard::key_plan::plan_keysyms(combo)?;
-            world.send_keysyms(&[keys], gate, deadline)?;
+            world.send_keysyms(&[keys], gate, deadline)?
         }
-    }
-    Ok(())
+    };
+    Ok(delivery.channel)
 }
 
-fn physical_step(backend: &Backend, operation: &'static str) -> ActionStep {
-    let label = match (backend, operation) {
-        (Backend::X11(_), "type_text") => "XTEST.type_text",
-        (Backend::X11(_), _) => "XTEST.press_key",
-        (Backend::Wayland, "type_text") => "RemoteDesktop.type_text",
-        (Backend::Wayland, _) => "RemoteDesktop.press_key",
-    };
-    ActionStep::succeeded(label)
+fn physical_step(channel: DeliveryChannel, operation: &'static str) -> ActionStep {
+    ActionStep::succeeded(channel.step_label(operation))
         .with_mechanism(StepMechanism::PhysicalSynthetic)
         .with_verified(false)
 }

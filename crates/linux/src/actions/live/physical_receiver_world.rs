@@ -9,6 +9,7 @@ use crate::input::keyboard::keymap::Keymap;
 use crate::input::keyboard::keysym_step::KeysymStep;
 use crate::input::physical::target_world::{LiveWorld, PhysicalWorld};
 use crate::input::plan::Plan;
+use crate::system::window::active_watch::ActiveWatch;
 use crate::tree::AtspiElement;
 
 pub(in crate::actions) struct ReceiverWorld<'a> {
@@ -54,6 +55,22 @@ impl PhysicalWorld for ReceiverWorld<'_> {
         deadline: Deadline,
     ) -> Result<Option<bool>, AdapterError> {
         self.live.frame_active(element, deadline)
+    }
+
+    fn compositor_active(
+        &self,
+        element: &AtspiElement,
+        deadline: Deadline,
+    ) -> Result<Option<bool>, AdapterError> {
+        self.live.compositor_active(element, deadline)
+    }
+
+    fn compositor_watch(
+        &self,
+        element: &AtspiElement,
+        deadline: Deadline,
+    ) -> Result<Option<Box<dyn ActiveWatch>>, AdapterError> {
+        self.live.compositor_watch(element, deadline)
     }
 
     fn bounds(

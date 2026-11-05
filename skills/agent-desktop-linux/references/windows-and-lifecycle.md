@@ -357,11 +357,13 @@ Headless `press --app <name>` delivers only while the target process owns the
 active window. On X11 a background or minimized app is refused: `ACTION_FAILED`,
 `check: window_active`, cause `display_active_window`, `not_delivered`; the
 message says the application's active window could not be confirmed. `--headed`
-brings the window forward, un-minimizes it and sends the keys (X11). Without the
-foreign toplevel protocol (GNOME), `focus-window` and headed app- or
+brings the window forward, un-minimizes it and sends the keys (X11). With the
+foreign toplevel protocol, `--headed` activates the window through it, and keys
+go out only once the compositor reports the window `activated`; see "Wayland
+keys" in `references/display-servers-and-input.md` (measured on Hyprland 0.56.2
+only). Without the protocol (GNOME), `focus-window` and headed app- or
 window-scoped `press` on Wayland refuse with `ACTION_NOT_SUPPORTED`, cause
-`wayland_session`, Xwayland clients included. Headed scoped `press` was not
-measured on Hyprland.
+`wayland_session`, Xwayland clients included.
 
 Headless scoped `press` does not activate a window: it requires the live focus
 guard to confirm the target. If focus cannot be confirmed, bring the target

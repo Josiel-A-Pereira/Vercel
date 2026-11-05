@@ -2,6 +2,8 @@
 //! protocol, for sessions where the accessibility tree names windows but no
 //! X11 server can address them.
 
+pub(in crate::system) mod foreign_active;
+mod foreign_active_watch;
 mod foreign_await;
 mod foreign_awaited;
 pub(in crate::system) mod foreign_close;
@@ -35,6 +37,6 @@ pub(in crate::system) mod foreign_fake;
 #[cfg(test)]
 mod foreign_live_review_tests;
 #[cfg(test)]
-mod foreign_live_rig;
+pub(crate) mod foreign_live_rig;
 #[cfg(test)]
 mod foreign_live_tests;

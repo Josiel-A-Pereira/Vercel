@@ -76,7 +76,7 @@ The CLI looks for the helper in its own directory, so move the two together.
 
 **Linux** needs Ubuntu 24.04 or later on x86_64 or aarch64, with a glibc 2.35 floor. Ubuntu 22.04's AT-SPI bridge aborts on `Action.GetActions`. Run the CLI inside the user's graphical session, with `at-spi2-core` installed. A TTY, an SSH shell, or a container without that session's bus, display, and runtime environment sees no apps. `agent-desktop status` activates and checks the accessibility bus. An empty `supported_surfaces` list means the bus did not answer.
 
-Keys need XTEST on X11 and GNOME Mutter RemoteDesktop on Wayland. The Wayland clipboard needs `wl-clipboard`. For the rest, run `agent-desktop skills get platform` on the Linux machine.
+Keys need XTEST on X11, and on Wayland GNOME Mutter RemoteDesktop or a compositor that advertises `zwp_virtual_keyboard_manager_v1` (measured on Hyprland). The Wayland clipboard needs `wl-clipboard`. For the rest, run `agent-desktop skills get platform` on the Linux machine.
 
 ## Platform notes
 
@@ -84,4 +84,4 @@ Keys need XTEST on X11 and GNOME Mutter RemoteDesktop on Wayland. The Wayland cl
 
 `launch` takes an absolute path, or a bare name under System32 or the Windows directory, with or without `.exe`. It does not resolve a display name such as "Google Chrome". Use `list-apps` to find a running app.
 
-**Linux.** Semantic actions work on X11 and Wayland. On Wayland, app pointer input returns `ACTION_NOT_SUPPORTED`, and window control is refused for native windows.
+**Linux.** Semantic actions work on X11 and Wayland. On Wayland, app pointer input returns `ACTION_NOT_SUPPORTED`. Native window control is refused on GNOME; a compositor with the foreign toplevel protocol (measured on Hyprland) serves `focus-window`, `maximize`, `restore` and graceful `close-app`.
