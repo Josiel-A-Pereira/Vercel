@@ -30,6 +30,18 @@ existing custom installations remain pinned to their installed version.
 If an older installation shadows the command, uninstall it through its original package manager. Check resolution
 with `command -v agent-desktop` on macOS/Linux or `Get-Command agent-desktop` on Windows.
 
+## MacPorts
+
+macOS users who need a local or universal build of `agent-deskop` CLI can use [MacPorts](https://macports.org) to install `agent-desktop`.
+
+```sh
+# Installation
+sudo port install agent-desktop
+
+# Build with universal archs
+sudo port install agent-desktop +universal
+```
+
 ## Blocked install scripts
 
 The npm package's `postinstall` script replaces the Node launcher with a link to the native binary. Some package managers block install scripts, and npm 12 does by default. Then every call runs through the Node launcher, which adds about 125 ms. The launcher prints a one-time notice to stderr. Allow the script and reinstall:
