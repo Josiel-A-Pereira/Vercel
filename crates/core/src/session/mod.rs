@@ -384,3 +384,6 @@ mod gc_tests;
 
 #[cfg(test)]
 mod cursor_profile_tests;
+
+#[cfg(test)]
+mod gc_age_tests;

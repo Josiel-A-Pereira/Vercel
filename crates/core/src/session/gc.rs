@@ -60,16 +60,7 @@ pub fn gc(options: GcOptions) -> Result<GcReport, AppError> {
         if is_live_by(&manifest.id, activity_counts)? {
             continue;
         }
-        if options.ended_only && manifest.ended_at.is_none() {
-            continue;
-        }
-        if let Some(older_than) = options.older_than {
-            let age_reference = manifest.ended_at.unwrap_or(manifest.created_at);
-            let age_ms = now_millis().saturating_sub(age_reference);
-            if Duration::from_millis(age_ms) < older_than {
-                continue;
-            }
-        } else if manifest.ended_at.is_none() {
+        if !matches_gc_options(&manifest, &options) {
             continue;
         }
         let store = RefStore::for_session(Some(&manifest.id))?;
@@ -78,7 +69,12 @@ pub fn gc(options: GcOptions) -> Result<GcReport, AppError> {
             Ok(lock) => lock,
             Err(_) => continue,
         };
-        if super::liveness::any_held(&dir)
+        let Some(manifest) = read_manifest(&manifest.id)? else {
+            continue;
+        };
+        let activity_counts = !(options.ended_only && manifest.ended_at.is_some());
+        if !matches_gc_options(&manifest, &options)
+            || super::liveness::any_held(&dir)
             || (activity_counts && has_recent_activity(&store, Some(&manifest)))
         {
             drop(lock);
@@ -91,6 +87,19 @@ pub fn gc(options: GcOptions) -> Result<GcReport, AppError> {
         }
     }
     Ok(GcReport { removed })
+}
+
+fn matches_gc_options(manifest: &SessionManifest, options: &GcOptions) -> bool {
+    if options.ended_only && manifest.ended_at.is_none() {
+        return false;
+    }
+    if let Some(older_than) = options.older_than {
+        let age_reference = manifest.ended_at.unwrap_or(manifest.created_at);
+        let age_ms = now_millis().saturating_sub(age_reference);
+        Duration::from_millis(age_ms) >= older_than
+    } else {
+        manifest.ended_at.is_some()
+    }
 }
 
 fn path_recently_modified(path: &Path) -> bool {
