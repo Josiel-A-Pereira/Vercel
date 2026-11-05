@@ -196,6 +196,11 @@ fn timeout_carries_wait_timeout_kind_in_details() {
         panic!("expected AppError::Adapter");
     };
     assert_eq!(adapter_err.code, ErrorCode::Timeout);
+    let suggestion = adapter_err.suggestion.as_deref().unwrap();
+    assert!(suggestion.contains("list-windows"));
+    assert!(suggestion.contains("batch"));
+    assert!(suggestion.contains("baseline before the action"));
+    assert!(!suggestion.contains("--wait"));
     let details = adapter_err.details.expect("timeout must carry details");
     assert_eq!(details["kind"], "wait_timeout");
     assert_eq!(details["predicate"], "event");
