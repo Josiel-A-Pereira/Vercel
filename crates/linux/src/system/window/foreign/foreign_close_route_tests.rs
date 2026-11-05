@@ -157,16 +157,32 @@ fn the_toplevel_a_close_raises_is_a_dialog_and_is_never_sent_a_close() {
 }
 
 #[test]
-fn a_prompt_that_shows_up_as_a_frame_is_still_a_dialog() {
-    let port = FakePort::showing(vec![record(1, "Home", "thunar")])
-        .mapped()
-        .reacting(raises_a_save_prompt);
+fn a_prompt_frame_makes_its_toplevel_a_dialog_without_the_late_id_rule() {
+    let port = FakePort::showing(vec![
+        record(1, "Home", "thunar"),
+        record(9, "Save changes?", "thunar"),
+    ]);
     let route = ForeignCloseRoute::over(port);
-    assert_eq!(ids(&read(&route, &["Home"])), vec![1]);
-    route.close(1, deadline()).expect("sent");
-    let windows = read(&route, &["Home", "Save changes?"]);
+    let frames = || {
+        Ok(vec![
+            Frame {
+                title: "Home".to_owned(),
+                prompt: false,
+            },
+            Frame {
+                title: "Save changes?".to_owned(),
+                prompt: true,
+            },
+        ])
+    };
+    let windows = route
+        .standing(&thunar(), frames, deadline())
+        .expect("a read");
+    assert!(route.evidence.borrow().known.is_empty());
     assert_eq!(ids(&windows), vec![1, 9]);
+    assert_eq!(windows[0].kind, WindowKind::Normal);
     assert_eq!(windows[1].kind, WindowKind::Dialog);
+    assert_eq!(route.close(9, deadline()), Err(ControlError::BadWindow));
 }
 
 #[test]
