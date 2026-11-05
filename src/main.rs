@@ -337,7 +337,18 @@ fn response(cmd_name: &str, result: Result<serde_json::Value, AppError>) -> Resp
 }
 
 fn report_output_failure(write_err: std::io::Error) -> ExitCode {
-    eprintln!("agent-desktop: failed to write response to stdout: {write_err}");
+    report_output_failure_to(write_err, &mut std::io::stderr())
+}
+
+// `eprintln!` panics when its own write fails, and the release profile sets
+// `panic = "abort"`, so a handled output error turned into SIGABRT whenever
+// stderr could not be written either (`2>&1 | head`, a full disk, a closed fd).
+// Write best-effort and keep the exit code meaningful instead.
+fn report_output_failure_to(write_err: std::io::Error, stderr: &mut dyn Write) -> ExitCode {
+    let _ = writeln!(
+        stderr,
+        "agent-desktop: failed to write response to stdout: {write_err}"
+    );
     ExitCode::FAILURE
 }
 

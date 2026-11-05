@@ -267,7 +267,12 @@ fn write_line(out: &Mutex<std::io::Stdout>, message: &Value) {
         .and_then(|()| out.flush())
         .is_err()
     {
-        eprintln!("agent-desktop mcp: failed to write to stdout");
+        // `eprintln!` panics when stderr is closed, and `panic = "abort"` turns
+        // that into SIGABRT. Report best-effort and keep serving.
+        let _ = writeln!(
+            std::io::stderr(),
+            "agent-desktop mcp: failed to write to stdout"
+        );
     }
 }
 

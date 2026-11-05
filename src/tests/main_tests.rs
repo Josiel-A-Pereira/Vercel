@@ -56,3 +56,27 @@ fn pre_dispatch_failures_are_always_safe_to_retry() {
         );
     }
 }
+
+struct FailingStderr;
+
+impl std::io::Write for FailingStderr {
+    fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
+        Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+// Regression test for the SIGABRT in #462: reporting a failed stdout write must
+// not itself panic when stderr is unusable, or `panic = "abort"` kills the
+// process with a core dump instead of a clean failure exit.
+#[test]
+fn failed_stderr_write_reports_failure_instead_of_panicking() {
+    let code = crate::report_output_failure_to(
+        std::io::Error::from(std::io::ErrorKind::BrokenPipe),
+        &mut FailingStderr,
+    );
+    assert_eq!(code, std::process::ExitCode::FAILURE);
+}
