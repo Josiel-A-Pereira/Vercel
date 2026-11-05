@@ -117,3 +117,11 @@ fn launch_args(args: &[String], env: &[String]) -> crate::cli_args::system::Laun
         cdp: None,
     }
 }
+
+#[test]
+fn url_is_a_get_property() {
+    assert!(matches!(
+        parse_get_property("url"),
+        Ok(agent_desktop_core::commands::get::GetProperty::Url)
+    ));
+}

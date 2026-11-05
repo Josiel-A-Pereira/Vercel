@@ -26,3 +26,4 @@ pub(crate) mod selection_owner;
 pub(crate) mod selection_verdicts;
 pub(crate) mod text_attributes;
 pub(crate) mod text_insertion;
+pub(crate) mod url;

@@ -13,8 +13,9 @@ pub(crate) fn parse_get_property(s: &str) -> Result<get::GetProperty, AppError> 
         "bounds" => Ok(get::GetProperty::Bounds),
         "role" => Ok(get::GetProperty::Role),
         "states" => Ok(get::GetProperty::States),
+        "url" => Ok(get::GetProperty::Url),
         _ => Err(AppError::invalid_input(
-            "Unknown property. Valid: text, value, title, bounds, role, states",
+            "Unknown property. Valid: text, value, title, bounds, role, states, url",
         )),
     }
 }

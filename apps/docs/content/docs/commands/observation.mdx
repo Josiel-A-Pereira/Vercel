@@ -109,7 +109,7 @@ When a `--role` filter matches nothing, `roles_present` lists the roles in the s
 Reads one property of a ref.
 
 ```bash
-agent-desktop get <REF> [--property text|value|title|bounds|role|states]
+agent-desktop get <REF> [--property text|value|title|bounds|role|states|url]
 ```
 
 <table>
@@ -118,7 +118,7 @@ agent-desktop get <REF> [--property text|value|title|bounds|role|states]
   </thead>
   <tbody>
     <tr><td><code>REF</code></td><td>required</td><td>Qualified ref.</td></tr>
-    <tr><td><code>--property</code></td><td><code>text</code></td><td><code>text</code> is what a person reads: the value for <code>textfield</code>, <code>combobox</code>, <code>listbox</code>, <code>datefield</code>, and <code>timefield</code>, and the name for every other role, each falling back to the other. <code>value</code> is the raw value. <code>title</code> is the accessible name. <code>bounds</code>, <code>role</code>, and <code>states</code> are as named.</td></tr>
+    <tr><td><code>--property</code></td><td><code>text</code></td><td><code>text</code> is what a person reads: the value for <code>textfield</code>, <code>combobox</code>, <code>listbox</code>, <code>datefield</code>, and <code>timefield</code>, and the name for every other role, each falling back to the other. <code>value</code> is the raw value. <code>title</code> is the accessible name. <code>bounds</code>, <code>role</code>, and <code>states</code> are as named. <code>url</code> is the target a link navigates to, such as its <code>href</code>; it is read live on macOS and answers <code>PLATFORM_NOT_SUPPORTED</code> where the platform does not expose one.</td></tr>
   </tbody>
 </table>
 

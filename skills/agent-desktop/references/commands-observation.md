@@ -96,11 +96,12 @@ A match without `ref_id` is a context match: readable text with no action target
 
 ## get
 
-Reads one property of a ref: `text` (default), `value`, `title`, `bounds`, `role`, `states`.
+Reads one property of a ref: `text` (default), `value`, `title`, `bounds`, `role`, `states`, `url`.
 
 - `title` is the accessible name. It answers "what does this button say".
 - `text` is what a person reads. It is the content for `textfield`, `combobox`, `listbox`, `datefield` and `timefield`, and the name everywhere else. If the preferred half is empty, the other half answers. A checkbox answers its label, not `1`.
 - `value` is the raw value regardless of role (text, slider position).
+- `url` is the target the element navigates to, such as a link's `href`, read from the live element. An element that navigates nowhere answers `null`. macOS reads it; a platform without one answers `PLATFORM_NOT_SUPPORTED`.
 - `text`, `value`, `bounds` and `states` read live state when the adapter can. A missing live value or bounds returns `null`. When an optional live read is unavailable, `get` can fall back to the saved ref entry's value, name, bounds or states.
 - Only `bounds` reports whether it is live, in `data.live`. When it is `false`, the rectangle came from the snapshot and may be out of date. Check it before you pass bounds to `mouse-click`.
 

@@ -154,6 +154,19 @@ impl ObservationOps for MacOSAdapter {
         Err(AdapterError::not_supported("get_live_value"))
     }
 
+    fn get_live_url(
+        &self,
+        handle: &NativeHandle,
+        deadline: Deadline,
+    ) -> Result<Option<String>, AdapterError> {
+        #[cfg(target_os = "macos")]
+        {
+            crate::tree::properties::url::read_url(ax_element(handle)?, deadline)
+        }
+        #[cfg(not(target_os = "macos"))]
+        Err(AdapterError::not_supported("get_live_url"))
+    }
+
     fn get_live_state(
         &self,
         handle: &NativeHandle,

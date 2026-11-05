@@ -267,3 +267,93 @@ fn each_preference_falls_back_across_when_its_own_half_is_empty() {
         "a nameless cell answers the content its value carries"
     );
 }
+
+struct LiveUrlAdapter {
+    url: Option<Option<String>>,
+}
+
+impl LiveUrlAdapter {
+    fn with_url(url: &str) -> Self {
+        Self {
+            url: Some(Some(url.into())),
+        }
+    }
+
+    fn url(link: Option<String>) -> Self {
+        Self { url: Some(link) }
+    }
+
+    fn unsupported() -> Self {
+        Self { url: None }
+    }
+}
+
+impl ObservationOps for LiveUrlAdapter {
+    fn resolve_element_strict(
+        &self,
+        _entry: &RefEntry,
+        _deadline: crate::Deadline,
+    ) -> Result<NativeHandle, AdapterError> {
+        Ok(NativeHandle::null())
+    }
+
+    fn get_live_url(
+        &self,
+        _handle: &NativeHandle,
+        _deadline: crate::Deadline,
+    ) -> Result<Option<String>, AdapterError> {
+        match &self.url {
+            Some(url) => Ok(url.clone()),
+            None => Err(AdapterError::not_supported("get_live_url")),
+        }
+    }
+}
+
+impl ActionOps for LiveUrlAdapter {}
+
+impl InputOps for LiveUrlAdapter {}
+
+impl SystemOps for LiveUrlAdapter {}
+
+fn get_url(adapter: &dyn PlatformAdapter) -> Result<Value, AppError> {
+    execute(
+        GetArgs {
+            ref_id: format!(
+                "@{}:e1",
+                save_entry(crate::adapter::minimal_ref_entry("link", Some("Example")))
+            ),
+            property: GetProperty::Url,
+        },
+        adapter,
+        &CommandContext::default(),
+    )
+}
+
+#[test]
+fn get_url_reads_the_live_link_target() {
+    let _guard = HomeGuard::new();
+
+    let observed = get_url(&LiveUrlAdapter::with_url("https://example.com/a")).unwrap();
+
+    assert_eq!(observed["property"], json!("url"));
+    assert_eq!(observed["value"], json!("https://example.com/a"));
+}
+
+#[test]
+fn get_url_answers_null_when_the_element_navigates_nowhere() {
+    let _guard = HomeGuard::new();
+
+    let observed = get_url(&LiveUrlAdapter::url(None)).unwrap();
+
+    assert_eq!(observed["property"], json!("url"));
+    assert_eq!(observed["value"], Value::Null);
+}
+
+#[test]
+fn get_url_reports_the_platform_that_cannot_read_one() {
+    let _guard = HomeGuard::new();
+
+    let error = get_url(&LiveUrlAdapter::unsupported()).unwrap_err();
+
+    assert_eq!(error.code(), "PLATFORM_NOT_SUPPORTED");
+}

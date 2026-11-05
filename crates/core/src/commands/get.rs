@@ -18,6 +18,7 @@ pub enum GetProperty {
     Bounds,
     Role,
     States,
+    Url,
 }
 
 pub fn execute(
@@ -63,6 +64,10 @@ pub fn execute(
                 json!(live.map_or(entry.capabilities.states, |state| state.states)),
                 None,
             )
+        }
+        GetProperty::Url => {
+            let live = adapter.get_live_url(&handle, deadline)?;
+            ("url", json!(live), None)
         }
     };
 

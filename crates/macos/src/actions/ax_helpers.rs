@@ -229,7 +229,7 @@ mod imp {
         Err(read_failure(attribute, error))
     }
 
-    fn read_failure(attribute: &str, error: i32) -> AdapterError {
+    pub(crate) fn read_failure(attribute: &str, error: i32) -> AdapterError {
         use accessibility_sys::{
             kAXErrorAPIDisabled, kAXErrorCannotComplete, kAXErrorInvalidUIElement,
         };
@@ -385,9 +385,15 @@ mod imp {
     ) -> Result<Option<String>, AdapterError> {
         Ok(None)
     }
+    pub(crate) fn read_failure(attribute: &str, error: i32) -> AdapterError {
+        AdapterError::new(
+            ErrorCode::ActionFailed,
+            format!("Accessibility read failed for {attribute}: {error}"),
+        )
+    }
 }
 
 pub(crate) use imp::{
-    ax_focus_or_err, element_role, is_attr_settable, set_ax_bool_or_err, set_ax_string_or_err,
-    set_ax_value_coerced, try_ax_action_or_err,
+    ax_focus_or_err, element_role, is_attr_settable, read_failure, set_ax_bool_or_err,
+    set_ax_string_or_err, set_ax_value_coerced, try_ax_action_or_err,
 };

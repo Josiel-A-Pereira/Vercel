@@ -207,6 +207,15 @@ pub trait ObservationOps: Send + Sync {
         Err(AdapterError::not_supported("get_live_value"))
     }
 
+    /// The target an element navigates to, such as a link's URL.
+    fn get_live_url(
+        &self,
+        _handle: &NativeHandle,
+        _deadline: Deadline,
+    ) -> Result<Option<String>, AdapterError> {
+        Err(AdapterError::not_supported("get_live_url"))
+    }
+
     /// Selected text offsets in UTF-16 code units, or unavailable evidence.
     fn get_text_selection(
         &self,
