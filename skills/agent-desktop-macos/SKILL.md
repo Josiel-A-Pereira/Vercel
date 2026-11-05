@@ -32,7 +32,7 @@ Read the core skill first (`agent-desktop skills get desktop`) for the observe, 
 4. Run `agent-desktop permissions` to confirm `granted`. The next agent-desktop call sees a new grant, so the launching app does not need a restart. Each command reads permissions in its own process, so a permission granted during a `batch` applies from the next CLI call, not to later items in that batch.
 5. Run `agent-desktop snapshot -i` to confirm. It reads the focused app. `snapshot --app Finder -i` returns `WINDOW_NOT_FOUND` when Finder has no open window.
 
-`permissions` does not prompt. `permissions --request` can prompt, including for Automation. `permissions --guide` does not prompt and covers Accessibility and Screen Recording only. Automation reports `unknown` when macOS would need to prompt.
+`permissions` does not prompt. `permissions --request` can prompt, including for Automation. `permissions --guide` does not prompt and covers Accessibility and Screen Recording only. Automation reports `unknown` when macOS would need to prompt. The Automation prompt gets at most 5 seconds; when it is still open, `--request` fails with `PERM_DENIED` and `details.kind` `automation_permission_pending`. Answer the prompt, then run `permissions` again.
 
 ## What differs on macOS
 
