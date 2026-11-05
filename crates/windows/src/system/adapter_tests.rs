@@ -158,6 +158,7 @@ fn supported_surfaces_advertises_window_focused_sheet_menu_and_shell_kinds() {
             SnapshotSurface::Focused,
             SnapshotSurface::Sheet,
             SnapshotSurface::Menu,
+            SnapshotSurface::Popover,
             SnapshotSurface::StartMenu,
             SnapshotSurface::Taskbar,
             SnapshotSurface::SystemTray,

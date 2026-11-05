@@ -7,8 +7,9 @@ use super::element::UIAElement;
 use super::properties::property_ids::TreeProperty;
 #[cfg(target_os = "windows")]
 use super::properties::read_one;
-use crate::system::window::window_enum::enumerate_top_level;
+use crate::system::window::window_enum::{WindowHandle, enumerate_top_level};
 use crate::system::window::window_ops::{parse_window_id, passes_filter};
+use crate::system::window::window_popover::locate_popover;
 
 /// Resolves the element an observation root names, per-surface (`Window`
 /// resolves the named window directly; `Focused` composes the focused-only
@@ -60,6 +61,19 @@ pub(crate) fn surface_root(
                     )
                 })?;
             root_from_hwnd(location.root_handle(), deadline)
+        }
+        (ObservationRoot::Window(window), SnapshotSurface::Popover) => {
+            let owner = parse_window_id(&window.id)?;
+            let popover = locate_popover(owner as WindowHandle)?.ok_or_else(|| {
+                AdapterError::new(
+                    ErrorCode::ElementNotFound,
+                    "No popover owned by this window is open",
+                )
+                .with_suggestion(
+                    "Open the popup first, for example a browser toolbar button, then read --surface popover again.",
+                )
+            })?;
+            root_from_hwnd(popover as isize, deadline)
         }
         (ObservationRoot::Window(window), SnapshotSurface::StartMenu)
         | (ObservationRoot::Window(window), SnapshotSurface::Taskbar)

@@ -72,6 +72,7 @@ mod shell_surfaces {
     use crate::system::shell::shell_surface::resolve_surface;
     use crate::system::shell::shell_surface_open::{close_surface, open_surface};
     use crate::tree::fixture::fixture_menu::MenuFixture;
+    use crate::tree::fixture::fixture_popover::PopoverFixture;
     use crate::tree::fixture::fixture_window;
     use crate::tree::test_support::rooted_child_count;
     use agent_desktop_core::{InteractionPolicy, ObservationOps, ProcessId, SystemOps, WindowInfo};
@@ -267,6 +268,14 @@ mod shell_surfaces {
                 eprintln!("skip sheet leg: the OS declined the modal window the foreground");
                 skipped.push(SnapshotSurface::Sheet);
             }
+        }
+        {
+            let popover = PopoverFixture::create().expect("the popover fixture opens");
+            assert_roots_non_empty(
+                SnapshotSurface::Popover,
+                &window_info(popover.owner_handle(), std::process::id()),
+            );
+            covered.push(SnapshotSurface::Popover);
         }
         stage_and_assert_shell_kinds(&advertised, &mut covered, &mut skipped);
         stage_and_assert_menu(&advertised, &mut covered);

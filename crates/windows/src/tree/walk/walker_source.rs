@@ -357,9 +357,19 @@ pub fn walk_uia_subtree(
     root_source: &ObservationRoot<'_>,
     budget: WalkBudget,
 ) -> Result<WalkOutcome, AdapterError> {
+    walk_uia_subtree_on_surface(root, root_source, root_source.surface(), budget)
+}
+
+/// Walks a resolved surface while retaining its identity in every materialized ref.
+pub fn walk_uia_subtree_on_surface(
+    root: &UIAElement,
+    root_source: &ObservationRoot<'_>,
+    surface: agent_desktop_core::SnapshotSurface,
+    budget: WalkBudget,
+) -> Result<WalkOutcome, AdapterError> {
     let source = UiaTreeSource::for_root(root)?;
     let prepared = source.prepare_root(root)?;
-    walk_from_root(&source, &prepared, root_source, budget)
+    walk_from_root(&source, &prepared, root_source, surface, budget)
 }
 
 #[cfg(test)]

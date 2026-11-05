@@ -8,4 +8,5 @@ pub(crate) mod window_op_readback;
 pub(crate) mod window_op_verb;
 pub(crate) mod window_op_wait;
 pub(crate) mod window_ops;
+pub(crate) mod window_popover;
 pub(crate) mod window_resolve;

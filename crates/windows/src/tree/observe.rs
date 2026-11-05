@@ -9,7 +9,7 @@ use serde_json::json;
 use super::chromium;
 use super::surfaces::surface_root;
 use super::walk::walker::{DEFAULT_MAX_RAW_DEPTH, WalkBudget, WalkOutcome};
-use super::walk::walker_source::walk_uia_subtree;
+use super::walk::walker_source::walk_uia_subtree_on_surface;
 
 /// Runs one observation: resolve the root, walk it, detect a Chromium shell,
 /// and report completeness honestly.
@@ -55,7 +55,7 @@ pub(crate) fn observe_tree(
     let budget = WalkBudget::new(request.max_logical_depth, request.deadline)
         .with_max_raw_depth(request.max_raw_depth.min(DEFAULT_MAX_RAW_DEPTH));
     let walk_started = Instant::now();
-    let outcome = walk_uia_subtree(&element, &root, budget)?;
+    let outcome = walk_uia_subtree_on_surface(&element, &root, request.surface, budget)?;
     finish_observation(
         root,
         request,

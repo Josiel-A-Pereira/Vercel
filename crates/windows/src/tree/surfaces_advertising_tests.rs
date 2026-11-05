@@ -28,6 +28,7 @@ const SURFACE_ROOT_RESOLVABLE: &[SnapshotSurface] = &[
     SnapshotSurface::Focused,
     SnapshotSurface::Sheet,
     SnapshotSurface::Menu,
+    SnapshotSurface::Popover,
     SnapshotSurface::StartMenu,
     SnapshotSurface::Taskbar,
     SnapshotSurface::SystemTray,
