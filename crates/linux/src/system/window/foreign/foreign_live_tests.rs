@@ -215,16 +215,15 @@ fn foreign_live_a_same_titled_window_of_another_program_is_left_alone() {
 
 #[test]
 #[ignore = "drives real windows; run inside an isolated nested Hyprland with AGENT_DESKTOP_ISOLATED_HYPRLAND=1"]
-fn foreign_live_a_window_whose_app_id_is_unrelated_to_its_process_is_not_changed() {
+fn foreign_live_a_window_whose_app_id_is_unrelated_to_its_process_is_proven_by_pid() {
     let mut scene = Scene::start("unrelated");
     let title = scene.title("window");
     let shown = scene.other_program_window(&title, "zzzz.unrelated");
-    let before = clients();
 
-    let refused = operate(&scene, &shown, WindowOp::Maximize).expect_err("identity unproven");
-    assert_eq!(cause(&refused), "toplevel_identity_unproven");
-    assert_eq!(refused.disposition, DeliverySemantics::not_delivered());
-    assert_eq!(clients(), before, "the compositor saw no change");
+    operate(&scene, &shown, WindowOp::Maximize).expect("the pid proves the window is ours");
+    assert_eq!(state_of(&shown).fullscreen, (1, 1));
+    operate(&scene, &shown, WindowOp::Restore).expect("the same proof restores it");
+    assert_eq!(state_of(&shown).fullscreen, (0, 0));
 }
 
 #[test]
