@@ -63,8 +63,10 @@ observation, actions and capture there fail or return nothing.
   without `--force`. In combos, `cmd` and `meta` are the Windows key, so
   `meta+c` is a shell shortcut. Write `ctrl+c` to copy.
 - **`type` needs `--headed`.** It is keystroke synthesis through `SendInput`,
-  so a strict-headless `type` returns `POLICY_DENIED`. Use `set-value`, or pass
-  `--headed`. It ends `delivered_unverified` (`verification_scope:
+  so a strict-headless `type` returns `POLICY_DENIED`. When the text field
+  exposes `SetValue`, the error suggests `set-value`, which replaces the whole
+  value; use that or pass `--headed`. It ends `delivered_unverified`
+  (`verification_scope:
   "unavailable"`) when the field exposes no readable Text selection, and can
   verify when one is readable: confirm with a fresh `get`.
 - **`press --app` writes to the foreground queue** with no per-process

@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     AdapterError, ErrorCode,
-    actions::action_request::ActionRequest,
+    actions::{action_request::ActionRequest, capability},
     adapter::{NativeHandle, PlatformAdapter},
 };
 use serde_json::json;
@@ -263,6 +263,12 @@ fn finish(
         })
     {
         "This cell is not directly editable. Activate it, take a fresh snapshot, and target the text editor if one appears."
+    } else if code == ErrorCode::PolicyDenied
+        && matches!(request.action, crate::Action::TypeText(_))
+        && matches!(evidence.state.role.as_str(), "textfield" | "combobox")
+        && capability::contains(&evidence.available_actions, capability::SET_VALUE)
+    {
+        "This field exposes SetValue. Use 'set-value' to replace the whole value without '--headed', or pass '--headed' to type with keyboard events."
     } else if code == ErrorCode::ActionNotSupported
         && matches!(request.action, crate::Action::SetFocus)
     {

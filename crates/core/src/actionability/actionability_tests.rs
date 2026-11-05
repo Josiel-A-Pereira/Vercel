@@ -258,7 +258,8 @@ fn cursor_movement_requires_physical_policy() {
 fn headless_type_text_fails_policy_before_dispatch() {
     let mut target = entry();
     target.identity.role = "textfield".into();
-    target.capabilities.available_actions = vec![capability::SET_VALUE.into()];
+    target.capabilities.available_actions =
+        vec![capability::SET_VALUE.into(), capability::SET_FOCUS.into()];
 
     let err = check(
         &target,
@@ -268,6 +269,9 @@ fn headless_type_text_fails_policy_before_dispatch() {
 
     assert_eq!(err.code, ErrorCode::PolicyDenied);
     assert!(err.message.contains("focus"));
+    let hint = err.suggestion.unwrap();
+    assert!(hint.contains("set-value"), "{hint}");
+    assert!(hint.contains("--headed"), "{hint}");
 }
 
 #[test]

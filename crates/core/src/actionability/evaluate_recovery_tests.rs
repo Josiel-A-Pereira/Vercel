@@ -1,8 +1,8 @@
 use super::*;
 use crate::{Action, InteractionPolicy, Rect};
 
-fn unsupported(action: Action, policy: InteractionPolicy) -> AdapterError {
-    let evidence = ActionabilityEvidence {
+fn textfield(available_actions: Vec<String>) -> ActionabilityEvidence {
+    ActionabilityEvidence {
         nonspatial: false,
         state: crate::ElementState {
             role: "textfield".into(),
@@ -19,8 +19,12 @@ fn unsupported(action: Action, policy: InteractionPolicy) -> AdapterError {
             width: 100.0,
             height: 20.0,
         }),
-        available_actions: Vec::new(),
-    };
+        available_actions,
+    }
+}
+
+fn unsupported(action: Action, policy: InteractionPolicy) -> AdapterError {
+    let evidence = textfield(Vec::new());
     let mut request = ActionRequest::headless(action);
     request.policy = policy;
     let error = check_with_stability(
@@ -69,4 +73,21 @@ fn unsupported_text_write_names_typing_for_the_actual_mode_and_a_paste_fallback(
             assert!(hint.contains("paste shortcut"), "{hint}");
         }
     }
+}
+
+#[test]
+fn headless_type_text_without_set_value_keeps_the_generic_suggestion() {
+    let evidence = textfield(vec![crate::actions::capability::SET_FOCUS.into()]);
+    let request = ActionRequest::headless(Action::TypeText("x".into()));
+    let error = check_with_stability(
+        StabilityExpectation::permissive(None),
+        &evidence,
+        &request,
+        None,
+        crate::Deadline::standard().unwrap(),
+    )
+    .unwrap_err();
+
+    assert_eq!(error.code, ErrorCode::PolicyDenied);
+    assert!(!error.suggestion.unwrap().contains("set-value"));
 }
