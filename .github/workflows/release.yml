@@ -19,8 +19,9 @@ jobs:
   check-release:
     name: Check for new version
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 70
     permissions:
+      actions: read
       contents: write
     outputs:
       tag_name: ${{ steps.prepare.outputs.tag_name }}
@@ -44,7 +45,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.sha }}
 
-      - name: Validate release metadata and create immutable tag
+      - name: Validate metadata, wait for checks, and create immutable tag
         id: prepare
         env:
           GH_TOKEN: ${{ github.token }}

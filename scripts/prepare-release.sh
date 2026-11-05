@@ -21,7 +21,9 @@ if [ "$SHOULD_RELEASE" = true ] || [ "$NEEDS_GITHUB_RELEASE" = true ]; then
       echo "Existing tag ${TAG_NAME} has inconsistent version metadata" >&2
       exit 1
     fi
-  else
+  fi
+  bash "$(dirname "${BASH_SOURCE[0]}")/wait-release-checks.sh" "$SOURCE_SHA"
+  if ! git rev-parse --verify "refs/tags/${TAG_NAME}" >/dev/null 2>&1; then
     gh api "repos/${GH_REPO}/git/refs" -f "ref=refs/tags/${TAG_NAME}" -f "sha=${SOURCE_SHA}"
   fi
 fi
