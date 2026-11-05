@@ -39,6 +39,8 @@ pub(super) struct Screen {
     pub(super) inventory_broken: bool,
     /// The window the platform's shell surface resolves to, when it has one.
     pub(super) shell: Option<WindowInfo>,
+    /// The frontmost application, on a platform that reports one.
+    pub(super) frontmost: Option<AppInfo>,
 }
 
 /// Each scenario app runs as its own process, so a window or ref is owned
@@ -87,6 +89,20 @@ impl Screen {
 }
 
 impl ObservationOps for DeskAdapter {
+    fn focused_app(&self, _deadline: Deadline) -> Result<Option<AppInfo>, AdapterError> {
+        let screen = self.screen.lock().unwrap();
+        if screen.inventory_broken {
+            return Err(AdapterError::new(
+                ErrorCode::Internal,
+                "inventory is broken",
+            ));
+        }
+        match &screen.frontmost {
+            Some(app) => Ok(Some(app.clone())),
+            None => Err(AdapterError::not_supported("focused_app")),
+        }
+    }
+
     fn list_apps(&self, _deadline: Deadline) -> Result<Vec<AppInfo>, AdapterError> {
         self.target_queries.fetch_add(1, Ordering::SeqCst);
         let screen = self.screen.lock().unwrap();

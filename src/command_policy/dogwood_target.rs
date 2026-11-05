@@ -41,15 +41,7 @@ impl<'a> Resolver<'a> {
             TargetPlan::System | TargetPlan::App(None) => Ok(vec![TargetFacts::default()]),
             TargetPlan::App(Some(query)) => self.named(query),
             TargetPlan::Ref(ref_id) => self.ref_target(ref_id).map(|target| vec![target]),
-            TargetPlan::Focused => {
-                let window = self
-                    .adapter
-                    .focused_window(lookup_deadline()?)
-                    .map_err(|error| {
-                        format!("the focused window could not be read: {}", error.message)
-                    })?;
-                self.window(window).map(|target| vec![target])
-            }
+            TargetPlan::Focused => self.focused().map(|target| vec![target]),
             TargetPlan::WindowId(window_id) => {
                 let window = self
                     .listed_windows()?
@@ -82,6 +74,30 @@ impl<'a> Resolver<'a> {
             }
             TargetPlan::Unnamed(reason) => Err((*reason).to_string()),
             TargetPlan::Shell { surface, app } => self.shell(*surface, *app),
+        }
+    }
+
+    /// The focused window's owner. A frontmost app with no focused window still
+    /// receives keys and presents its menus, so it is the one judged; only
+    /// with no frontmost app, or a platform that reports none, is the command
+    /// judged as `system`.
+    fn focused(&mut self) -> Result<TargetFacts, String> {
+        let window = self
+            .adapter
+            .focused_window(lookup_deadline()?)
+            .map_err(|error| format!("the focused window could not be read: {}", error.message))?;
+        if window.is_some() {
+            return self.window(window);
+        }
+        match self.adapter.focused_app(lookup_deadline()?) {
+            Ok(app) => Ok(app.as_ref().map(app_target).unwrap_or_default()),
+            Err(error) if error.is_default_not_supported("focused_app") => {
+                Ok(TargetFacts::default())
+            }
+            Err(error) => Err(format!(
+                "the frontmost application could not be read: {}",
+                error.message
+            )),
         }
     }
 

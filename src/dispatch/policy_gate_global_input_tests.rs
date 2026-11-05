@@ -3,6 +3,8 @@
 //! touch the password manager" is bypassed by a shortcut sent to whatever
 //! is focused, or a click at the coordinates where its window sits.
 
+use agent_desktop_core::AppInfo;
+
 use super::policy_gate_desk::{Scenario, Screen, error_code};
 
 const HANDS_OFF_THE_VAULT: &str = r#"@id("allow-input")
@@ -45,6 +47,46 @@ fn shortcuts_are_judged_by_the_focused_app() {
         error_code(&scenario.run(&["press", "cmd+v"])),
         "POLICY_DENIED"
     );
+}
+
+#[test]
+fn a_frontmost_app_with_no_window_is_judged_as_itself() {
+    let scenario = Scenario::new(
+        r#"@id("allow-all")
+permit (principal, action, resource);
+
+@id("hands-off-the-vault")
+forbid (principal, action, resource == Desktop::App::"1Password");
+"#,
+    );
+    let reaches_the_frontmost_app: [&[&str]; 3] = [
+        &["press", "cmd+v"],
+        &["snapshot", "--surface", "menu"],
+        &["snapshot", "--surface", "menubar"],
+    ];
+    let set_frontmost =
+        |app: Option<AppInfo>| scenario.adapter.screen.lock().unwrap().frontmost = app;
+
+    set_frontmost(Some(Screen::app("1Password", "com.1password.1password")));
+    for args in reaches_the_frontmost_app {
+        denial_names_the_vault_policy(&scenario.run(args));
+    }
+
+    set_frontmost(Some(Screen::app("TextEdit", "com.apple.TextEdit")));
+    for args in reaches_the_frontmost_app {
+        assert_ne!(error_code(&scenario.run(args)), "POLICY_DENIED", "{args:?}");
+    }
+
+    set_frontmost(None);
+    assert_ne!(
+        error_code(&scenario.run(&["press", "cmd+v"])),
+        "POLICY_DENIED",
+        "a platform that reports no frontmost app judges it as system"
+    );
+
+    scenario.adapter.screen.lock().unwrap().inventory_broken = true;
+    let unreadable = scenario.run(&["press", "cmd+v"]);
+    assert_eq!(error_code(&unreadable), "POLICY_DENIED", "{unreadable:?}");
 }
 
 #[test]

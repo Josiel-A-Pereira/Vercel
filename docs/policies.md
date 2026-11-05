@@ -142,7 +142,8 @@ not running is judged as the installed app the name would launch.
   `move-window`, `minimize`, `maximize`, `restore`, `focus-window`,
   `list-surfaces`) are judged as the owner of the window they act on: the
   `--window-id` window, the windows `focus-window --title` matches, or the
-  focused window when neither is named. With `--app`, every listed window of
+  focused window when neither is named, or the frontmost app when no window
+  has focus. With `--app`, every listed window of
   that app is judged with its title, since the command may act on any of
   them, so a rule over `context.input.window` holds without `--window-id`.
 - `snapshot` and `find` on a shell surface (`--surface dock`,
@@ -153,7 +154,8 @@ not running is judged as the installed app the name would launch.
   `system`: it answers with the surface's window id, not what the surface
   shows.
 - Keyboard input (`press` without `--app`, `key-down`, `key-up`) is judged as
-  the focused window's app, `press --window-id` as that window's owner, and
+  the focused window's app, or the frontmost app when no window has focus,
+  `press --window-id` as that window's owner, and
   `press --app` as every window of that app.
 - Pointer input at coordinates (`mouse-*`, `hover --xy`) is judged as the app
   whose window is on top at that point. On macOS a point on the menu bar is
@@ -228,7 +230,7 @@ would compare equal.
 
 ```json
 {
-  "version": "2.5",
+  "version": "2.6",
   "ok": false,
   "command": "type",
   "error": {
