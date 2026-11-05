@@ -191,6 +191,7 @@ agent-desktop --headed mouse-move --xy 100,200
 - `drag --timeout-ms` covers the whole gesture as well as target preparation. An explicit `--duration` plus `--drop-delay` at or above the budget returns `INVALID_ARGS` before target work. Leave additional room for platform pickup/default delays, resolution and completion: for a 5000 ms movement, use `--duration 5000 --timeout-ms 10000`. A valid request can still return `TIMEOUT` if preparation consumes the remaining gesture budget. Optional `--wait-for`/`--wait-for-gone` verification has its own separate wait budget.
 - A drop target often needs the item to dwell over it. The default `--drop-delay` is 500 ms (150 ms on Linux, where a longer hold opens a hovered Files folder). Raise it (800 to 1200) for list reorders and cross-window drops.
 - `mouse-click` takes `--button left|right|middle`, `--count`, and `--modifiers`.
+- `mouse-click --app APP --xy X,Y` presses that app's element at the point through accessibility on macOS, with no `--headed`: the pointer stays put and the app stays behind. It takes a single left click with no modifiers, and returns `ACTION_NOT_SUPPORTED` with nothing delivered when no element at the point can be pressed.
 
 ## Choose the command
 

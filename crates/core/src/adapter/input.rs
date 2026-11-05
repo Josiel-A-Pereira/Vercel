@@ -32,6 +32,17 @@ pub trait InputOps: Send + Sync {
         Err(AdapterError::not_supported("mouse_event"))
     }
 
+    /// Presses the element of `pid` at the event's point through accessibility,
+    /// without moving the pointer or activating the app.
+    fn background_click(
+        &self,
+        _pid: i32,
+        _event: MouseEvent,
+        _lease: &InteractionLease,
+    ) -> Result<OperationReport, AdapterError> {
+        Err(AdapterError::not_supported("background_click"))
+    }
+
     fn key_event(
         &self,
         _combo: &KeyCombo,
