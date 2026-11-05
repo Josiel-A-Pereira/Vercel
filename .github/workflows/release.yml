@@ -205,7 +205,15 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          & "target/${{ matrix.target }}/release/agent-desktop.exe" version
+          $binary = "target/${{ matrix.target }}/release/agent-desktop.exe"
+          $python = Get-Command python3, python -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $python) {
+            Write-Host "FAIL: Python is not on PATH, so the CRT import check cannot run"
+            exit 1
+          }
+          & $python.Source scripts/check-windows-crt-imports.py $binary
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $binary version
           if ($LASTEXITCODE -ne 0) {
             Write-Host "FAIL: agent-desktop version exited $LASTEXITCODE on the freshly built binary"
             exit $LASTEXITCODE

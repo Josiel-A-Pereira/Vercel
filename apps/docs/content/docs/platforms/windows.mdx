@@ -9,6 +9,7 @@ agent-desktop reads Windows apps through UI Automation (UIA). The loop, refs, JS
 ## Requirements
 
 - Windows 10 1809 or later, or Windows Server 2019 or later, on x64 or ARM64.
+- The executable links the Microsoft C runtime statically, so it does not need the Visual C++ Redistributable.
 - The interactive desktop session of the signed-in user. Session 0 (services and SYSTEM tasks), Server Core, the secure desktop (UAC prompts and the sign-in screen), a locked desktop, and another user's session are not supported.
 - The binary is unsigned. SmartScreen can warn on a browser download, antivirus can quarantine it, and Smart App Control on a clean Windows 11 install blocks it.
 

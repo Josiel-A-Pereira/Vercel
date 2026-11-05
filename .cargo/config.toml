@@ -1,0 +1,5 @@
+# Link the MSVC C runtime into the binary. A Windows build then starts without
+# the Visual C++ Redistributable. RUSTFLAGS in the environment replaces these
+# flags, so a workflow that sets RUSTFLAGS has to keep +crt-static itself.
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]

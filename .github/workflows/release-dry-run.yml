@@ -32,6 +32,8 @@ on:
       - 'tests/linux-dist/**'
       - 'tests/ffi-python/**'
       - 'scripts/ci-ffi-helper-discovery-smoke.sh'
+      - '.cargo/config.toml'
+      - 'scripts/check-windows-crt-imports.py'
 
 permissions: {}
 
@@ -150,7 +152,16 @@ jobs:
       - name: Smoke-run the built binary (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: '& "target/${{ matrix.target }}/release/agent-desktop.exe" version'
+        run: |
+          $binary = "target/${{ matrix.target }}/release/agent-desktop.exe"
+          $python = Get-Command python3, python -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $python) {
+            Write-Host "FAIL: Python is not on PATH, so the CRT import check cannot run"
+            exit 1
+          }
+          & $python.Source scripts/check-windows-crt-imports.py $binary
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $binary version
 
       - name: Create tarball (macOS)
         if: runner.os == 'macOS'

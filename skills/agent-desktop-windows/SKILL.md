@@ -19,11 +19,13 @@ description: >
 This file covers only what differs on Windows. The observe-act loop, refs, JSON
 envelope, sessions and tracing are the same on every platform.
 
-Requires Windows 10 1809+ / Windows Server 2019+ (x64 or ARM64). Run it in the
-interactive desktop session of the signed-in user. Session 0 (services and
-SYSTEM tasks), Server Core, the secure desktop (UAC prompts, the sign-in
-screen), a locked desktop and another user's session are not supported:
-observation, actions and capture there fail or return nothing.
+Requires Windows 10 1809+ / Windows Server 2019+ (x64 or ARM64). The executable
+links the Microsoft C runtime statically, so it does not need the Visual C++
+Redistributable. Run it in the interactive desktop session of the signed-in
+user. Session 0 (services and SYSTEM tasks), Server Core, the secure desktop
+(UAC prompts, the sign-in screen), a locked desktop and another user's session
+are not supported: observation, actions and capture there fail or return
+nothing.
 
 ## Capability Table
 
