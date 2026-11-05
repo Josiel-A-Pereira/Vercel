@@ -64,6 +64,7 @@ Each command prints one JSON envelope. A trimmed snapshot:
 - Refs carry their snapshot id. A bare `@e8` fails with `INVALID_ARGS`.
 - If the UI changed, an action returns `STALE_REF` or `AMBIGUOUS_TARGET`. Take a new snapshot and use its refs.
 - Actions are headless by default: no pointer movement, no focus change. Pass `--headed` for physical input.
+- `type`, `set-value`, and `clipboard-set` accept `--stdin` for piped text, keeping it out of process arguments. Run secret steps as separate commands; batch JSON text appears in process arguments.
 - In PowerShell, quote every ref (`'@s8f3k2p9:e8'`), because a bare `@token` is the splatting operator.
 
 The full walkthrough is in the [quick start](https://agent-browser.dev/desktop/quick-start).

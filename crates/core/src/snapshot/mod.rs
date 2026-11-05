@@ -48,7 +48,7 @@ pub fn build(
     deadline: crate::Deadline,
 ) -> Result<SnapshotResult, AppError> {
     let windows = surface_windows(adapter, app_name, window_id, opts.surface, deadline)?;
-    let (window, capture) = first_surface_owner(windows, |window| {
+    let (window, capture) = window_capture::first_surface_owner(windows, |window| {
         window_capture::capture_window(adapter, opts, window, deadline)
     })?;
     let identity_unproven = capture.identity_unproven.clone();
@@ -225,25 +225,6 @@ fn frontmost_process_windows(
         windows.push(owner);
     }
     Ok(windows)
-}
-
-pub(crate) fn first_surface_owner<T>(
-    windows: Vec<WindowInfo>,
-    mut observe: impl FnMut(&WindowInfo) -> Result<T, AppError>,
-) -> Result<(WindowInfo, T), AppError> {
-    let mut windows = windows.into_iter().peekable();
-    while let Some(window) = windows.next() {
-        match observe(&window) {
-            Err(AppError::Adapter(error))
-                if error.code == crate::ErrorCode::ElementNotFound && windows.peek().is_some() => {}
-            result => return result.map(|observed| (window, observed)),
-        }
-    }
-    Err(
-        crate::AdapterError::new(crate::ErrorCode::WindowNotFound, "No window to observe")
-            .unsent()
-            .into(),
-    )
 }
 
 fn windows_for_app(
