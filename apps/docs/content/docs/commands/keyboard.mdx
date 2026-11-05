@@ -30,7 +30,7 @@ agent-desktop press return --app gnome-calculator
 
 The combo is lowercased and stripped of spaces, so `Ctrl + A` is `ctrl+a`. Modifiers are `meta` (aliases `cmd`, `command`, `super`, `win`: Command on macOS, the Windows key on Windows, Super on Linux), `ctrl` (`control`), `alt` (`option`), and `shift`. A bare uppercase letter adds Shift. Key names that work everywhere are `return`, `escape`, `tab`, `space`, `delete`, `up`, `down`, `left`, `right`, and `f1` to `f12`. Copy is `cmd+c` on macOS and `ctrl+c` elsewhere.
 
-Keys are physical keyboard input, and `press` does not need `--headed` for an unscoped press. The result is always `delivered_unverified`, because delivery does not prove the shortcut did anything:
+An unscoped `press COMBO` is an exception to the default headless interaction model: it sends physical synthetic keystrokes to whichever application is foreground at delivery time, even **without `--headed`**. It does not verify or pin the foreground window. On a shared desktop, keys can enter another user's active app if focus changes. Prefer `--app` or `--window-id` to target and verify the intended application; do not use unscoped press while the user may be typing. Keys are physical keyboard input, and unscoped press needs no `--headed`. The result is always `delivered_unverified`, because delivery does not prove the shortcut did anything:
 
 ```json
 {

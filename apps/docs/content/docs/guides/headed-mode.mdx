@@ -49,7 +49,7 @@ Depending on the OS:
   </tbody>
 </table>
 
-`press` is keyboard input and does not need `--headed` for an unscoped press; scoped presses have platform rules. Each platform page has the full capability table: [macOS](/desktop/platforms/macos), [Windows](/desktop/platforms/windows), [Linux](/desktop/platforms/linux).
+**Exception:** unscoped `press COMBO` can send physical keystrokes to the current foreground application without `--headed`. It has no verified target and can redirect typing into another app if focus changes. Prefer a scoped `press --app NAME` or `press --window-id ID` when the user is working on the desktop. Scoped presses have platform rules. Each platform page has the full capability table: [macOS](/desktop/platforms/macos), [Windows](/desktop/platforms/windows), [Linux](/desktop/platforms/linux).
 
 ## Handle `POLICY_DENIED`
 
