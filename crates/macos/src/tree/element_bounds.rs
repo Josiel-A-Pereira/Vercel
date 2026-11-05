@@ -54,13 +54,55 @@ pub(crate) fn owning_window_bounds(
     if deadline.is_expired() {
         return Err(deadline.timeout_error());
     }
-    let Some(window) = window else {
-        return Ok(None);
+    let window = match window {
+        Some(window) => window,
+        None => {
+            let instant = super::locator_deadline::from_operation(deadline)?;
+            let found = window_through_parents(
+                |element| super::surface_read::element(element, "AXParent", instant),
+                |element| super::surface_read::string(element, "AXRole", instant),
+                |element| super::surface_read::element(element, "AXWindow", instant),
+                element.clone(),
+            )?;
+            let Some(window) = found else {
+                return Ok(None);
+            };
+            window
+        }
     };
     crate::tree::element_bounds::read_bounds_with_deadline(
         &window,
         super::locator_deadline::from_operation(deadline)?,
     )
+}
+
+/// The window that owns an element without an `AXWindow` attribute. Content
+/// that macOS draws in another process, such as the open and save panel inside
+/// a sheet, publishes no `AXWindow` on its controls, while an ancestor such as
+/// the sheet does. The first ancestor that is a window, or that names its
+/// window, is the owner. Bounded, so a cyclic parent chain ends.
+pub(crate) fn window_through_parents<E>(
+    mut parent: impl FnMut(&E) -> Result<Option<E>, AdapterError>,
+    mut role: impl FnMut(&E) -> Result<Option<String>, AdapterError>,
+    mut window: impl FnMut(&E) -> Result<Option<E>, AdapterError>,
+    element: E,
+) -> Result<Option<E>, AdapterError> {
+    let mut current = parent(&element)?;
+    for _ in 0..super::properties::element::ABSOLUTE_MAX_DEPTH {
+        let Some(ancestor) = current else {
+            return Ok(None);
+        };
+        match role(&ancestor)?.as_deref() {
+            Some("AXWindow") => return Ok(Some(ancestor)),
+            Some("AXApplication") | None => return Ok(None),
+            Some(_) => {}
+        }
+        if let Some(owner) = window(&ancestor)? {
+            return Ok(Some(owner));
+        }
+        current = parent(&ancestor)?;
+    }
+    Ok(None)
 }
 
 pub(crate) fn clips_descendants(role: &str) -> bool {
@@ -176,6 +218,47 @@ mod tests {
             width,
             height: 100.0,
         }
+    }
+
+    /// A parent chain for `window_through_parents`: index `i` has parent
+    /// `i + 1`, a role, and optionally a window it names.
+    fn walk(roles: &[&str], names_window: &[(usize, usize)]) -> Option<usize> {
+        window_through_parents(
+            |&i: &usize| Ok((i + 1 < roles.len()).then_some(i + 1)),
+            |&i: &usize| Ok(Some(roles[i].to_owned())),
+            |&i: &usize| {
+                Ok(names_window
+                    .iter()
+                    .find(|(from, _)| *from == i)
+                    .map(|(_, to)| *to))
+            },
+            0,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_control_without_axwindow_finds_its_window_through_a_sheet() {
+        let roles = [
+            "AXPopUpButton",
+            "AXSplitGroup",
+            "AXSheet",
+            "AXWindow",
+            "AXApplication",
+        ];
+        assert_eq!(walk(&roles, &[(2, 3)]), Some(3));
+    }
+
+    #[test]
+    fn a_window_ancestor_is_the_owner_when_no_ancestor_names_one() {
+        let roles = ["AXButton", "AXGroup", "AXWindow", "AXApplication"];
+        assert_eq!(walk(&roles, &[]), Some(2));
+    }
+
+    #[test]
+    fn the_application_ends_the_walk_without_an_owner() {
+        let roles = ["AXMenuItem", "AXMenu", "AXApplication"];
+        assert_eq!(walk(&roles, &[]), None);
     }
 
     #[test]
