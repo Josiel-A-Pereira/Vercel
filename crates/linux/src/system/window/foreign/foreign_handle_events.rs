@@ -1,4 +1,4 @@
-use wayland_client::{Connection, Dispatch, Proxy, QueueHandle};
+use wayland_client::{Connection, Dispatch, QueueHandle};
 use wayland_protocols_wlr::foreign_toplevel::v1::client::zwlr_foreign_toplevel_handle_v1::{
     self, ZwlrForeignToplevelHandleV1,
 };
@@ -16,24 +16,26 @@ impl Dispatch<ZwlrForeignToplevelHandleV1, ()> for ForeignState {
         _: &QueueHandle<Self>,
     ) {
         use zwlr_foreign_toplevel_handle_v1::Event;
-        let id = handle.id().protocol_id();
+        let Some(id) = state.roster.serial_of(handle) else {
+            return;
+        };
         match event {
             Event::Title { title } => {
-                if let Some(tracked) = state.tracked_mut(id) {
+                if let Some(tracked) = state.roster.tracked_mut(id) {
                     tracked.pending.title = Some(title);
                 }
             }
             Event::AppId { app_id } => {
-                if let Some(tracked) = state.tracked_mut(id) {
+                if let Some(tracked) = state.roster.tracked_mut(id) {
                     tracked.pending.app_id = Some(app_id);
                 }
             }
             Event::State { state: words } => {
-                if let Some(tracked) = state.tracked_mut(id) {
+                if let Some(tracked) = state.roster.tracked_mut(id) {
                     tracked.pending.flags = Some(ToplevelFlags::from_state_words(&words));
                 }
             }
-            Event::Done => state.settle(id),
+            Event::Done => state.roster.settle(id),
             Event::Closed => state.forget(id),
             _ => {}
         }

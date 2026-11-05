@@ -4,7 +4,8 @@ use std::os::unix::net::UnixStream;
 
 use agent_desktop_core::{AdapterError, Deadline};
 use wayland_client::protocol::wl_seat::WlSeat;
-use wayland_client::{Connection, EventQueue, Proxy};
+use wayland_client::{Connection, EventQueue};
+use wayland_protocols_wlr::foreign_toplevel::v1::client::zwlr_foreign_toplevel_handle_v1::ZwlrForeignToplevelHandleV1;
 use wayland_protocols_wlr::foreign_toplevel::v1::client::zwlr_foreign_toplevel_manager_v1::ZwlrForeignToplevelManagerV1;
 
 use super::foreign_hypr_ipc;
@@ -135,14 +136,14 @@ impl ToplevelPort for ForeignLink {
         let mut queue = self.queue.borrow_mut();
         let mut state = self.state.borrow_mut();
         state.addresses.clear();
-        let handles: Vec<_> = state
-            .tracked
-            .iter()
-            .filter(|item| item.shown.is_some())
-            .map(|item| item.handle.clone())
+        let handles: Vec<(u32, ZwlrForeignToplevelHandleV1)> = state
+            .roster
+            .shown_handles()
+            .into_iter()
+            .map(|(serial, handle)| (serial, handle.clone()))
             .collect();
-        for handle in &handles {
-            manager.get_window_for_toplevel_wlr(handle, &queue.handle(), handle.id().protocol_id());
+        for (serial, handle) in &handles {
+            manager.get_window_for_toplevel_wlr(handle, &queue.handle(), *serial);
         }
         match roundtrip(&self.connection, &mut queue, &mut state, deadline) {
             Ok(true) => {}
@@ -159,12 +160,14 @@ impl ToplevelPort for ForeignLink {
         let clients = foreign_hypr_mapping::stable_clients(&clients, &after);
         let addresses = handles
             .iter()
-            .filter_map(|handle| {
-                let id = handle.id().protocol_id();
-                if !state.handle_of(id).is_some_and(|current| current == handle) {
+            .filter_map(|(id, handle)| {
+                if !state
+                    .handle_of(*id)
+                    .is_some_and(|current| current == handle)
+                {
                     return None;
                 }
-                state.addresses.get(&id).map(|address| (id, *address))
+                state.addresses.get(id).map(|address| (*id, *address))
             })
             .collect();
         Ok(Some(foreign_hypr_mapping::join(&addresses, &clients)))

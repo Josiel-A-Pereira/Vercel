@@ -94,8 +94,8 @@ fn a_fresh_state_holds_no_toplevels_and_forgets_unknown_ids_quietly() {
     let mut state = ForeignState::default();
     assert!(state.records().is_empty());
     assert!(state.handle_of(3).is_none());
-    assert!(state.tracked_mut(3).is_none());
-    state.settle(3);
+    assert!(state.roster.tracked_mut(3).is_none());
+    state.roster.settle(3);
     state.forget(3);
     assert!(state.records().is_empty());
 }

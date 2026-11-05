@@ -3,14 +3,14 @@ use std::collections::HashMap;
 use wayland_client::protocol::wl_callback::{self, WlCallback};
 use wayland_client::protocol::wl_registry::{self, WlRegistry};
 use wayland_client::protocol::wl_seat::{self, WlSeat};
-use wayland_client::{Connection, Dispatch, Proxy, QueueHandle, event_created_child};
+use wayland_client::{Connection, Dispatch, QueueHandle, event_created_child};
 use wayland_protocols_wlr::foreign_toplevel::v1::client::zwlr_foreign_toplevel_handle_v1::ZwlrForeignToplevelHandleV1;
 use wayland_protocols_wlr::foreign_toplevel::v1::client::zwlr_foreign_toplevel_manager_v1::{
     self, EVT_TOPLEVEL_OPCODE, ZwlrForeignToplevelManagerV1,
 };
 
 use super::foreign_record::ToplevelRecord;
-use super::foreign_tracked::Tracked;
+use super::foreign_roster::Roster;
 use crate::system::display::display_wayland_state::Global;
 use crate::system::display::wayland_link::SyncDone;
 
@@ -20,7 +20,7 @@ use crate::system::display::wayland_link::SyncDone;
 pub(super) struct ForeignState {
     pub(super) globals: Vec<Global>,
     pub(super) seat: Option<WlSeat>,
-    pub(super) tracked: Vec<Tracked>,
+    pub(super) roster: Roster<ZwlrForeignToplevelHandleV1>,
     pub(super) addresses: HashMap<u32, u64>,
     synced: bool,
 }
@@ -33,42 +33,17 @@ impl SyncDone for ForeignState {
 
 impl ForeignState {
     pub(super) fn records(&self) -> Vec<ToplevelRecord> {
-        self.tracked
-            .iter()
-            .filter_map(|tracked| tracked.shown.clone())
-            .collect()
+        self.roster.records()
     }
 
     pub(super) fn handle_of(&self, id: u32) -> Option<&ZwlrForeignToplevelHandleV1> {
-        self.tracked
-            .iter()
-            .find(|tracked| tracked.handle.id().protocol_id() == id && tracked.shown.is_some())
-            .map(|tracked| &tracked.handle)
-    }
-
-    pub(super) fn tracked_mut(&mut self, id: u32) -> Option<&mut Tracked> {
-        self.tracked
-            .iter_mut()
-            .find(|tracked| tracked.handle.id().protocol_id() == id)
-    }
-
-    pub(super) fn settle(&mut self, id: u32) {
-        if let Some(tracked) = self.tracked_mut(id) {
-            let record = tracked.pending.settle(id, tracked.shown.as_ref());
-            tracked.shown = Some(record);
-        }
+        self.roster.handle_of(id)
     }
 
     pub(super) fn forget(&mut self, id: u32) {
-        let Some(at) = self
-            .tracked
-            .iter()
-            .position(|tracked| tracked.handle.id().protocol_id() == id)
-        else {
-            return;
-        };
-        let gone = self.tracked.remove(at);
-        gone.handle.destroy();
+        if let Some(handle) = self.roster.forget(id) {
+            handle.destroy();
+        }
     }
 }
 
@@ -133,11 +108,7 @@ impl Dispatch<ZwlrForeignToplevelManagerV1, ()> for ForeignState {
         _: &QueueHandle<Self>,
     ) {
         if let zwlr_foreign_toplevel_manager_v1::Event::Toplevel { toplevel } = event {
-            state.tracked.push(Tracked {
-                handle: toplevel,
-                shown: None,
-                pending: Default::default(),
-            });
+            state.roster.announce(toplevel);
         }
     }
 

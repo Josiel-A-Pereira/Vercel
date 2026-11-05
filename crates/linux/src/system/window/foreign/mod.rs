@@ -24,6 +24,7 @@ pub(in crate::system) mod foreign_proof;
 pub(in crate::system) mod foreign_record;
 pub(in crate::system) mod foreign_refusal;
 pub(in crate::system) mod foreign_request;
+mod foreign_roster;
 pub(in crate::system) mod foreign_route;
 mod foreign_state;
 pub(in crate::system) mod foreign_target;
