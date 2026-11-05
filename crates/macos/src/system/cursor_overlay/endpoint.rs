@@ -3,7 +3,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::{DirBuilderExt, FileTypeExt, MetadataExt};
 use std::path::{Path, PathBuf};
 
-pub(super) const PROTOCOL_VERSION: &str = "v2";
+pub(super) const PROTOCOL_VERSION: &str = "v3";
 
 pub(super) fn path(session_id: &str, agent_id: Option<&str>) -> Result<PathBuf, AdapterError> {
     let root = session::agent_desktop_dir()

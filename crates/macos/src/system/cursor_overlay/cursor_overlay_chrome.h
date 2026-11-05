@@ -16,6 +16,9 @@ CGColorRef ADColor(const double *rgb, CGFloat alpha);
 const AgentDesktopCursorStyle *ADStyle(void);
 
 NSWindow *ADWindow(NSRect frame);
+void ADPlace(NSWindow *window);
+void ADStackWindows(NSWindow *cursor, NSWindow *bubble, NSWindow *ripple);
+void agent_desktop_cursor_overlay_reanchor(void);
 void ADPump(NSApplication *app);
 void ADFreezeLayer(CALayer *layer);
 NSWindow *ADRippleWindow(void);

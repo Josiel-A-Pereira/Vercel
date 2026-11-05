@@ -196,6 +196,7 @@ On macOS:
 
 - `--travel-ms MIN,MAX` needs `30 ≤ MIN ≤ MAX`. Travel max plus `--dwell-ms` must be at most 700 ms, or the command returns `INVALID_ARGS`.
 - Reduce Motion skips travel and dwell. Physical headed drags keep their own motion.
+- A ref action draws the overlay directly above the target's window, so a window in front of the target covers it. A menu, popover or panel target, and physical pointer input, draw it above every window.
 
 On macOS and Windows:
 

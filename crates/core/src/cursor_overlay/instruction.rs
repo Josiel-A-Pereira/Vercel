@@ -1,5 +1,5 @@
-use super::{CursorOverlayConfig, CursorPhase};
-use crate::{AdapterError, ErrorCode, Point, Rect};
+use super::{CursorArrival, CursorOverlayConfig, CursorPhase};
+use crate::{AdapterError, ErrorCode, Point, ProcessId, Rect};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
@@ -15,8 +15,8 @@ pub struct CursorOverlayInstruction {
     target: Option<Rect>,
     #[serde(default)]
     phase: CursorPhase,
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pointer: bool,
+    #[serde(default, skip_serializing_if = "CursorArrival::is_plain")]
+    arrival: CursorArrival,
 }
 
 impl CursorOverlayInstruction {
@@ -39,7 +39,7 @@ impl CursorOverlayInstruction {
             click,
             target: None,
             phase: CursorPhase::Travel,
-            pointer: false,
+            arrival: CursorArrival::new(false, None),
         })
     }
 
@@ -48,14 +48,25 @@ impl CursorOverlayInstruction {
         self
     }
 
-    /// Arrive showing the pointer image: the travel ends on a pressable control.
-    pub const fn with_pointer(mut self, pointer: bool) -> Self {
-        self.pointer = pointer;
+    /// How a travel arrives: with the pointer image on a pressable control,
+    /// and the process whose window holds the target, when it has one.
+    pub const fn with_arrival(mut self, arrival: CursorArrival) -> Self {
+        self.arrival = arrival;
         self
     }
 
     pub const fn is_pointer(&self) -> bool {
-        self.pointer
+        self.arrival.pointer()
+    }
+
+    pub const fn owner(&self) -> Option<ProcessId> {
+        self.arrival.owner()
+    }
+
+    /// Whether this instruction moves the cursor somewhere new: a travel or a
+    /// drag. Effects and carets play where the cursor already is.
+    pub const fn moves_cursor(&self) -> bool {
+        matches!(self.phase, CursorPhase::Travel | CursorPhase::Drag)
     }
 
     pub fn with_drag_from(mut self, drag_from: Option<Point>) -> Self {

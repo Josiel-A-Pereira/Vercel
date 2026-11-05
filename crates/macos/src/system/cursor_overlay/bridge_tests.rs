@@ -6,7 +6,7 @@ fn instruction(phase: CursorPhase, pointer: bool) -> CursorOverlayInstruction {
     CursorOverlayInstruction::new(Point { x: 5.0, y: 5.0 }, &config, false)
         .expect("valid instruction")
         .with_phase(phase)
-        .with_pointer(pointer)
+        .with_arrival(agent_desktop_core::CursorArrival::new(pointer, None))
 }
 
 #[test]

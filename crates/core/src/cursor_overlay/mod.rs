@@ -1,3 +1,4 @@
+mod arrival;
 mod caret_follow;
 mod config;
 mod control;
@@ -17,6 +18,7 @@ mod style;
 mod submit;
 mod timing;
 
+pub use arrival::CursorArrival;
 pub(crate) use caret_follow::follow_caret_after_key;
 pub use config::{CursorOverlayConfig, MAX_CURSOR_LABEL_BYTES, MAX_CURSOR_LABEL_WORDS};
 pub use control::{CURSOR_OVERLAY_GREETING, CursorOverlayControl};
