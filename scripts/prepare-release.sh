@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 bash scripts/check-release-consistency.sh
-VERSION=$(node "$(dirname "${BASH_SOURCE[0]}")/release-version.js")
+VERSION=$(node "${SCRIPT_DIR}/release-version.js")
 TAG_NAME="v${VERSION}"
 NPM_VERSION=$(npm view agent-desktop version 2>/dev/null || echo "0.0.0")
 SHOULD_RELEASE=false
@@ -16,12 +17,14 @@ SOURCE_SHA=$(git rev-parse HEAD)
 if [ "$SHOULD_RELEASE" = true ] || [ "$NEEDS_GITHUB_RELEASE" = true ]; then
   if git rev-parse --verify "refs/tags/${TAG_NAME}" >/dev/null 2>&1; then
     SOURCE_SHA=$(git rev-parse "refs/tags/${TAG_NAME}^{commit}")
-    TAG_VERSION=$(git show "${SOURCE_SHA}:Cargo.toml" | node "$(dirname "${BASH_SOURCE[0]}")/release-version.js" -)
+    TAG_VERSION=$(git show "${SOURCE_SHA}:Cargo.toml" | node "${SCRIPT_DIR}/release-version.js" -)
     if [ "$TAG_VERSION" != "$VERSION" ]; then
       echo "Existing tag ${TAG_NAME} has inconsistent version metadata" >&2
       exit 1
     fi
+    git show "${SOURCE_SHA}:CHANGELOG.md" | node "${SCRIPT_DIR}/release-notes.js" "$VERSION" - >/dev/null
   else
+    node "${SCRIPT_DIR}/release-notes.js" "$VERSION" >/dev/null
     gh api "repos/${GH_REPO}/git/refs" -f "ref=refs/tags/${TAG_NAME}" -f "sha=${SOURCE_SHA}"
   fi
 fi
