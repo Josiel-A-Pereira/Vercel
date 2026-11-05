@@ -184,6 +184,11 @@ On Windows, use `agent-desktop-windows` instead of `agent-desktop-macos`; on Lin
 - [CONCEPTS.md](CONCEPTS.md): vocabulary
 - [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md)
 
+## Requirements
+
+- A stable Rust toolchain (install with rustup)
+- A local `.env` created from `.env.example`
+
 ## License
 
 Apache-2.0
