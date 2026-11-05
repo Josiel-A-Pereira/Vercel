@@ -58,6 +58,7 @@ fn run() -> Result<(), AdapterError> {
             .with_platform_detail(error.to_string())
     })?;
     let mut quiet_since = std::time::Instant::now();
+    let mut rest_ms = initial.rest_ms_or(CURSOR_IDLE_REST_MS);
     let mut checked_session = quiet_since;
     loop {
         if checked_session.elapsed() >= Duration::from_secs(1) {
@@ -92,6 +93,7 @@ fn run() -> Result<(), AdapterError> {
                     continue;
                 }
                 quiet_since = std::time::Instant::now();
+                rest_ms = control.rest_ms_or(rest_ms);
                 if std::mem::take(&mut state.resting) {
                     bridge::show();
                 }
@@ -107,7 +109,7 @@ fn run() -> Result<(), AdapterError> {
                 bridge::idle();
                 if !state.resting
                     && !bridge::drag_active()
-                    && quiet_since.elapsed().as_millis() >= u128::from(CURSOR_IDLE_REST_MS)
+                    && agent_desktop_core::rest_is_due(rest_ms, quiet_since.elapsed())
                 {
                     bridge::rest();
                     state.resting = true;

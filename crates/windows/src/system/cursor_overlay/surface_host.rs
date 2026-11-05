@@ -26,7 +26,7 @@ use agent_desktop_core::{
     CursorOverlayControl, CursorPhase, LABEL_FONT_POINTS, Point, Rect,
 };
 #[cfg(target_os = "windows")]
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// Thirteen hops, matching the reference, which is enough that the fade
 /// reads as continuous without costing a frame per pixel row.
@@ -54,17 +54,15 @@ impl SurfaceHost {
             caret: CaretMark::create()?,
             session_id,
             presentation: Presentation::resting_at(pose),
-            rest: RestState {
-                resting: false,
-                quiet_since: Instant::now(),
-            },
+            rest: RestState::new(),
             watch: session_state::EndWatch::default(),
             topology,
         })
     }
 
     pub(crate) fn idle_tick(&self) -> Duration {
-        Duration::from_millis(CURSOR_IDLE_REST_MS / 4)
+        self.rest
+            .wait(Duration::from_millis(CURSOR_IDLE_REST_MS / 4))
     }
 
     /// Everything that must be true before the control's sender is
@@ -75,8 +73,7 @@ impl SurfaceHost {
         if self.rest.resting && control.is_caret_follow() {
             return;
         }
-        self.rest.resting = false;
-        self.rest.quiet_since = Instant::now();
+        self.rest.wake(control);
         if let Some(style) = control.style() {
             self.presentation.style = style.clone();
         }
@@ -314,7 +311,7 @@ impl SurfaceHost {
         if self.rest.resting {
             return;
         }
-        if self.rest.quiet_since.elapsed() < Duration::from_millis(CURSOR_IDLE_REST_MS) {
+        if !self.rest.is_due() {
             return;
         }
         self.fade_away();

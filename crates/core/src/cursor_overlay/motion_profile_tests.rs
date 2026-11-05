@@ -313,3 +313,45 @@ fn an_unvalidated_profile_falls_back_to_the_default_motion() {
         }
     }
 }
+
+#[test]
+fn rest_ms_defaults_to_the_idle_rest_and_stays_out_of_json() {
+    let motion = CursorMotionProfile::default();
+    assert_eq!(motion.rest_ms(), crate::CURSOR_IDLE_REST_MS);
+    assert!(!serde_json::to_string(&motion).unwrap().contains("rest_ms"));
+}
+
+#[test]
+fn tuned_rest_ms_round_trips_and_is_carried_by_the_control() {
+    let motion = profile(|motion| motion.set_rest_ms(0));
+    let json = serde_json::to_string(&motion).unwrap();
+    assert!(json.contains("\"rest_ms\":0"));
+    let parsed: CursorMotionProfile = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.rest_ms(), 0);
+    let control = crate::CursorOverlayControl::hide("s1".to_owned());
+    assert_eq!(control.rest_ms_or(42), 42);
+}
+
+#[test]
+fn rest_is_due_after_the_rest_time_and_never_for_zero() {
+    use std::time::Duration;
+    assert!(!crate::rest_is_due(6_000, Duration::from_millis(5_999)));
+    assert!(crate::rest_is_due(6_000, Duration::from_millis(6_000)));
+    assert!(!crate::rest_is_due(0, Duration::from_secs(86_400)));
+}
+
+#[test]
+fn rest_wait_ends_when_the_rest_is_due_and_is_capped() {
+    use std::time::Duration;
+    let most = Duration::from_millis(1_500);
+    assert_eq!(
+        crate::rest_wait(500, Duration::from_millis(100), most),
+        Duration::from_millis(400)
+    );
+    assert_eq!(
+        crate::rest_wait(500, Duration::from_millis(900), most),
+        Duration::ZERO
+    );
+    assert_eq!(crate::rest_wait(6_000, Duration::ZERO, most), most);
+    assert_eq!(crate::rest_wait(0, Duration::ZERO, most), most);
+}

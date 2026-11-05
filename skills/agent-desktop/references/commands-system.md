@@ -192,6 +192,8 @@ agent-desktop session end "$AGENT_DESKTOP_SESSION"
 
 `cursor-overlay enable` draws an agent cursor and ripple for actions. It affects presentation only. `enable` returns `data.rendered`: `false` means the setting was saved but nothing was drawn. `session start --cursor` enables it at start. `agent-desktop cursor-overlay enable --help` lists the style, image and motion flags with their ranges and defaults. Settings persist in the session and in per-agent profiles. After an upgrade, run `cursor-overlay disable`, then `enable`, to restart the renderer with the new settings.
 
+`--rest-ms MS` sets how long a cursor stays on screen after its last action before it fades (default 6000). `0` keeps it until the session ends or the overlay is disabled. On Linux the cursor does not fade, so the flag has no effect there.
+
 On macOS:
 
 - `--travel-ms MIN,MAX` needs `30 ≤ MIN ≤ MAX`. Travel max plus `--dwell-ms` must be at most 700 ms, or the command returns `INVALID_ARGS`.

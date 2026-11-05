@@ -120,6 +120,12 @@ impl CursorOverlayControl {
         self
     }
 
+    /// The rest time this control carries, or `fallback` when it carries no
+    /// motion profile.
+    pub fn rest_ms_or(&self, fallback: u64) -> u64 {
+        self.motion().map_or(fallback, CursorMotionProfile::rest_ms)
+    }
+
     pub fn motion(&self) -> Option<&CursorMotionProfile> {
         match self {
             Self::Enable { motion, .. } | Self::Present { motion, .. } => Some(motion),

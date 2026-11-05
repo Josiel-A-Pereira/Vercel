@@ -94,5 +94,36 @@ mod imp {
     pub(crate) struct RestState {
         pub(crate) resting: bool,
         pub(crate) quiet_since: Instant,
+        pub(crate) after_ms: u64,
+    }
+
+    impl RestState {
+        pub(crate) fn new() -> Self {
+            Self {
+                resting: false,
+                quiet_since: Instant::now(),
+                after_ms: agent_desktop_core::CURSOR_IDLE_REST_MS,
+            }
+        }
+
+        /// Restarts the quiet period for a control that just arrived, and
+        /// adopts the rest time it carries, if it carries one.
+        pub(crate) fn wake(&mut self, control: &agent_desktop_core::CursorOverlayControl) {
+            self.resting = false;
+            self.quiet_since = Instant::now();
+            self.after_ms = control.rest_ms_or(self.after_ms);
+        }
+
+        /// How long the idle wait may last before the rest has to be checked.
+        pub(crate) fn wait(&self, most: std::time::Duration) -> std::time::Duration {
+            if self.resting {
+                return most;
+            }
+            agent_desktop_core::rest_wait(self.after_ms, self.quiet_since.elapsed(), most)
+        }
+
+        pub(crate) fn is_due(&self) -> bool {
+            agent_desktop_core::rest_is_due(self.after_ms, self.quiet_since.elapsed())
+        }
     }
 }

@@ -50,7 +50,7 @@ pub use cursor_overlay::{
     CursorPhase, CursorPose, LABEL_FONT_POINTS, LABEL_PILL_HEIGHT, LABEL_PILL_MAX_WIDTH,
     LABEL_PILL_PADDING, LABEL_SHADOW_BLUR, LABEL_SHADOW_OFFSET, LABEL_SHADOW_OPACITY, LabelPill,
     MAX_CURSOR_IMAGE_BYTES, MAX_CURSOR_IMAGE_PATH_BYTES, MAX_CURSOR_IMAGE_PIXELS,
-    MAX_CURSOR_LABEL_BYTES, MAX_CURSOR_LABEL_WORDS, place_label,
+    MAX_CURSOR_LABEL_BYTES, MAX_CURSOR_LABEL_WORDS, place_label, rest_is_due, rest_wait,
 };
 pub use input::clipboard_content::ClipboardContent;
 pub use input::clipboard_format::ClipboardFormat;

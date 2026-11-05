@@ -1,4 +1,4 @@
-use super::timing::CURSOR_MOTION_BUDGET_MS;
+use super::timing::{CURSOR_IDLE_REST_MS, CURSOR_MOTION_BUDGET_MS};
 use crate::{AdapterError, ErrorCode};
 use serde::{Deserialize, Serialize};
 
@@ -41,6 +41,12 @@ pub struct CursorMotionProfile {
     dwell_ms: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     seed: Option<u64>,
+    /// How long the cursor stays after its last instruction before it fades; 0 keeps it until the session ends.
+    #[serde(
+        default = "default_rest_ms",
+        skip_serializing_if = "is_default_rest_ms"
+    )]
+    rest_ms: u64,
 }
 
 impl CursorMotionProfile {
@@ -100,6 +106,15 @@ impl CursorMotionProfile {
         self.seed = seed;
     }
 
+    pub fn set_rest_ms(&mut self, rest_ms: u64) {
+        self.rest_ms = rest_ms;
+    }
+
+    /// 0 means the cursor never rests (stays until the session ends or the overlay is disabled).
+    pub const fn rest_ms(&self) -> u64 {
+        self.rest_ms
+    }
+
     pub const fn travel_ms(&self) -> (u64, u64) {
         (self.travel_min_ms, self.travel_max_ms)
     }
@@ -135,6 +150,7 @@ impl Default for CursorMotionProfile {
             tremor: DEFAULT_TREMOR,
             dwell_ms: 0,
             seed: None,
+            rest_ms: CURSOR_IDLE_REST_MS,
         }
     }
 }
@@ -151,6 +167,14 @@ fn check_range(flag: &str, value: f64, max: f64) -> Result<(), AdapterError> {
 
 fn invalid(message: String) -> AdapterError {
     AdapterError::new(ErrorCode::InvalidArgs, message)
+}
+
+const fn default_rest_ms() -> u64 {
+    CURSOR_IDLE_REST_MS
+}
+
+fn is_default_rest_ms(value: &u64) -> bool {
+    *value == CURSOR_IDLE_REST_MS
 }
 
 const fn default_travel_min_ms() -> u64 {

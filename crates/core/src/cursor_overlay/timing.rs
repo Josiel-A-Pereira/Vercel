@@ -27,3 +27,27 @@ pub const CURSOR_REST_FADE_MS: u64 = 156;
 /// arrives does not simply blink into place. The same caveat applies: the
 /// bridge holds its own copy for now.
 pub const CURSOR_LABEL_REVEAL_MS: u64 = 180;
+
+/// Whether a cursor that has been quiet for `quiet` should rest under a rest
+/// time of `rest_ms`. A rest time of zero keeps the cursor until its session
+/// ends or the overlay is disabled.
+pub fn rest_is_due(rest_ms: u64, quiet: std::time::Duration) -> bool {
+    rest_ms != 0 && quiet.as_millis() >= u128::from(rest_ms)
+}
+
+/// How long a renderer that polls for rest may wait before its next check:
+/// the time left until the rest is due, never more than `most`. Waiting a
+/// fixed tick instead would let a short rest time (e.g. 500 ms) fire up to a
+/// whole tick late. A rest time of zero never comes due, so it waits `most`.
+pub fn rest_wait(
+    rest_ms: u64,
+    quiet: std::time::Duration,
+    most: std::time::Duration,
+) -> std::time::Duration {
+    if rest_ms == 0 {
+        return most;
+    }
+    std::time::Duration::from_millis(rest_ms)
+        .saturating_sub(quiet)
+        .min(most)
+}

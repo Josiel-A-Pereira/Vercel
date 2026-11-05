@@ -39,6 +39,12 @@ pub(crate) struct CursorOverlayMotionArgs {
         help = "Vary each move deterministically from this seed"
     )]
     pub motion_seed: Option<u64>,
+    #[arg(
+        long,
+        value_name = "MS",
+        help = "How long a cursor stays after its last action before fading, in ms; 0 keeps it until the session ends (default 6000)"
+    )]
+    pub rest_ms: Option<u64>,
 }
 
 impl CursorOverlayMotionArgs {
@@ -60,6 +66,9 @@ impl CursorOverlayMotionArgs {
             motion.set_dwell_ms(dwell_ms);
         }
         motion.set_seed(self.motion_seed);
+        if let Some(rest_ms) = self.rest_ms {
+            motion.set_rest_ms(rest_ms);
+        }
         motion
     }
 }
