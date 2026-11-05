@@ -44,7 +44,7 @@ Exit codes: `0` success, `1` structured error, `2` argument error. The `error` o
 | `PERM_DENIED` | A required OS permission is missing | Read the platform skill |
 | `ELEMENT_NOT_FOUND` | Ref is absent, or the requested surface is absent | Read `details.kind` and `details.surface`; open an absent menu or refresh only after checking the UI |
 | `STALE_REF` | Ref no longer matches the live UI | Snapshot again, use the new ref |
-| `AMBIGUOUS_TARGET` | Several live elements match the ref's identity, or it was not proven unique at capture | Act on a control unique in the window; identical twins need `--headed mouse-click --xy` (see `commands-observation.md`) |
+| `AMBIGUOUS_TARGET` | Several live elements, windows, or app instances match | Ref ambiguity: narrow with `find` or `--root`. Process/window ambiguity: inspect candidates with `list-windows`, then scope via `--window-id` |
 | `SNAPSHOT_NOT_FOUND` | Snapshot id missing or expired | Snapshot again |
 | `APP_NOT_FOUND` | App not running | `launch` it |
 | `WINDOW_NOT_FOUND` | No matching window | Check the name, use `list-windows` |
