@@ -22,6 +22,7 @@ pub(in crate::system) struct ForeignCloseRoute<P: ToplevelPort> {
     link: OnceCell<Option<P>>,
     in_use: Cell<bool>,
     contested: Cell<usize>,
+    sent: RefCell<Vec<u32>>,
     evidence: RefCell<CloseEvidence>,
 }
 
@@ -31,6 +32,7 @@ impl<P: ToplevelPort> Default for ForeignCloseRoute<P> {
             link: OnceCell::new(),
             in_use: Cell::new(false),
             contested: Cell::new(0),
+            sent: RefCell::new(Vec::new()),
             evidence: RefCell::new(CloseEvidence::default()),
         }
     }
@@ -62,6 +64,7 @@ impl<P: ToplevelPort> ForeignCloseRoute<P> {
     pub(in crate::system) fn release(&self) {
         self.in_use.set(false);
         self.contested.set(0);
+        self.sent.borrow_mut().clear();
         let mut evidence = self.evidence.borrow_mut();
         evidence.unproven.clear();
         evidence.dialogs.clear();
@@ -155,8 +158,18 @@ impl<P: ToplevelPort> ForeignCloseRoute<P> {
         if !names.is_current() {
             return Err(ControlError::StaleWindow);
         }
+        let sent = self.sent.borrow();
+        let remaining: Vec<_> = match owners.as_ref() {
+            Some(owners) => records
+                .iter()
+                .filter(|record| !sent.contains(&record.id) || owners.contains_key(&record.id))
+                .cloned()
+                .collect(),
+            None => records.clone(),
+        };
+        drop(sent);
         let standing = read_standing(
-            &records,
+            &remaining,
             &evidence.frames,
             names,
             &evidence.known,
@@ -176,7 +189,9 @@ impl<P: ToplevelPort> ForeignCloseRoute<P> {
         if evidence.known.is_empty() {
             evidence.known = records.iter().map(|record| record.id).collect();
         }
-        port.send(id, ToplevelRequest::Close)
+        let result = port.send(id, ToplevelRequest::Close);
+        self.sent.borrow_mut().push(id);
+        result
     }
 
     pub(in crate::system) fn port(&self) -> Result<&P, ControlError> {
@@ -190,3 +205,7 @@ impl<P: ToplevelPort> ForeignCloseRoute<P> {
 #[cfg(test)]
 #[path = "foreign_close_route_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "foreign_close_sent_tests.rs"]
+mod sent_tests;
