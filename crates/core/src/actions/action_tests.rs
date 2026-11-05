@@ -25,6 +25,10 @@ fn action_names_do_not_include_payloads() {
     let cases = [
         (Action::SetValue("private".into()), "set-value"),
         (Action::Select("private".into()), "select"),
+        (
+            Action::SelectText(crate::TextSelection::Range { start: 0, end: 1 }),
+            "select-text",
+        ),
         (Action::TypeText("private".into()), "type"),
         (
             Action::PressKey(KeyCombo {
@@ -79,6 +83,10 @@ fn headed_requirements_distinguish_window_and_pointer_preconditions() {
             action.name()
         );
     }
+    assert_eq!(
+        Action::SelectText(crate::TextSelection::Range { start: 0, end: 1 }).headed_requirement(),
+        crate::HeadedRequirement::None
+    );
 }
 
 #[test]
@@ -100,6 +108,7 @@ fn pure_ax_actions_base_policy_is_headless() {
         Action::Scroll(Direction::Down, 3),
         Action::SetValue("v".into()),
         Action::Select("s".into()),
+        Action::SelectText(crate::TextSelection::Range { start: 0, end: 1 }),
     ];
     for action in pure_ax {
         assert_eq!(

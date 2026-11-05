@@ -6,7 +6,7 @@ description: Reference for click, double-click, triple-click, right-click, type,
 
 Every command here acts on one element. Pass the qualified ref from [`snapshot`](/desktop/commands/observation#snapshot) or [`find`](/desktop/commands/observation#find), such as `@s8f3k2p9:e1`; a bare `@e1` is rejected with `INVALID_ARGS`.
 
-By default these commands run headless: semantic accessibility calls that do not take focus, move the cursor, synthesize keys, or use the clipboard. If no semantic path exists, the action fails closed. The global `--headed` flag permits physical input and focus changes; see [Headed mode](/desktop/guides/headed-mode). The examples on this page are real output from GNOME Calculator and GTK Widget Factory on Linux.
+By default these commands run headless: semantic accessibility calls that do not take focus, move the cursor, synthesize keys, or use the clipboard. If no semantic path exists, the action fails closed. The global `--headed` flag permits physical input and focus changes; see [Headed mode](/desktop/guides/headed-mode). The click result example is real output from GNOME Calculator.
 
 ## Result shape
 
@@ -41,7 +41,7 @@ Every successful ref action returns an action report in `data`. This is a `click
     <tr><th>Field</th><th>Meaning</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>action</code></td><td>The command that ran.</td></tr>
+    <tr><td><code>action</code></td><td>The action that ran.</td></tr>
     <tr><td><code>disposition</code></td><td><code>delivery</code> and <code>retry</code>. Repeat an action only when <code>retry</code> is <code>safe</code>. See <a href="/desktop/errors-and-recovery#disposition">Disposition</a>.</td></tr>
     <tr><td><code>steps</code></td><td>The mechanisms tried: <code>label</code>, <code>outcome</code> (<code>attempted</code>, <code>skipped</code>, or <code>succeeded</code>), <code>mechanism</code> (<code>semantic_api</code> or <code>physical_synthetic</code>), and <code>verified</code> when the step read back its effect.</td></tr>
     <tr><td><code>post_state</code></td><td>The element's state after the action, for the commands that read it back.</td></tr>
@@ -258,14 +258,18 @@ On Linux, a GTK4 app rejects the call with cause `grab_focus_rejected`; use [`fo
 
 ## select
 
-Picks an option by display text in a list, dropdown, or combo box.
+Selects a list option by value or a text range in a field.
 
 ```bash
 agent-desktop select <REF> <VALUE> [--timeout-ms MS]
+agent-desktop select <REF> --match TEXT [--nth N] [--timeout-ms MS]
+agent-desktop select <REF> --range START..END [--timeout-ms MS]
 ```
 
 ```bash
 agent-desktop select @s30sxlstqzdq8x:e21 Middle
+agent-desktop select @s8f3k2p9:e2 --match "quarterly" --nth 2
+agent-desktop select @s8f3k2p9:e2 --range 72..120
 ```
 
 ```json
@@ -280,7 +284,17 @@ agent-desktop select @s30sxlstqzdq8x:e21 Middle
 
 If the control already shows the value, nothing is delivered. A combo box whose accessible name is its current value gets a new identity when the value changes, so the old ref returns `STALE_REF` afterward: find the control again before the next action.
 
-Platform limits: on macOS, dismiss any open menu first. On Linux, a Qt combo refuses headless with `details.kind: pointer_required`, and a GTK4 list refuses with `selection_index_unproven`. See the platform pages.
+For text fields, `--match` selects a case-sensitive literal. Duplicate matches need one-based `--nth` or return `AMBIGUOUS_TARGET`; overlapping matches count. `--range` uses zero-based Unicode scalar offsets with an exclusive end; equal offsets place a caret. Text selection uses the native accessibility setter in both modes.
+
+`--nth` counts matches within the referenced field, not paragraphs. If “quarterly” appears once in each of three paragraphs, `--match "quarterly"` fails and `--match "quarterly" --nth 2` selects the second occurrence. The calling agent must read the text to choose the intended passage.
+
+<Diagram name="text-selection" title="How text selection works" aspectRatio="720 / 828" />
+
+The command resolves the field ref, reads its text, and converts the requested match or range to Unicode scalar positions. The adapter maps those positions to the native selection API, sets the range, and reads it back with the text and focus state. macOS uses UTF-16 offsets, Windows maps to the provider's text units, and Linux uses character offsets.
+
+Success requires an exact text and range readback, unchanged full-field text, and 100 ms of stability. Secure fields, incomplete reads, text over 65,536 UTF-8 bytes, and providers without a readable, settable range are refused. Headless mode requires readable focus and activation before delivery; changes afterward fail, though checks can miss brief changes between reads. Verified results put `range`, `focus_changed`, and `activated` in `data.details`; macOS omits `selection_count` when the provider lacks its full selection list.
+
+Platform limits: on macOS, dismiss any open menu first. On Linux, a Qt combo refuses headless with `details.kind: pointer_required`, and a GTK4 list refuses with `selection_index_unproven`. Text-selection support depends on the accessibility provider. See the platform pages.
 
 ## toggle
 

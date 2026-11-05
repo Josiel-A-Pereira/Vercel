@@ -350,3 +350,7 @@ fn parse_trace(args: Value) -> Result<TraceArgs, AppError> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "select_tests.rs"]
+mod select_tests;

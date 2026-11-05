@@ -71,6 +71,22 @@ fn editing_actions_do_not_require_positional_stability_or_hit_testing() {
 }
 
 #[test]
+fn text_selection_does_not_require_visibility_or_geometry() {
+    let action = Action::SelectText(crate::TextSelection::Range { start: 0, end: 2 });
+    let requirements = ActionabilityRequirements::for_action(&action);
+    assert!(!requirements.visible);
+    assert!(!requirements.stable);
+    assert!(!requirements.receives_events);
+    for request in [
+        crate::ActionRequest::headless(action.clone()),
+        crate::ActionRequest::headed(action),
+    ] {
+        assert!(!requirements.requires_geometry(&request, &[]));
+        assert!(!request.action.requires_scroll_into_view());
+    }
+}
+
+#[test]
 fn keyboard_and_focus_actions_skip_irrelevant_geometry_checks() {
     for action in [
         Action::SetFocus,

@@ -255,6 +255,7 @@ enum AdActionKind
   AD_ACTION_KIND_CLEAR = 18,
   AD_ACTION_KIND_HOVER = 19,
   AD_ACTION_KIND_DRAG = 20,
+  AD_ACTION_KIND_SELECT_TEXT = 21,
 };
 #ifndef __cplusplus
 #if __STDC_VERSION__ >= 202311L

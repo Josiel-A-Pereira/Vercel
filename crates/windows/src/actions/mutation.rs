@@ -166,10 +166,10 @@ fn platform_hresult(api: &str, operation: &str, hresult: i32) -> String {
 
 /// The action-file source set every write-path/read-path scan test walks.
 /// One list shared by `mutation_tests.rs`, `dispatch_tests.rs`, and
-/// `value_write_gate_tests.rs` so a 13th action file needs one edit, not
+/// `value_write_gate_tests.rs` so a new action file needs one edit, not
 /// three.
 #[cfg(test)]
-pub(crate) fn action_scan_sources() -> [(&'static str, &'static str); 12] {
+pub(crate) fn action_scan_sources() -> [(&'static str, &'static str); 17] {
     [
         ("actions/mutation.rs", include_str!("mutation.rs")),
         (
@@ -185,6 +185,26 @@ pub(crate) fn action_scan_sources() -> [(&'static str, &'static str); 12] {
         ("actions/disclosure.rs", include_str!("disclosure.rs")),
         ("actions/select.rs", include_str!("select.rs")),
         ("actions/select_search.rs", include_str!("select_search.rs")),
+        (
+            "actions/select_text/mod.rs",
+            include_str!("select_text/mod.rs"),
+        ),
+        (
+            "actions/select_text/select_text_focus.rs",
+            include_str!("select_text/select_text_focus.rs"),
+        ),
+        (
+            "actions/select_text/select_text_endpoints.rs",
+            include_str!("select_text/select_text_endpoints.rs"),
+        ),
+        (
+            "actions/select_text/select_text_target.rs",
+            include_str!("select_text/select_text_target.rs"),
+        ),
+        (
+            "actions/select_text/select_text_verify.rs",
+            include_str!("select_text/select_text_verify.rs"),
+        ),
         ("actions/scroll.rs", include_str!("scroll.rs")),
     ]
 }

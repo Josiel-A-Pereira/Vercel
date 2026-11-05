@@ -120,14 +120,20 @@ For a shared editor, such as a spreadsheet cell, the edit is a sequence: activat
 
 ```bash
 agent-desktop select @s8f3k2p9:e4 "Option B"
+agent-desktop select @s8f3k2p9:e2 --match "quarterly" --nth 2
+agent-desktop select @s8f3k2p9:e2 --range 72..120
 agent-desktop check @s8f3k2p9:e6
 agent-desktop toggle @s8f3k2p9:e6
 agent-desktop expand @s8f3k2p9:e7
 ```
 
-- `select` picks an option by display text in a list, dropdown or combobox. For menu-backed controls it opens the menu, activates the item and checks the control value. A missing item or an unchanged value returns a structured error.
+- `select` picks an option by display text in a list, dropdown, or combo box. For menu-backed controls, it opens the menu, activates the item, and checks the control value. A missing item or unchanged value returns a structured error.
 - `check` and `uncheck` are idempotent and verify the final state. Prefer them over `toggle`. Use `toggle` only when the current state is unknown, and it needs readable before and after state.
 - `expand` and `collapse` act on disclosure triangles, tree items and accordions, and verify the final state.
+
+Text fields accept case-sensitive `--match TEXT [--nth N]` or `--range START..END`. Duplicate matches return `AMBIGUOUS_TARGET` unless you pass one-based `--nth`; overlapping matches count. Ranges use zero-based Unicode scalar offsets with an exclusive end; equal offsets place a caret.
+
+Text selection is headless by default and requires readable text plus a native settable range. It refuses secure fields, incomplete reads, and text over 65,536 UTF-8 bytes. It verifies the exact selection for 100 ms and checks focus and activation before and after.
 
 ## Scroll
 

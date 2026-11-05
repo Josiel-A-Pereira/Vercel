@@ -23,6 +23,7 @@ fn a_false_return_is_an_absent_affordance_for_every_flag_kind() {
         WriteKind::ClearSelection,
         WriteKind::ScrollTo,
         WriteKind::InsertText,
+        WriteKind::SetSelection,
         WriteKind::DeleteText,
         WriteKind::SetTextContents,
     ] {

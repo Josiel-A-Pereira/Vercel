@@ -8,7 +8,7 @@ use crate::tree::fixture::{LocalFixture, ensure_test_apartment};
 use agent_desktop_core::{
     Action, ActionRequest, ActionStepOutcome, AdapterError, Deadline, DeliveryDisposition,
     Direction, DragParams, ErrorCode, InteractionLease, InteractionPolicy, KeyCombo, NativeHandle,
-    Point, StepMechanism,
+    Point, StepMechanism, TextSelection,
 };
 use uiautomation::types::Handle;
 
@@ -32,7 +32,7 @@ fn dummy_drag() -> DragParams {
     }
 }
 
-fn all_actions() -> [Action; 21] {
+fn all_actions() -> [Action; 22] {
     [
         Action::Click,
         Action::DoubleClick,
@@ -43,6 +43,7 @@ fn all_actions() -> [Action; 21] {
         Action::Expand,
         Action::Collapse,
         Action::Select("x".into()),
+        Action::SelectText(TextSelection::Range { start: 0, end: 1 }),
         Action::Toggle,
         Action::Check,
         Action::Uncheck,
@@ -208,7 +209,7 @@ fn set_focus_call_site_lives_only_in_focus_rs() {
     let banned = concat!(".", "set_focus(");
     for (name, source) in sources {
         for (number, line) in code_lines(source) {
-            if name.ends_with("focus.rs") {
+            if name == "actions/focus.rs" {
                 continue;
             }
             assert!(

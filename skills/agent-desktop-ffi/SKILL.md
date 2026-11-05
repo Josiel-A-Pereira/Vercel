@@ -79,8 +79,8 @@ are not exposed over the ABI. A bare `@eN` ref returns
 - **Ref actions.** `ad_execute_by_ref` is the primary action entrypoint. It loads
   the RefStore, resolves the ref strictly (`STALE_REF` when the snapshot has no
   such ref or the element changed, `AMBIGUOUS_TARGET` on several candidates), runs
-  the live actionability preflight (visible, stable, enabled, supported action,
-  policy, editable), then dispatches. A disabled or unsupported target fails
+  the live actionability preflight for that action's required checks, then
+  dispatches. A disabled or unsupported target fails
   before any platform call; on `AD_RESULT_ERR_ACTION_FAILED` the check report is
   JSON in `ad_last_error_details()`. It auto-waits 5000 ms before the preflight;
   `ad_execute_by_ref_timeout` takes `timeout_ms` (`-1` = 5000 ms default, `0` =
@@ -91,6 +91,12 @@ are not exposed over the ABI. A bare `@eN` ref returns
   always fails with `AD_RESULT_ERR_ACTION_NOT_SUPPORTED`: an exact entry has no
   retained element token and no capture proof, so it cannot be re-identified.
   Use `ad_execute_by_ref` instead.
+
+  The `SelectText` FFI action uses native accessibility and remains headless.
+  Set `AdAction.kind` to `AD_ACTION_KIND_SELECT_TEXT` and pass JSON in the
+  existing `AdAction.text` pointer: `{"kind":"match","text":"quarterly","nth":2}`
+  or `{"kind":"range","start":7,"end":19}`. Match `nth` is one-based;
+  range offsets are Unicode scalars with an exclusive end. The `AdAction` layout is unchanged.
 
 - **Generation-safe direct APIs.** Every direct targeting function takes
   process-generation evidence: `AdExactRefEntry`, `AdExactWindowInfo`,

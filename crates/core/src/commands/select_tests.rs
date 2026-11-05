@@ -69,7 +69,8 @@ fn transient_stale_ref_retries_then_succeeds_when_timeout_wired() {
     let value = execute(
         SelectArgs {
             ref_id: format!("@{}:e1", snapshot_id),
-            value: "choice".into(),
+            value: Some("choice".into()),
+            selection: None,
             timeout_ms: Some(5_000),
         },
         &adapter,
@@ -90,7 +91,8 @@ fn timeout_none_makes_exactly_one_resolve_attempt() {
     let err = execute(
         SelectArgs {
             ref_id: format!("@{}:e1", snapshot_id),
-            value: "choice".into(),
+            value: Some("choice".into()),
+            selection: None,
             timeout_ms: None,
         },
         &adapter,

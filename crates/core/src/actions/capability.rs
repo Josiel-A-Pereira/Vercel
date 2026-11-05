@@ -7,6 +7,7 @@ pub const SET_FOCUS: &str = "SetFocus";
 pub const EXPAND: &str = "Expand";
 pub const COLLAPSE: &str = "Collapse";
 pub const SELECT: &str = "Select";
+pub const SELECT_TEXT: &str = "SelectText";
 pub const TOGGLE: &str = "Toggle";
 pub const SCROLL: &str = "Scroll";
 pub const SCROLL_TO: &str = "ScrollTo";
@@ -31,6 +32,7 @@ pub fn for_action(action: &Action) -> &'static [&'static str] {
         Action::Expand => &[EXPAND],
         Action::Collapse => &[COLLAPSE],
         Action::Select(_) => &[SELECT, CLICK],
+        Action::SelectText(_) => &[SELECT_TEXT],
         Action::Toggle => &[TOGGLE, CLICK],
         Action::Check | Action::Uncheck => &[TOGGLE, CLICK],
         Action::Scroll(_, _) => &[SCROLL],

@@ -10,7 +10,6 @@ use crate::{
     refs::refs_store::RefStore,
     trace::trace_artifacts,
 };
-use serde_json::json;
 
 #[derive(Clone)]
 pub struct SnapshotResult {
@@ -337,31 +336,13 @@ pub fn run_with_context(
     let snapshot_id = result.save_refmap(&store)?;
     trace_artifacts::copy_refmap_if_full(context, &store, &snapshot_id, &result.refmap)?;
     result.bind_snapshot_id(snapshot_id);
-    emit_snapshot_saved(context, &result)?;
+    snapshot_saved::emit_snapshot_saved(context, &result)?;
     Ok(result)
-}
-
-pub(crate) fn emit_snapshot_saved(
-    context: &CommandContext,
-    result: &SnapshotResult,
-) -> Result<(), AppError> {
-    context.trace_lazy("snapshot.saved", || {
-        let mut fields = json!({
-            "snapshot_id": result.snapshot_id,
-            "ref_count": result.refmap.len(),
-        });
-        if !result.window.app.is_empty() {
-            fields["app"] = json!(result.window.app);
-        }
-        if let Some(reason) = &result.identity_unproven {
-            fields["identity_unproven"] = json!(reason);
-        }
-        fields
-    })
 }
 
 pub mod hints;
 pub mod snapshot_ref;
+pub(crate) mod snapshot_saved;
 pub mod snapshot_surface;
 #[cfg(test)]
 #[path = "snapshot_tests.rs"]

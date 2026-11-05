@@ -159,6 +159,7 @@ pub(crate) fn execute_action(
                 pointer.as_ref().map(|pointer| pointer as &dyn Pointer),
             )
         }
+        Action::SelectText(selection) => super::select_text::select_text(&target, selection),
         Action::SetFocus => focus(&target, request.policy),
         Action::SetValue(text) => set_value(&target, text, request.policy),
         Action::Clear => clear(&target, request.policy),

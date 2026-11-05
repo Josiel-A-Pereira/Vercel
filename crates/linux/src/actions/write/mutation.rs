@@ -27,6 +27,7 @@ pub(crate) enum WriteKind {
     ScrollTo,
     GrabFocus,
     InsertText,
+    SetSelection,
     DeleteText,
     SetTextContents,
     SetProperty,

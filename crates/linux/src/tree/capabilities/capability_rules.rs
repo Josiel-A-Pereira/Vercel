@@ -1,4 +1,4 @@
-use agent_desktop_core::actions::capability;
+use agent_desktop_core::{Role, actions::capability};
 
 use super::scroll_capability::{eligible, wheel_target};
 use crate::system::display::display_server::{DisplayServer, session_server};
@@ -11,7 +11,7 @@ use crate::tree::vocabulary::role_numbers::{
 use crate::tree::vocabulary::state_bits::{
     EDITABLE, EXPANDABLE, EXPANDED, FOCUSABLE, HAS_POPUP, READ_ONLY, SELECTABLE, StateBits,
 };
-use crate::tree::{Field, RawNode};
+use crate::tree::{Field, RawNode, base_role};
 
 const VALUE: &str = "org.a11y.atspi.Value";
 const TEXT_INTERFACE: &str = "org.a11y.atspi.Text";
@@ -37,7 +37,7 @@ pub(crate) struct Facts<'a> {
 }
 
 fn interface_decides(role: u32, bits: &StateBits) -> bool {
-    is_text_entry(role)
+    is_text_container(role)
         || is_numeric_control(role)
         || matches!(role, LIST | COMBO_BOX)
         || bits.has(FOCUSABLE)
@@ -98,6 +98,13 @@ impl<'a> Facts<'a> {
 
 fn is_text_entry(role: u32) -> bool {
     matches!(role, TEXT | TERMINAL | ENTRY | PASSWORD_TEXT)
+}
+
+fn is_text_container(role: u32) -> bool {
+    matches!(
+        base_role(role),
+        Role::TextField | Role::Document | Role::WebArea
+    )
 }
 
 fn is_numeric_control(role: u32) -> bool {
@@ -175,6 +182,9 @@ pub(crate) fn rule_tokens(facts: &Facts) -> Vec<&'static str> {
         && facts.bits.has(EDITABLE)
         && !facts.bits.has(READ_ONLY)
         && facts.advertises(EDITABLE_TEXT);
+    let selectable_text = is_text_container(facts.role)
+        && facts.role != PASSWORD_TEXT
+        && facts.advertises(TEXT_INTERFACE);
     let stateful = facts.bits.has(EXPANDABLE) || facts.bits.has(EXPANDED);
     let clickable = facts.has_any_name(&DISCLOSURE_CLICKS);
     let both = (stateful && (clickable || facts.has_name(TOGGLE_EXPAND))) || menu_button(facts);
@@ -183,6 +193,7 @@ pub(crate) fn rule_tokens(facts: &Facts) -> Vec<&'static str> {
     let pressable = facts.role == PUSH_BUTTON || carries_checked(facts.role);
     let rules = [
         (editable_text, capability::SET_VALUE),
+        (selectable_text, capability::SELECT_TEXT),
         (
             editable_text && facts.advertises(TEXT_INTERFACE),
             capability::TYPE_TEXT,

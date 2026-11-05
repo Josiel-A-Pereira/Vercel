@@ -92,6 +92,10 @@ mod imp {
                 )?);
             }
 
+            Action::SelectText(selection) => {
+                return crate::actions::select_text::execute(el, selection, deadline);
+            }
+
             Action::PressKey(combo) => {
                 crate::actions::physical_keyboard::press(el, combo, request.policy, deadline)?;
                 steps.push(

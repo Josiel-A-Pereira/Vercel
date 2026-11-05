@@ -62,7 +62,10 @@ pub(crate) enum Commands {
     Clear(RefArgs),
     #[command(about = "Set keyboard focus on element")]
     Focus(RefArgs),
-    #[command(about = "Select an option in a list or dropdown")]
+    #[command(
+        about = "Select an option or a text range through accessibility",
+        long_about = "Select an option with VALUE, or text with --match or --range. --nth chooses a one-based match occurrence."
+    )]
     Select(SelectArgs),
     #[command(about = "Toggle a checkbox or switch")]
     Toggle(RefArgs),

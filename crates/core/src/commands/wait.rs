@@ -11,7 +11,7 @@ use crate::{
     },
     context::CommandContext,
     refs::refs_store::RefStore,
-    snapshot::{self, emit_snapshot_saved},
+    snapshot::{self, snapshot_saved::emit_snapshot_saved},
     trace::trace_artifacts,
     tree::search_text,
 };

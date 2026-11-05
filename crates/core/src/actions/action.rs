@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{Direction, DragParams, KeyCombo};
+use crate::{Direction, DragParams, KeyCombo, TextSelection};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Action {
@@ -13,6 +13,7 @@ pub enum Action {
     Expand,
     Collapse,
     Select(String),
+    SelectText(TextSelection),
     Toggle,
     Check,
     Uncheck,
@@ -37,6 +38,7 @@ impl Action {
             | Self::Scroll(_, _)
             | Self::Hover
             | Self::Drag(_) => crate::HeadedRequirement::FocusedWindowAndCursor,
+            Self::SelectText(_) => crate::HeadedRequirement::None,
             Self::SetValue(_)
             | Self::SetFocus
             | Self::Expand
@@ -65,6 +67,7 @@ impl Action {
             Self::Expand => "expand",
             Self::Collapse => "collapse",
             Self::Select(_) => "select",
+            Self::SelectText(_) => "select-text",
             Self::Toggle => "toggle",
             Self::Check => "check",
             Self::Uncheck => "uncheck",

@@ -1,6 +1,6 @@
 use crate::convert::string::c_to_string;
 use crate::types::{AdAction, AdActionKind, AdDirection, AdKeyCombo, AdModifier};
-use agent_desktop_core::{Action, Direction, KeyCombo as CoreKeyCombo, Modifier};
+use agent_desktop_core::{Action, Direction, KeyCombo as CoreKeyCombo, Modifier, TextSelection};
 
 /// Four modifier keys exist (`AdModifier::{Meta, Ctrl, Alt, Shift}`),
 /// so a combo can name at most four. Anything larger must be bogus
@@ -64,6 +64,12 @@ pub(crate) unsafe fn action_from_c(action: &AdAction) -> Result<Action, &'static
             AdActionKind::TypeText => {
                 let text = c_to_string(action.text).ok_or("text is null or invalid UTF-8")?;
                 Ok(Action::TypeText(text))
+            }
+            AdActionKind::SelectText => {
+                let json = c_to_string(action.text).ok_or("text is null or invalid UTF-8")?;
+                let selection = serde_json::from_str::<TextSelection>(&json)
+                    .map_err(|_| "invalid text selection JSON")?;
+                Ok(Action::SelectText(selection))
             }
             AdActionKind::Scroll => {
                 let dir = match AdDirection::from_c(action.scroll.direction)
@@ -151,6 +157,54 @@ mod tests {
         let result = unsafe { action_from_c(&action) };
         assert!(result.is_ok());
         assert!(matches!(result.unwrap(), Action::SetValue(ref s) if s == "hello world"));
+        unsafe { free_c_string(text as *mut _) };
+    }
+
+    #[test]
+    fn select_text_action_decodes_match_and_range_json_from_text() {
+        for (json, expected) in [
+            (
+                r#"{"kind":"match","text":"quarterly","nth":2}"#,
+                TextSelection::Match {
+                    text: "quarterly".to_owned(),
+                    nth: Some(2),
+                },
+            ),
+            (
+                r#"{"kind":"range","start":7,"end":19}"#,
+                TextSelection::Range { start: 7, end: 19 },
+            ),
+        ] {
+            let text = string_to_c(json);
+            let action = AdAction {
+                kind: AdActionKind::SelectText as i32,
+                text,
+                scroll: make_scroll_params(),
+                key: make_key_combo(),
+                drag: make_drag_params(),
+            };
+            assert!(matches!(
+                unsafe { action_from_c(&action) },
+                Ok(Action::SelectText(selection)) if selection == expected
+            ));
+            unsafe { free_c_string(text as *mut _) };
+        }
+    }
+
+    #[test]
+    fn select_text_action_rejects_invalid_json() {
+        let text = string_to_c(r#"{"kind":"range","start":7}"#);
+        let action = AdAction {
+            kind: AdActionKind::SelectText as i32,
+            text,
+            scroll: make_scroll_params(),
+            key: make_key_combo(),
+            drag: make_drag_params(),
+        };
+        assert_eq!(
+            unsafe { action_from_c(&action) }.unwrap_err(),
+            "invalid text selection JSON"
+        );
         unsafe { free_c_string(text as *mut _) };
     }
 

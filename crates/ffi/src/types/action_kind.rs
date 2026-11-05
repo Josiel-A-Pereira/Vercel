@@ -22,4 +22,5 @@ pub enum AdActionKind {
     Clear = 18,
     Hover = 19,
     Drag = 20,
+    SelectText = 21,
 }

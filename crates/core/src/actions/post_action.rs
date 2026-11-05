@@ -11,6 +11,22 @@ pub fn execute_verified_action(
     lease: &InteractionLease,
 ) -> Result<ActionResult, AdapterError> {
     let action = request.action.clone();
+    if let Action::SelectText(selection) = &action {
+        selection.validate()?;
+        let result = adapter.execute_action(handle, request, lease)?;
+        if matches!(
+            result.disposition(),
+            DeliverySemantics::NotDelivered | DeliverySemantics::DeliveredVerified
+        ) {
+            return Ok(result);
+        }
+        let disposition = result.disposition();
+        return Err(
+            AdapterError::new(ErrorCode::ActionFailed, "Text selection was not verified")
+                .with_details(serde_json::json!({ "after_action": result }))
+                .with_disposition(disposition),
+        );
+    }
     if !action.requires_state_readback() {
         return adapter.execute_action(handle, request, lease);
     }
@@ -268,3 +284,7 @@ mod tests;
 #[cfg(test)]
 #[path = "post_action_toggle_tests.rs"]
 mod toggle_tests;
+
+#[cfg(test)]
+#[path = "post_action_select_text_tests.rs"]
+mod select_text_tests;

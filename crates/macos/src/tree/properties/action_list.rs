@@ -111,6 +111,13 @@ pub(crate) fn read_platform_available_actions(
     {
         push_unique(&mut read.actions, capability::TYPE_TEXT);
     }
+    if role_may_select_text(role)
+        && attrs.role.as_deref() != Some("AXSecureTextField")
+        && attrs.subrole.as_deref() != Some("AXSecureTextField")
+        && read_settable(el, "AXSelectedTextRange", deadline, &mut read).unwrap_or(false)
+    {
+        push_unique(&mut read.actions, capability::SELECT_TEXT);
+    }
     if (role_may_expand(role)
         && read_settable(el, "AXExpanded", deadline, &mut read).unwrap_or(false))
         || (has("AXPress") && agent_desktop_core::tree::roles::is_expandable_role(role))
@@ -208,6 +215,10 @@ fn role_may_insert_text(role: &str) -> bool {
     matches!(role, "textfield" | "combobox")
 }
 
+fn role_may_select_text(role: &str) -> bool {
+    matches!(role, "textfield" | "webarea")
+}
+
 #[cfg(not(target_os = "macos"))]
 pub(crate) fn read_platform_available_actions(
     _el: &AXElement,
@@ -273,7 +284,8 @@ mod tests {
     use super::{AvailableActionsRead, record_error};
     use super::{
         has_scroll_mechanism, role_allows_context_menu_action, role_may_accept_focus,
-        role_may_bear_value, role_may_insert_text, role_supports_collection_select,
+        role_may_bear_value, role_may_insert_text, role_may_select_text,
+        role_supports_collection_select,
     };
 
     #[test]
@@ -331,6 +343,14 @@ mod tests {
         assert!(role_may_insert_text("combobox"));
         assert!(!role_may_insert_text("unknown"));
         assert!(!role_may_insert_text("button"));
+    }
+
+    #[test]
+    fn text_selection_probe_is_limited_to_text_content_roles() {
+        assert!(role_may_select_text("textfield"));
+        assert!(role_may_select_text("webarea"));
+        assert!(!role_may_select_text("button"));
+        assert!(!role_may_select_text("unknown"));
     }
 
     #[test]

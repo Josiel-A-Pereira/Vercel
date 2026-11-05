@@ -67,17 +67,17 @@ fn policy_rows_preserve_rule_tokens() {
             &[EDITABLE_TEXT, TEXT_INTERFACE],
             &[],
             0,
-            &["SetValue", "TypeText"],
+            &["SetValue", "SelectText", "TypeText"],
         ),
         (ENTRY, &editable, &[EDITABLE_TEXT], &[], 0, &["SetValue"]),
-        (ENTRY, &editable, &[TEXT_INTERFACE], &[], 0, &[]),
+        (ENTRY, &editable, &[TEXT_INTERFACE], &[], 0, &["SelectText"]),
         (
             ENTRY,
             &enabled,
             &[EDITABLE_TEXT, TEXT_INTERFACE],
             &[],
             0,
-            &[],
+            &["SelectText"],
         ),
         (
             PASSWORD_TEXT,
@@ -93,7 +93,7 @@ fn policy_rows_preserve_rule_tokens() {
             &[EDITABLE_TEXT, TEXT_INTERFACE],
             &[],
             0,
-            &[],
+            &["SelectText"],
         ),
         (TEXT, &editable, &[EDITABLE_TEXT], &[], 0, &["SetValue"]),
         (
@@ -211,6 +211,38 @@ fn policy_rows_preserve_rule_tokens() {
 }
 
 #[test]
+fn text_selection_keeps_document_refs_without_making_static_text_ref_able() {
+    use agent_desktop_core::refs::ref_alloc::is_ref_able_role_actions;
+
+    use crate::tree::base_role;
+
+    for role in [29, 73, 81, 83, 85, 116, 60, 61, 79, 82, 92, 93, 94, 95, 96] {
+        let mut raw = node(role, &[SENSITIVE, READ_ONLY], &[TEXT_INTERFACE], &[], 0);
+        let LocatorField::Known(actions) = capabilities(&raw) else {
+            panic!("expected known capabilities");
+        };
+        let selectable = matches!(role, 60 | 61 | 79 | 82 | 92 | 93 | 94 | 95 | 96);
+        assert_eq!(
+            actions.iter().any(|action| action == "SelectText"),
+            selectable
+        );
+        assert_eq!(
+            is_ref_able_role_actions(base_role(role).as_str(), &actions),
+            selectable
+        );
+        raw.traits.interfaces = Field::Failed("unavailable".to_owned());
+        assert_eq!(
+            capabilities(&raw),
+            if selectable {
+                LocatorField::Unknown
+            } else {
+                LocatorField::Known(Vec::new())
+            }
+        );
+    }
+}
+
+#[test]
 fn a_node_that_can_take_focus_and_has_a_component_takes_set_focus_on_any_role() {
     let focusable = [SENSITIVE, FOCUSABLE];
     for role in [PUSH_BUTTON, CHECK_BOX, PANEL, SCROLL_PANE, LIST] {
@@ -229,7 +261,7 @@ fn a_node_that_can_take_focus_and_has_a_component_takes_set_focus_on_any_role() 
             &[],
             0
         ),
-        ["SetValue", "TypeText", "SetFocus"]
+        ["SetValue", "SelectText", "TypeText", "SetFocus"]
     );
 }
 

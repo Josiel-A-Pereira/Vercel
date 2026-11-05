@@ -1,12 +1,12 @@
 mod common;
 
 use agent_desktop_ffi::{
-    AdDeliverySemantics, AdExactRefEntry, AdExactSurfaceInfo, AdExactWindowInfo, AdFindControl,
-    AdFindFilter, AdFindIdentity, AdFindQuery, AdFindSelection, AdFindStatePredicate,
-    AdFindStateSlice, AdNode, AdNodeContent, AdNodePresentation, AdNodeRelation, AdOptionalU64,
-    AdOptionalUsize, AdRefCapabilities, AdRefGeometry, AdRefIdentity, AdRefProcess, AdRefScope,
-    AdRefSource, AdScreenshotTarget, AdStringSlice, AdWaitMode, AdWaitPredicate, AdWaitScope,
-    AdWaitSurfaceModes,
+    AdActionKind, AdDeliverySemantics, AdExactRefEntry, AdExactSurfaceInfo, AdExactWindowInfo,
+    AdFindControl, AdFindFilter, AdFindIdentity, AdFindQuery, AdFindSelection,
+    AdFindStatePredicate, AdFindStateSlice, AdNode, AdNodeContent, AdNodePresentation,
+    AdNodeRelation, AdOptionalU64, AdOptionalUsize, AdRefCapabilities, AdRefGeometry,
+    AdRefIdentity, AdRefProcess, AdRefScope, AdRefSource, AdScreenshotTarget, AdStringSlice,
+    AdWaitMode, AdWaitPredicate, AdWaitScope, AdWaitSurfaceModes,
 };
 use common::{
     AdAction, AdActionResult, AdActionStep, AdElementState, AdPoint, AdRect, AdRefEntry, AdWaitArgs,
@@ -29,6 +29,7 @@ fn action_layout_is_guarded_for_c_consumers() {
         agent_desktop_ffi::AD_ACTION_SIZE
     );
     assert_eq!(size_of::<AdAction>(), 96);
+    assert_eq!(AdActionKind::SelectText as i32, 21);
     assert_eq!(align_of::<AdAction>(), align_of::<usize>());
 
     let offsets = [

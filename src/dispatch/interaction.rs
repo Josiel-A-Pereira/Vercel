@@ -155,10 +155,12 @@ pub(super) fn select(
     adapter: &dyn PlatformAdapter,
     context: &CommandContext,
 ) -> Result<Value, AppError> {
+    let selection = args.selection()?;
     select_command::execute(
         select_command::SelectArgs {
             ref_id: args.ref_id,
             value: args.value,
+            selection,
             timeout_ms: helpers::normalize_action_timeout_ms(args.timeout_ms),
         },
         adapter,

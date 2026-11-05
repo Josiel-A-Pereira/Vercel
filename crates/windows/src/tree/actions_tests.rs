@@ -1,5 +1,6 @@
 use super::*;
 use agent_desktop_core::refs::ref_alloc::is_ref_able_role_actions;
+use uiautomation::types::ControlType;
 
 use crate::tree::properties::property_outcome::PropertyValue;
 
@@ -11,6 +12,10 @@ fn known_text(value: &str) -> PropertyOutcome {
     PropertyOutcome::Known(PropertyValue::Text(value.to_string()))
 }
 
+fn known_control_type(control_type: ControlType) -> PropertyOutcome {
+    PropertyOutcome::Known(PropertyValue::Number(control_type as i32))
+}
+
 /// A read set with every affordance-bearing pattern reporting `false` or
 /// absent, and no keyboard focusability - the shape an inert static text
 /// element reads as once `LegacyAvailable` is excluded as an affordance.
@@ -20,6 +25,7 @@ fn inert_reads() -> Vec<(TreeProperty, PropertyOutcome)> {
         (TreeProperty::ToggleAvailable, known_flag(false)),
         (TreeProperty::ExpandCollapseAvailable, known_flag(false)),
         (TreeProperty::SelectionItemAvailable, known_flag(false)),
+        (TreeProperty::TextAvailable, known_flag(false)),
         (TreeProperty::ValueAvailable, known_flag(false)),
         (TreeProperty::RangeValueAvailable, known_flag(false)),
         (TreeProperty::ScrollAvailable, known_flag(false)),
@@ -112,6 +118,7 @@ fn every_emitted_action_is_a_member_of_core_capability_vocabulary() {
         capability::EXPAND,
         capability::COLLAPSE,
         capability::SELECT,
+        capability::SELECT_TEXT,
         capability::TOGGLE,
         capability::SCROLL,
         capability::SCROLL_TO,
@@ -129,6 +136,11 @@ fn every_emitted_action_is_a_member_of_core_capability_vocabulary() {
         (TreeProperty::ToggleAvailable, known_flag(true)),
         (TreeProperty::ExpandCollapseAvailable, known_flag(true)),
         (TreeProperty::SelectionItemAvailable, known_flag(true)),
+        (TreeProperty::TextAvailable, known_flag(true)),
+        (
+            TreeProperty::ControlType,
+            known_control_type(ControlType::Edit),
+        ),
         (TreeProperty::ValueAvailable, known_flag(true)),
         (TreeProperty::ValueIsReadOnly, known_flag(false)),
         (TreeProperty::RangeValueAvailable, known_flag(true)),
@@ -156,6 +168,7 @@ fn every_emitted_action_is_a_member_of_core_capability_vocabulary() {
             capability::EXPAND.to_string(),
             capability::COLLAPSE.to_string(),
             capability::SELECT.to_string(),
+            capability::SELECT_TEXT.to_string(),
             capability::SET_VALUE.to_string(),
             capability::SCROLL.to_string(),
             capability::SCROLL_TO.to_string(),
@@ -183,18 +196,25 @@ fn every_emitted_action_is_a_member_of_core_capability_vocabulary() {
         );
     }
 
-    let isolated_cases: [(TreeProperty, &[&str]); 3] = [
+    let isolated_cases: [(TreeProperty, &[&str]); 4] = [
         (TreeProperty::ToggleAvailable, &[capability::TOGGLE]),
         (
             TreeProperty::ExpandCollapseAvailable,
             &[capability::EXPAND, capability::COLLAPSE],
         ),
         (TreeProperty::SelectionItemAvailable, &[capability::SELECT]),
+        (TreeProperty::TextAvailable, &[capability::SELECT_TEXT]),
     ];
     for (property, expected) in isolated_cases {
         let mut reads = inert_reads();
         reads.retain(|(candidate, _)| *candidate != property);
         reads.push((property, known_flag(true)));
+        if property == TreeProperty::TextAvailable {
+            reads.push((
+                TreeProperty::ControlType,
+                known_control_type(ControlType::Edit),
+            ));
+        }
         let isolated = resolve_actions(&ElementProperties::from_reads(reads));
         for action in expected {
             assert!(
@@ -229,6 +249,38 @@ fn writable_value_availability_produces_set_value() {
     let actions = resolve_actions(&properties);
 
     assert!(known_actions(&actions).contains(&capability::SET_VALUE.to_string()));
+}
+
+#[test]
+fn text_pattern_availability_produces_select_text_only_for_edit_and_document_controls() {
+    let cases = [
+        (known_control_type(ControlType::Edit), false, true),
+        (known_control_type(ControlType::Document), false, true),
+        (known_control_type(ControlType::Text), false, false),
+        (known_control_type(ControlType::Button), false, false),
+        (PropertyOutcome::Unknown, false, false),
+        (PropertyOutcome::Absent, false, false),
+        (known_control_type(ControlType::Edit), true, false),
+    ];
+
+    for (control_type, secure, expected) in cases {
+        let properties = ElementProperties::from_reads(vec![
+            (TreeProperty::TextAvailable, known_flag(true)),
+            (TreeProperty::ControlType, control_type),
+            (TreeProperty::IsPassword, known_flag(secure)),
+            (TreeProperty::ValueIsReadOnly, known_flag(true)),
+        ]);
+        let actions = resolve_actions(&properties);
+
+        assert_eq!(
+            known_actions(&actions).contains(&capability::SELECT_TEXT.to_string()),
+            expected
+        );
+        assert_eq!(
+            is_ref_able_role_actions("statictext", known_actions(&actions)),
+            expected
+        );
+    }
 }
 
 #[test]

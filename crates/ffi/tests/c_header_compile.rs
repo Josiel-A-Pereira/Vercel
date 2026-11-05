@@ -60,6 +60,7 @@ static void log_callback(int32_t level, const char *message) {
 
 int main(void) {
     (void)AD_ACTION_KIND_CLICK;
+    (void)AD_ACTION_KIND_SELECT_TEXT;
     (void)AD_DIRECTION_UP;
     (void)AD_DELIVERY_DISPOSITION_DELIVERED_VERIFIED;
     (void)AD_FIND_SELECTION_KIND_STRICT;
@@ -76,6 +77,7 @@ int main(void) {
     (void)AD_WINDOW_OP_KIND_RESIZE;
     (void)AD_IMAGE_FORMAT_PNG;
     (void)AD_RESULT_OK;
+    _Static_assert(AD_ACTION_KIND_SELECT_TEXT == 21, "AdActionKind discriminant changed");
     _Static_assert(AD_ACTION_SIZE == sizeof(AdAction), "AdAction size macro drifted");
     _Static_assert(AD_DRAG_PARAMS_SIZE == sizeof(AdDragParams), "AdDragParams size macro drifted");
     _Static_assert(AD_ACTION_STEP_SIZE == sizeof(AdActionStep), "AdActionStep size macro drifted");

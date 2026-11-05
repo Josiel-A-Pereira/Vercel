@@ -33,6 +33,7 @@ pub(crate) use resolve::resolve_source::{resolve_element_strict, resolve_locator
 pub(crate) use vocabulary::label_outcome::LabelOutcome;
 #[cfg(test)]
 pub(crate) use vocabulary::label_read::read_label;
+pub(crate) use vocabulary::role_table::base_role;
 #[cfg(test)]
 pub(crate) use vocabulary::{ResolvedVocabulary, resolve_vocabulary};
 pub(crate) use walk::Walk;

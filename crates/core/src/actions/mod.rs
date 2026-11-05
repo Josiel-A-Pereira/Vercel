@@ -9,4 +9,6 @@ pub(crate) mod headed_focus;
 pub(crate) mod headed_requirement;
 pub mod interaction_policy;
 pub(crate) mod post_action;
+pub(crate) mod resolved_text_selection;
 pub mod step_mechanism;
+pub(crate) mod text_selection;

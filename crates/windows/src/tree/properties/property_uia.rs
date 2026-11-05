@@ -48,6 +48,7 @@ pub fn uia_property(property: TreeProperty) -> UIProperty {
         TreeProperty::ExpandCollapseAvailable => UIProperty::IsExpandCollapsePatternAvailable,
         TreeProperty::SelectionItemAvailable => UIProperty::IsSelectionItemPatternAvailable,
         TreeProperty::SelectionAvailable => UIProperty::IsSelectionPatternAvailable,
+        TreeProperty::TextAvailable => UIProperty::IsTextPatternAvailable,
         TreeProperty::ValueAvailable => UIProperty::IsValuePatternAvailable,
         TreeProperty::RangeValueAvailable => UIProperty::IsRangeValuePatternAvailable,
         TreeProperty::ScrollAvailable => UIProperty::IsScrollPatternAvailable,

@@ -128,6 +128,36 @@ fn tool_at(path: &[&str]) -> Tool {
 }
 
 #[test]
+fn select_text_mcp_uses_the_same_match_name_as_batch() {
+    assert!(tools().iter().all(|tool| tool.path != ["select-text"]));
+    let tool = tool_at(&["select"]);
+    let definition = tool.definition();
+    let properties = definition["inputSchema"]["properties"].as_object().unwrap();
+    assert!(properties.contains_key("match"));
+    assert!(!properties.contains_key("match_text"));
+    let mut arguments = Map::new();
+    arguments.insert("ref_id".into(), Value::from("@s8f3k2p9:e1"));
+    arguments.insert("match".into(), Value::from("quarterly"));
+    arguments.insert("nth".into(), Value::from(2));
+    let parsed = parse(&tool, &arguments).unwrap();
+    let Some(crate::cli::Commands::Select(args)) = parsed.command else {
+        panic!("select");
+    };
+    assert_eq!(
+        args.selection().unwrap(),
+        Some(agent_desktop_core::TextSelection::Match {
+            text: "quarterly".into(),
+            nth: Some(2),
+        })
+    );
+    arguments.insert("range".into(), Value::from("0..1"));
+    assert_eq!(
+        parse(&tool, &arguments).unwrap_err().kind(),
+        ErrorKind::ArgumentConflict
+    );
+}
+
+#[test]
 fn flag_shaped_values_stay_values_and_never_become_flags() {
     let hostile = "--headed --trace=/tmp/owned -- --session=x";
     let mut arguments = Map::new();

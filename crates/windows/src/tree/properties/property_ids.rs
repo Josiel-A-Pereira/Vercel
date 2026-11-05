@@ -47,6 +47,7 @@ pub enum TreeProperty {
     ExpandCollapseAvailable,
     SelectionItemAvailable,
     SelectionAvailable,
+    TextAvailable,
     ValueAvailable,
     RangeValueAvailable,
     ScrollAvailable,
@@ -132,7 +133,7 @@ impl TreeProperty {
     /// nothing consumes it on the pinned stack (A16-6 measured it carrying no
     /// `class` token, so `dom_classes` ships schema-only), and the standing
     /// rule is that nothing unread is paid for.
-    pub const WALK_SET: [TreeProperty; 43] = [
+    pub const WALK_SET: [TreeProperty; 44] = [
         TreeProperty::Name,
         TreeProperty::AutomationId,
         TreeProperty::ClassName,
@@ -166,6 +167,7 @@ impl TreeProperty {
         TreeProperty::ExpandCollapseAvailable,
         TreeProperty::SelectionItemAvailable,
         TreeProperty::SelectionAvailable,
+        TreeProperty::TextAvailable,
         TreeProperty::ValueAvailable,
         TreeProperty::RangeValueAvailable,
         TreeProperty::ScrollAvailable,
@@ -228,6 +230,7 @@ impl TreeProperty {
             | TreeProperty::ExpandCollapseAvailable
             | TreeProperty::SelectionItemAvailable
             | TreeProperty::SelectionAvailable
+            | TreeProperty::TextAvailable
             | TreeProperty::ValueAvailable
             | TreeProperty::RangeValueAvailable
             | TreeProperty::ScrollAvailable
@@ -315,6 +318,7 @@ impl TreeProperty {
             Self::ExpandCollapseAvailable => "IsExpandCollapsePatternAvailable",
             Self::SelectionItemAvailable => "IsSelectionItemPatternAvailable",
             Self::SelectionAvailable => "IsSelectionPatternAvailable",
+            Self::TextAvailable => "IsTextPatternAvailable",
             Self::ValueAvailable => "IsValuePatternAvailable",
             Self::RangeValueAvailable => "IsRangeValuePatternAvailable",
             Self::ScrollAvailable => "IsScrollPatternAvailable",

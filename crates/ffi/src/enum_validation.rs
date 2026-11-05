@@ -35,6 +35,7 @@ try_from_c_enum! {
         Select = 8, Toggle = 9, Check = 10, Uncheck = 11,
         Scroll = 12, ScrollTo = 13, PressKey = 14, KeyDown = 15,
         KeyUp = 16, TypeText = 17, Clear = 18, Hover = 19, Drag = 20,
+        SelectText = 21,
     }
 }
 
@@ -97,7 +98,7 @@ mod tests {
 
     #[test]
     fn test_action_kind_valid_range() {
-        for raw in 0..=20 {
+        for raw in 0..=21 {
             assert!(AdActionKind::from_c(raw).is_some(), "raw = {}", raw);
         }
     }
@@ -105,7 +106,7 @@ mod tests {
     #[test]
     fn test_action_kind_out_of_range() {
         assert!(AdActionKind::from_c(-1).is_none());
-        assert!(AdActionKind::from_c(21).is_none());
+        assert!(AdActionKind::from_c(22).is_none());
         assert!(AdActionKind::from_c(999).is_none());
         assert!(AdActionKind::from_c(i32::MAX).is_none());
         assert!(AdActionKind::from_c(i32::MIN).is_none());
@@ -181,6 +182,7 @@ mod tests {
     fn action_kind_boundary_discriminants_map_to_exact_variants() {
         assert_eq!(AdActionKind::from_c(0), Some(AdActionKind::Click));
         assert_eq!(AdActionKind::from_c(20), Some(AdActionKind::Drag));
+        assert_eq!(AdActionKind::from_c(21), Some(AdActionKind::SelectText));
     }
 
     #[test]

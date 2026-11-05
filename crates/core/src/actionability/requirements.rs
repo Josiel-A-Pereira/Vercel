@@ -21,6 +21,7 @@ impl ActionabilityRequirements {
                 Self::new(true, false, true, true, false)
             }
             Action::Select(_) => Self::new(true, false, true, false, false),
+            Action::SelectText(_) => Self::new(false, false, false, false, false),
             Action::Expand
             | Action::Collapse
             | Action::Toggle
@@ -73,7 +74,8 @@ impl ActionabilityRequirements {
         request: &crate::ActionRequest,
         available_actions: &[String],
     ) -> bool {
-        if request.action.delivered_by_keyboard() {
+        if request.action.delivered_by_keyboard() || matches!(request.action, Action::SelectText(_))
+        {
             return false;
         }
         if request.policy != crate::InteractionPolicy::headless() {

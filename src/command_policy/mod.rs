@@ -173,7 +173,10 @@ fn validate_args(cmd: &Commands) -> Result<(), AppError> {
         }
         Commands::Type(args) => validate_ref_id(&args.ref_id)?,
         Commands::SetValue(args) => validate_ref_id(&args.ref_id)?,
-        Commands::Select(args) => validate_ref_id(&args.ref_id)?,
+        Commands::Select(args) => {
+            validate_ref_id(&args.ref_id)?;
+            args.selection()?;
+        }
         Commands::Scroll(args) => {
             validate_ref_id(&args.ref_id)?;
         }

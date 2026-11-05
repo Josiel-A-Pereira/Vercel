@@ -63,7 +63,7 @@ mod imp {
     /// answers with a partial bundle claiming completeness.
     ///
     /// Wires `properties::read_live_bounded` rather than the unbounded
-    /// `read_live`: the property set is 43 properties wide, one cross-process
+    /// `read_live`: the property set is 44 properties wide, one cross-process
     /// call apiece, and nothing checked the operation deadline between them -
     /// a poll-style caller (`resolve.rs`'s retry loop, core's ref-action poll)
     /// could overshoot its own user-visible timeout on every single iteration.

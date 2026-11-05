@@ -8,7 +8,7 @@ use crate::{
         resolve_query,
     },
     refs::refs_store::RefStore,
-    snapshot::{self, emit_snapshot_saved},
+    snapshot::{self, snapshot_saved::emit_snapshot_saved},
     trace::trace_artifacts,
 };
 use serde_json::{Value, json};

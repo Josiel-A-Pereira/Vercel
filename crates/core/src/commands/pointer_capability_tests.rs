@@ -107,7 +107,8 @@ fn a_headed_ref_click_is_refused_before_target_resolution() {
 fn select_args() -> select::SelectArgs {
     select::SelectArgs {
         ref_id: "@missing:e1".into(),
-        value: "Choice".into(),
+        value: Some("Choice".into()),
+        selection: None,
         timeout_ms: Some(5_000),
     }
 }

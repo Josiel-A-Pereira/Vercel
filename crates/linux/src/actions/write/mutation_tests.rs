@@ -187,6 +187,7 @@ fn a_missing_action_index_falls_through_for_an_action_and_stays_uncertain_for_te
     assert_eq!(decide(WriteKind::DoAction), Verdict::Absent);
     for kind in [
         WriteKind::InsertText,
+        WriteKind::SetSelection,
         WriteKind::SetTextContents,
         WriteKind::SetProperty,
     ] {

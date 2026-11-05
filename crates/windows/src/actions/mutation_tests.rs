@@ -247,7 +247,7 @@ fn actions_never_construct_stale_via_adapter_error_stale_ref() {
 #[cfg(target_os = "windows")]
 mod classify_write_tests {
     use crate::actions::mutation::classify_write;
-    use crate::system::runtime::hresult::E_ACCESSDENIED;
+    use crate::system::runtime::hresult::{E_ACCESSDENIED, UIA_E_NOTSUPPORTED};
     use crate::tree::automation::{ERR_NONE, ERR_NOTFOUND};
     use agent_desktop_core::{DeliveryDisposition, ErrorCode};
     use uiautomation::Error as UiaError;
@@ -266,6 +266,16 @@ mod classify_write_tests {
             .expect("an empty pattern must not be Err");
 
         assert!(!result);
+    }
+
+    #[test]
+    fn unsupported_text_selection_is_absence_not_an_error() {
+        let error = UiaError::from(windows::core::HRESULT(UIA_E_NOTSUPPORTED));
+
+        let delivered = classify_write("Select", "TextPattern.Select", &error)
+            .expect("an unsupported TextPattern selection must be absence");
+
+        assert!(!delivered);
     }
 
     #[test]

@@ -12,6 +12,8 @@ mod popup_verify;
 mod process_check;
 pub(crate) mod scroll;
 pub(crate) mod select;
+pub(crate) mod select_text;
+pub(crate) mod select_text_focus;
 pub(crate) mod toggle_state;
 pub(crate) mod write;
 

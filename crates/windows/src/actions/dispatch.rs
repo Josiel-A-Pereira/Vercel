@@ -42,6 +42,7 @@ mod imp {
     use crate::actions::scroll::scroll_steps;
     use crate::actions::scroll_into_view::scroll_into_view_outcome;
     use crate::actions::select::select_steps;
+    use crate::actions::select_text::select_text_action;
     use crate::actions::toggle_state::{check_steps, toggle_steps, uncheck_steps};
     use crate::actions::value_write::{clear_steps, set_value_steps};
     use crate::tree::element::{UIAElement, uia_element};
@@ -139,6 +140,7 @@ mod imp {
                 let steps = select_steps(element, value, deadline)?;
                 Ok(ActionResult::from_execution(&request.action, steps))
             }
+            Action::SelectText(selection) => select_text_action(element, selection, deadline),
             Action::Scroll(direction, amount) => {
                 let steps = scroll_steps(element, direction, *amount, deadline)?;
                 Ok(ActionResult::from_execution(&request.action, steps))

@@ -40,6 +40,9 @@ pub fn execute_with_timeout(
         action,
         caller_policy,
     } = args;
+    if let Action::SelectText(selection) = &action {
+        selection.validate()?;
+    }
     let timeout_ms = normalize_action_timeout_ms(timeout_ms);
     let base = action.base_interaction_policy();
     let effective = base.join(caller_policy);

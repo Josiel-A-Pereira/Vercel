@@ -359,6 +359,9 @@ pub fn execute_entry_with_context(
     request: ActionRequest,
     context: &CommandContext,
 ) -> Result<ActionResult, AdapterError> {
+    if let crate::Action::SelectText(selection) = &request.action {
+        selection.validate()?;
+    }
     let label = ref_label_from_entry(entry);
     crate::ref_action::ref_action_wait::execute_with_auto_wait(
         crate::ref_action::ref_action_wait_context::RefActionWaitContext {

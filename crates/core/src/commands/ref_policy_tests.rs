@@ -15,7 +15,6 @@ use crate::{
     refs::{RefEntry, RefMap},
 };
 use std::sync::Mutex;
-
 /// Every command module stem whose execute function calls `context.request_base(`.
 /// Adding a new ref-action command requires adding its stem here; the
 /// `every_ref_action_command_is_registered_in_the_policy_list` guard enforces this.
@@ -198,7 +197,6 @@ fn default_ref_commands_use_least_permissive_supported_policy() {
     let snapshot_id = snapshot_id();
     let adapter = RecordingAdapter::new();
     let context = CommandContext::default();
-
     click::execute(ref_args(&snapshot_id), &adapter, &context).unwrap();
     let double_click_error =
         double_click::execute(ref_args(&snapshot_id), &adapter, &context).unwrap_err();
@@ -232,7 +230,8 @@ fn default_ref_commands_use_least_permissive_supported_policy() {
     select::execute(
         select::SelectArgs {
             ref_id: format!("@{}:e1", snapshot_id.clone()),
-            value: "choice".into(),
+            value: Some("choice".into()),
+            selection: None,
             timeout_ms: None,
         },
         &adapter,
@@ -321,7 +320,8 @@ fn headed_context_reaches_every_ref_action_without_policy_downgrade() {
     select::execute(
         select::SelectArgs {
             ref_id: format!("@{}:e1", snapshot_id.clone()),
-            value: "choice".into(),
+            value: Some("choice".into()),
+            selection: None,
             timeout_ms: None,
         },
         &adapter,
