@@ -4,12 +4,13 @@ use agent_desktop_core::{AdapterError, AppInfo, InteractionLease, OperationRepor
 
 use super::SharedBus;
 use crate::system::process::process_lookup::Lookup;
-use crate::system::window::foreign::foreign_close_route::ForeignCloseRoute;
+use foreign_state::ForeignState;
 use world::{Live, World};
 
 #[cfg(test)]
 mod fake;
 mod force;
+mod foreign_state;
 mod graceful;
 mod refusal;
 mod standing;
@@ -80,8 +81,7 @@ pub(crate) fn close_app(
         instance: app.process_instance.as_deref().unwrap_or_default(),
         deadline: lease.deadline(),
         started: Instant::now(),
-        foreign: ForeignCloseRoute::default(),
-        unanswered: std::cell::Cell::new(false),
+        foreign: ForeignState::default(),
     };
     run_report(&live, app, force)
 }

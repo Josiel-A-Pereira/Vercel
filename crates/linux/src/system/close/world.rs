@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 use agent_desktop_core::{AdapterError, Deadline};
 
+use super::foreign_state::ForeignState;
 use crate::system::display::display_server::{DisplayServer, session_server};
 use crate::system::menu::surfaces;
 use crate::system::process::liveness::{self, Liveness};
@@ -10,7 +11,6 @@ use crate::system::process::process_lookup::Lookup;
 use crate::system::registry::registry_frames::RootRead;
 use crate::system::signal::Signal;
 use crate::system::signal::signal_sent::Sent;
-use crate::system::window::foreign::foreign_close_route::ForeignCloseRoute;
 use crate::system::window::foreign::foreign_frame::Frame;
 use crate::system::window::foreign::foreign_link::ForeignLink;
 use crate::system::window::foreign::foreign_names::ProcessNames;
@@ -78,8 +78,7 @@ pub(super) struct Live<'a> {
     pub(super) instance: &'a str,
     pub(super) deadline: Deadline,
     pub(super) started: Instant,
-    pub(super) foreign: ForeignCloseRoute<ForeignLink>,
-    pub(super) unanswered: Cell<bool>,
+    pub(super) foreign: ForeignState,
 }
 
 /// The frames of a process, or a timed-out read noted in `unanswered`: an
@@ -100,19 +99,19 @@ impl Live<'_> {
     /// The X11 answer, unless this is a Wayland session where that answer
     /// holds no window and the compositor lists toplevels itself.
     fn read_toplevels(&self, deadline: Deadline) -> ControlRead<Vec<Toplevel>> {
+        self.foreign.begin_read();
         let x11 = control::toplevels_of(self.pid, deadline);
         let listed = matches!(&x11, ControlRead::Ready(windows) if !windows.is_empty());
         if listed || !self.on_wayland() {
-            self.foreign.release();
+            self.foreign.route.release();
             return x11;
         }
-        match self.foreign.reach(|| ForeignLink::open(deadline)) {
+        match self.foreign.route.reach(|| ForeignLink::open(deadline)) {
             Ok(true) => {}
             Ok(false) => return x11,
             Err(_) => return ControlRead::Unavailable,
         }
         let names = ProcessNames::of(self.pid, self.name).with_instance(self.instance);
-        self.unanswered.set(false);
         let frames = || {
             let (windows, read) = listed_of_process(self.bus, self.pid, deadline)
                 .map_err(|_| ControlError::NoDisplay)?;
@@ -123,9 +122,9 @@ impl Live<'_> {
                     prompt: window.dialog || window.modal,
                 })
                 .collect();
-            answered_frames(frames, read, &self.unanswered)
+            answered_frames(frames, read, &self.foreign.unanswered)
         };
-        match self.foreign.standing(&names, frames, deadline) {
+        match self.foreign.route.standing(&names, frames, deadline) {
             Ok(windows) => ControlRead::Ready(windows),
             Err(_) => ControlRead::Unavailable,
         }
@@ -158,10 +157,7 @@ impl World for Live<'_> {
     }
 
     fn frames_unanswered(&self) -> Result<(), AdapterError> {
-        if self.unanswered.get() {
-            require_complete_frames(RootRead::TimedOut)?;
-        }
-        Ok(())
+        self.foreign.frames_unanswered()
     }
 
     fn toplevels(&self) -> ControlRead<Vec<Toplevel>> {
@@ -181,8 +177,8 @@ impl World for Live<'_> {
     }
 
     fn request_close(&self, window: u32) -> Result<(), ControlError> {
-        if self.foreign.in_use() {
-            return self.foreign.close(window, self.deadline);
+        if self.foreign.route.in_use() {
+            return self.foreign.route.close(window, self.deadline);
         }
         control::request_close(window, self.pid, self.instance, self.deadline)
     }
@@ -200,18 +196,18 @@ impl World for Live<'_> {
     }
 
     fn contested_windows(&self) -> usize {
-        self.foreign.contested()
+        self.foreign.route.contested()
     }
 
     fn has_foreign_route(&self) -> bool {
-        self.foreign.in_use()
+        self.foreign.route.in_use()
     }
 
     fn foreign_unproven(&self) -> Vec<String> {
-        self.foreign.unproven()
+        self.foreign.route.unproven()
     }
 
     fn foreign_dialogs(&self) -> Vec<String> {
-        self.foreign.dialogs()
+        self.foreign.route.dialogs()
     }
 }
