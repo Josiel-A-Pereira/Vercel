@@ -147,7 +147,7 @@ impl DebugCapture {
             }
             data["debug"] = metadata;
         } else {
-            eprintln!("agent-desktop debug: {metadata}");
+            let _ = writeln!(std::io::stderr().lock(), "agent-desktop debug: {metadata}");
         }
     }
 }

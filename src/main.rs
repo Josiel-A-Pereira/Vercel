@@ -337,7 +337,10 @@ fn response(cmd_name: &str, result: Result<serde_json::Value, AppError>) -> Resp
 }
 
 fn report_output_failure(write_err: std::io::Error) -> ExitCode {
-    eprintln!("agent-desktop: failed to write response to stdout: {write_err}");
+    let _ = writeln!(
+        std::io::stderr().lock(),
+        "agent-desktop: failed to write response to stdout: {write_err}"
+    );
     ExitCode::FAILURE
 }
 
