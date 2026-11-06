@@ -8,7 +8,7 @@ agent-desktop runs ref actions headless by default. The global `--headed` flag i
 
 ## What headless actions do
 
-A headless ref action calls the app's accessibility actions. It does not take focus, move the cursor, synthesize keystrokes, or use the clipboard, which keeps it safe to run while a person uses the desktop. When the accessibility API cannot do what you asked, the action fails closed with a structured error such as `ACTION_NOT_SUPPORTED` or `POLICY_DENIED`. It never silently switches to physical input.
+Headless ref actions use accessibility calls without taking focus, moving the cursor, or using the clipboard. Explicit key actions may use targeted keyboard delivery under the platform's rules. When the accessibility API cannot do what you asked, the action fails closed with a structured error such as `ACTION_NOT_SUPPORTED` or `POLICY_DENIED`. It never silently switches to physical input.
 
 A result shows which mechanism ran: in `data.steps`, `semantic_api` is an accessibility call and `physical_synthetic` is synthesized input.
 
@@ -49,7 +49,7 @@ Depending on the OS:
   </tbody>
 </table>
 
-`press` is keyboard input and does not need `--headed` for an unscoped press; scoped presses have platform rules. Each platform page has the full capability table: [macOS](/desktop/platforms/macos), [Windows](/desktop/platforms/windows), [Linux](/desktop/platforms/linux).
+`press` requires an explicit or remembered process target. On macOS, headless keys can reach that process without activating it; Windows and Linux require an active target. Each platform page has the full capability table: [macOS](/desktop/platforms/macos), [Windows](/desktop/platforms/windows), [Linux](/desktop/platforms/linux).
 
 ## Handle `POLICY_DENIED`
 

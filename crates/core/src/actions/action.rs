@@ -162,11 +162,7 @@ impl Action {
 
     /// Returns the command's minimum interaction policy.
     pub fn base_interaction_policy(&self) -> crate::actions::interaction_policy::InteractionPolicy {
-        if matches!(self, Self::PressKey(_)) {
-            crate::actions::interaction_policy::InteractionPolicy::focus_fallback()
-        } else {
-            crate::actions::interaction_policy::InteractionPolicy::headless()
-        }
+        crate::actions::interaction_policy::InteractionPolicy::headless()
     }
 }
 

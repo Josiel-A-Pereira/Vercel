@@ -68,6 +68,12 @@ fn execute_global_action(
     let Action::PressKey(combo) = request.action else {
         return Err(AdapterError::not_supported("global element action"));
     };
+    if !request.policy.allow_focus_steal {
+        return Err(AdapterError::policy_denied_for_policy(
+            "Global keys require explicit focus permission",
+            request.policy,
+        ));
+    }
     crate::input::keyboard::synthesize_key(&combo, None, lease.deadline())?;
     Ok(
         ActionResult::delivered_unverified("press_key").with_steps(vec![

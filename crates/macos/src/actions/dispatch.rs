@@ -91,7 +91,13 @@ mod imp {
             }
 
             Action::PressKey(combo) => {
-                crate::actions::physical_keyboard::press(el, combo, request.policy, deadline)?;
+                crate::actions::physical_keyboard::press(
+                    el,
+                    combo,
+                    request.policy,
+                    deadline,
+                    request.expected_process(),
+                )?;
                 steps.push(
                     ActionStep::succeeded("PressKey")
                         .with_mechanism(StepMechanism::PhysicalSynthetic)

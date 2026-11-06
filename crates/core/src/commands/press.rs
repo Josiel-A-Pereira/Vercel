@@ -1,6 +1,5 @@
 use crate::{
-    AppError,
-    actions::action::Action,
+    AdapterError, AppError, DeliverySemantics, ErrorCode,
     adapter::PlatformAdapter,
     commands::combo::{ensure_combo_allowed, parse_combo_normalized},
     context::CommandContext,
@@ -24,7 +23,11 @@ pub fn execute(
     ensure_combo_allowed(&combo, &args.combo, args.force, adapter)?;
     let deadline = crate::Deadline::standard()?;
 
-    let mut pressed_process = None;
+    if args.app.is_some() || args.window_id.is_some() {
+        context.invalidate_target()?;
+    }
+    let pressed_process;
+    let mut wait_window_id = args.window_id.clone();
     let result = if let Some((expected, window)) = target_app(&args, adapter, deadline)? {
         let lease = adapter.acquire_interaction_lease(deadline)?;
         let live = crate::commands::helpers::revalidate_app_for_mutation(
@@ -33,7 +36,8 @@ pub fn execute(
             lease.deadline(),
         )?;
         let process = crate::commands::helpers::process_identity(&live)?;
-        pressed_process = Some(process.pid);
+        context.remember_process(Some(process.clone()))?;
+        pressed_process = process.pid;
         if context.physical_input_policy().is_headed() {
             match &window {
                 Some(window) => crate::actions::headed_focus::focus_exact_window(
@@ -55,19 +59,38 @@ pub fn execute(
             adapter.press_key_for_app(process, &combo, context.physical_input_policy(), &lease)?
         }
     } else {
+        let process = context.remembered_process()?.ok_or_else(|| {
+            AdapterError::new(ErrorCode::PolicyDenied, "No application target is available for press")
+                .with_suggestion("Pass --app or --window-id, or select a target in the same --session/--agent-id scope")
+                .with_disposition(DeliverySemantics::not_delivered())
+        })?;
         let lease = adapter.acquire_interaction_lease(deadline)?;
-        let handle = crate::adapter::NativeHandle::null();
-        adapter.execute_action(
-            &handle,
-            context.request_base(Action::PressKey(combo)),
-            &lease,
-        )?
+        if context.wait_selector().is_some() {
+            wait_window_id = Some(
+                crate::system::window_lookup::find_window_for_process(
+                    process.clone(),
+                    adapter,
+                    lease.deadline(),
+                )?
+                .id,
+            );
+        }
+        if context.physical_input_policy().is_headed() {
+            crate::actions::headed_focus::focus_process_window(
+                process.clone(),
+                adapter,
+                context,
+                &lease,
+            )?;
+        }
+        pressed_process = process.pid;
+        adapter.press_key_for_app(process, &combo, context.physical_input_policy(), &lease)?
     };
-    crate::cursor_overlay::follow_caret_after_key(adapter, context, pressed_process);
+    crate::cursor_overlay::follow_caret_after_key(adapter, context, Some(pressed_process));
     super::helpers::apply_scoped_post_action_wait(
         serde_json::to_value(result)?,
         args.app,
-        args.window_id,
+        wait_window_id,
         adapter,
         context,
     )

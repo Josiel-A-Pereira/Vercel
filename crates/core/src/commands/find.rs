@@ -54,6 +54,7 @@ pub fn execute(
     let query = locator_query_from_args(&args)?;
     query.validate_states().map_err(AppError::Adapter)?;
 
+    context.invalidate_target()?;
     live::execute(&args, &query, adapter, context).map_err(name_the_traversal_remedy)
 }
 

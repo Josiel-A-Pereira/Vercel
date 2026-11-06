@@ -48,7 +48,7 @@ pub(super) fn execute(
                 args.surface,
                 deadline,
             )?;
-            snapshot::window_capture::first_surface_owner(owners, |owner| {
+            snapshot::observe_surface_owner(owners, context, |owner| {
                 resolve_query(
                     adapter,
                     query,
@@ -113,6 +113,7 @@ fn rooted_resolution(
             },
             |tree| !selects_tokenless_entry(tree),
         )?;
+        context.remember_process(entry.process.identity())?;
         match read {
             RootRead::Subtree(tree) => Ok(ObservedObservation::whole(tree)),
             RootRead::Window(window_read) => {

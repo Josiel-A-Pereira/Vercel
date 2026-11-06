@@ -15,9 +15,9 @@ Global flags work before or after the command name, so `agent-desktop --headed c
     <tr><th>Flag</th><th>Default</th><th>Meaning</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>--headed</code></td><td>off</td><td>Prefer physical delivery for natural input commands and allow focus and cursor side effects. The default is strict headless semantic delivery. See <a href="/desktop/guides/headed-mode">Headed mode</a>.</td></tr>
+    <tr><td><code>--headed</code></td><td>off</td><td>Prefer physical delivery for natural input commands and allow focus and cursor side effects. The default forbids focus and cursor side effects; targeted keyboard delivery follows the platform rules. See <a href="/desktop/guides/headed-mode">Headed mode</a>.</td></tr>
     <tr><td><code>--session ID</code></td><td>none</td><td>Select the snapshot namespace and trace. Overrides <code>AGENT_DESKTOP_SESSION</code>. See <a href="/desktop/sessions">Sessions</a>.</td></tr>
-    <tr><td><code>--agent-id ID</code></td><td>none</td><td>Subagent id within the session. Overrides <code>AGENT_DESKTOP_AGENT_ID</code>. Required for desktop actions in a multi-agent session.</td></tr>
+    <tr><td><code>--agent-id ID</code></td><td>none</td><td>Agent id for remembered targets, optionally within a session. Overrides <code>AGENT_DESKTOP_AGENT_ID</code>. Required for desktop actions in a multi-agent session.</td></tr>
     <tr><td><code>--trace PATH</code></td><td>off</td><td>Append trace events as JSONL to this file instead of the session's trace. See <a href="/desktop/guides/traces">Traces</a>.</td></tr>
     <tr><td><code>--trace-strict</code></td><td>off</td><td>Fail when trace setup or a pre-action write fails. Requires <code>--trace</code> or a tracing session.</td></tr>
     <tr><td><code>--wait-for SELECTOR</code>, <code>-w</code></td><td>none</td><td>After the command, poll until an element matches. See <a href="#post-action-wait-flags">Post-action wait flags</a>.</td></tr>

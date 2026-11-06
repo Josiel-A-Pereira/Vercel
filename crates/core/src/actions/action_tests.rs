@@ -112,7 +112,7 @@ fn pure_ax_actions_base_policy_is_headless() {
 }
 
 #[test]
-fn type_text_is_headless_but_explicit_press_allows_focus() {
+fn text_and_key_actions_default_to_headless() {
     let headless = InteractionPolicy::headless();
     assert_eq!(
         Action::PressKey(KeyCombo {
@@ -120,8 +120,8 @@ fn type_text_is_headless_but_explicit_press_allows_focus() {
             modifiers: vec![Modifier::Meta],
         })
         .base_interaction_policy(),
-        InteractionPolicy::focus_fallback(),
-        "PressKey is an explicit physical-input command"
+        headless,
+        "PressKey must not gain implicit focus permission"
     );
     assert_eq!(
         Action::TypeText("hello".into()).base_interaction_policy(),
@@ -131,7 +131,7 @@ fn type_text_is_headless_but_explicit_press_allows_focus() {
 }
 
 #[test]
-fn key_down_and_key_up_base_policy_is_headless_unlike_press_key() {
+fn held_key_base_policy_is_headless() {
     let headless = InteractionPolicy::headless();
     assert_eq!(
         Action::KeyDown(dummy_key()).base_interaction_policy(),

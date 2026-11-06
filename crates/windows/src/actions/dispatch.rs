@@ -60,6 +60,12 @@ mod imp {
     ) -> Result<ActionResult, AdapterError> {
         let deadline = lease.deadline();
         if handle.is_null() {
+            if matches!(request.action, Action::PressKey(_)) && !request.policy.allow_focus_steal {
+                return Err(AdapterError::policy_denied_for_policy(
+                    "Global keys require explicit focus permission",
+                    request.policy,
+                ));
+            }
             return null_handle_action(&request.action, deadline);
         }
         let element = uia_element(handle)?;

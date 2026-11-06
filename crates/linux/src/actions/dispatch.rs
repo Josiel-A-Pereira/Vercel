@@ -122,6 +122,12 @@ pub(crate) fn execute_action(
     let element = target_element(handle, &request.action)?;
     deadline.ensure_remaining()?;
     let Some(element) = element else {
+        if !request.policy.allow_focus_steal {
+            return Err(AdapterError::policy_denied_for_policy(
+                "Global keys require explicit focus permission",
+                request.policy,
+            ));
+        }
         return deliver(bus, &request.action, None, &request, lease);
     };
     verify_process(bus, element, request.expected_process(), deadline)?;

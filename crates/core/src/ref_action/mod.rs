@@ -134,6 +134,9 @@ pub(crate) fn dispatch_resolved_landing(
     request = request
         .with_verified_point(preflight.verified_point.clone())
         .with_expected_process(expected_process.clone());
+    target
+        .context
+        .remember_process(Some(expected_process.clone()))?;
     let final_target = ResolvedRefAction::new(target, &handle);
     final_target.context.trace_lazy(
         "action.dispatch.start",
@@ -349,15 +352,8 @@ fn ref_label_from_entry(entry: &RefEntry) -> String {
     format!("<{}/{}>", entry.identity.role, indices.join("/"))
 }
 
-/// Executes a pre-resolved ref-action entry using the provided `context` for
-/// session identity and trace emission. Prefer this over `execute_entry` when
-/// a real `CommandContext` is available (e.g. from `AdAdapter::command_context`
-/// in the FFI layer), so that trace events carry the correct session id.
-///
-/// Trace records use a role/path-derived label for the `"ref"` field so that
-/// FFI call-site events are distinguishable in multi-element trace logs. The
-/// label never includes content fields (name, value, text) that are subject to
-/// redaction.
+/// Executes a saved ref action with session identity and trace emission.
+/// Trace labels use role and path, omitting sensitive content fields.
 pub fn execute_entry_with_context(
     adapter: &dyn PlatformAdapter,
     entry: &RefEntry,

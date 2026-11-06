@@ -10,6 +10,7 @@ use std::time::Instant;
 
 mod cursor;
 mod options;
+mod remembered_target;
 mod session_scope;
 mod wait_selector;
 

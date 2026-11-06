@@ -86,8 +86,8 @@ ABI. A bare `@eN` ref returns
   before any platform call; on `AD_RESULT_ERR_ACTION_FAILED` the check report is
   JSON in `ad_last_error_details()`. It auto-waits 5000 ms before the preflight;
   `ad_execute_by_ref_timeout` takes `timeout_ms` (`-1` = 5000 ms default, `0` =
-  single-shot). `PressKey` defaults to `focus_fallback`; every other action,
-  including `TypeText`, defaults to `headless`. Pass `AD_POLICY_KIND_FOCUS_FALLBACK`
+  single-shot). All actions, including `PressKey` and `TypeText`, default to
+  `headless`. Pass `AD_POLICY_KIND_FOCUS_FALLBACK`
   (1) to allow focus without cursor movement, or `AD_POLICY_KIND_HEADED` (2) to allow
   physical cursor and keyboard delivery. `ad_execute_ref_action_exact_with_policy`
   always fails with `AD_RESULT_ERR_ACTION_NOT_SUPPORTED`: an exact entry has no

@@ -69,6 +69,7 @@ Each command prints one JSON envelope. A trimmed snapshot:
   `snapshot --root @s8f3k2p9:e3 -i --compact`.
 - **Headless by default.** Ref actions use the accessibility API without moving the pointer or taking focus. The global
   `--headed` flag allows physical input.
+- **Keyboard targets.** `press` requires `--app`, `--window-id`, or a process remembered by a snapshot or ref operation in the same `--session`/`--agent-id` scope. Without a target it returns `POLICY_DENIED`; it never falls back to the foreground app.
 - **Post-action waits** observe the ref's original process. Window-owned refs stay pinned to their original window,
   including refs captured from a sheet, alert, popover, focused view, or Linux menu. macOS application menus keep
   their application-owned surface and need no document window. The wait reads the whole pinned window, so overlay

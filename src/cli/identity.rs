@@ -11,7 +11,7 @@ pub(crate) struct IdentityArgs {
     #[arg(
         long,
         global = true,
-        help = "Harness subagent ID within --session (1-64 letters/digits/-/_; or AGENT_DESKTOP_AGENT_ID)"
+        help = "Agent ID for target isolation, optionally within --session (1-64 letters/digits/-/_; or AGENT_DESKTOP_AGENT_ID)"
     )]
     pub agent_id: Option<String>,
 }

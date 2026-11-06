@@ -62,6 +62,7 @@ pub fn run_from_ref_with_context(
     context: &CommandContext,
     timeout_ms: u64,
 ) -> Result<SnapshotResult, AppError> {
+    context.invalidate_target()?;
     let store = RefStore::for_session(context.session_id())?;
     let (active_snapshot_id, local_root_ref) =
         crate::refs::ref_token::resolve_ref_target(root_ref_id)?;
@@ -74,6 +75,7 @@ pub fn run_from_ref_with_context(
 
     let deadline = crate::Deadline::after(timeout_ms)?;
     let capture = drill_capture(adapter, opts, &entry, deadline)?;
+    context.remember_process(entry.process.identity())?;
     let DrillCapture {
         window,
         tree: raw_tree,

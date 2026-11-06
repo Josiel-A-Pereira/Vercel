@@ -78,7 +78,9 @@ pub(crate) enum Commands {
     Scroll(ScrollArgs),
     #[command(about = "Scroll element into visible area")]
     ScrollTo(RefArgs),
-    #[command(about = "Send a key combo: return, escape, cmd+c, shift+tab ...")]
+    #[command(
+        about = "Send a key combo to an explicit or remembered target: return, escape, cmd+c ..."
+    )]
     Press(PressArgs),
     #[command(about = "Hold a key or modifier down (fails closed in stateless mode; use press)")]
     KeyDown(KeyComboArgs),

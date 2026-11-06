@@ -9,10 +9,10 @@ use std::ffi::c_char;
 /// strict element resolution (→ `STALE_REF`/`AMBIGUOUS_TARGET`) → live
 /// actionability preflight → dispatch → owned-handle drop.
 ///
-/// Policy: semantic actions, including `TypeText`, default to strict
-/// `headless`. Explicit `PressKey` defaults to `focus_fallback`. A policy
-/// discriminant may elevate to focus fallback or headed. Base and elevation
-/// are computed by `agent_desktop_core::commands::execute_by_ref::execute_with_timeout` via
+/// Policy: all actions, including `PressKey` and `TypeText`, default to
+/// `headless`. A policy discriminant may permit focus fallback or headed input.
+/// Base and elevation are computed by
+/// `agent_desktop_core::commands::execute_by_ref::execute_with_timeout` via
 /// `Action::base_interaction_policy` + `InteractionPolicy::join`, so CLI and
 /// FFI share a single source of policy truth.
 ///

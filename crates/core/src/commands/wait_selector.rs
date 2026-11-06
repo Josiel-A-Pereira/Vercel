@@ -297,6 +297,10 @@ fn materialized_response(
     input: &WaitSelectorInput,
     elapsed_ms: u128,
 ) -> Result<Value, AppError> {
+    match &result.owner {
+        crate::SnapshotOwner::Application(app) => context.remember_app(app)?,
+        crate::SnapshotOwner::Window(window) => context.remember_window(window)?,
+    }
     let store = RefStore::for_session(context.session_id())?;
     let snapshot_id = result.save_refmap(&store)?;
     trace_artifacts::copy_refmap_if_full(context, &store, &snapshot_id, &result.refmap)?;

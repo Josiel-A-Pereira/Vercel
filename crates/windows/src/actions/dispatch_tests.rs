@@ -80,24 +80,17 @@ fn code_lines(source: &str) -> impl Iterator<Item = (usize, &str)> {
 }
 
 #[test]
-fn null_handle_press_key_synthesizes_globally() {
+fn headless_null_handle_press_key_never_synthesizes() {
     use crate::input::keyboard_send_fake_sink as key_sink;
     key_sink::reset();
-
-    let result = execute_action_impl(
+    let error = execute_action_impl(
         &NativeHandle::null(),
         ActionRequest::headless(Action::PressKey(dummy_key())),
         &lease(),
     )
-    .expect("null PressKey synthesizes");
-
-    assert_eq!(result.steps.len(), 1);
-    assert_eq!(result.steps[0].label(), "SendInput.press_key");
-    assert_eq!(
-        result.steps[0].mechanism(),
-        Some(StepMechanism::PhysicalSynthetic)
-    );
-    assert!(!key_sink::recorded().is_empty());
+    .unwrap_err();
+    assert_eq!(error.code, ErrorCode::PolicyDenied);
+    assert!(key_sink::recorded().is_empty());
 }
 
 #[test]

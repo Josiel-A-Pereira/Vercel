@@ -171,6 +171,7 @@ pub fn run_with_context(
     context: &CommandContext,
     timeout_ms: u64,
 ) -> Result<SnapshotResult, AppError> {
+    context.invalidate_target()?;
     let mut result = build(
         adapter,
         opts,
@@ -178,12 +179,30 @@ pub fn run_with_context(
         target.window_id,
         crate::Deadline::after(timeout_ms)?,
     )?;
+    match &result.owner {
+        SnapshotOwner::Application(app) => context.remember_app(app)?,
+        SnapshotOwner::Window(window) => context.remember_window(window)?,
+    }
     let store = RefStore::for_session(context.session_id())?;
     let snapshot_id = result.save_refmap(&store)?;
     trace_artifacts::copy_refmap_if_full(context, &store, &snapshot_id, &result.refmap)?;
     result.bind_snapshot_id(snapshot_id);
     emit_snapshot_saved(context, &result)?;
     Ok(result)
+}
+
+pub(crate) fn observe_surface_owner<T>(
+    owners: Vec<SnapshotOwner>,
+    context: &CommandContext,
+    observe: impl FnMut(&SnapshotOwner) -> Result<T, AppError>,
+) -> Result<(SnapshotOwner, T), AppError> {
+    context.invalidate_target()?;
+    let (owner, result) = window_capture::first_surface_owner(owners, observe)?;
+    match &owner {
+        SnapshotOwner::Application(app) => context.remember_app(app)?,
+        SnapshotOwner::Window(window) => context.remember_window(window)?,
+    }
+    Ok((owner, result))
 }
 
 pub(crate) fn emit_snapshot_saved(

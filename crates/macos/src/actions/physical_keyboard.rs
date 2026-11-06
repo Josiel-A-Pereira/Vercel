@@ -8,7 +8,29 @@ pub(crate) fn press(
     combo: &KeyCombo,
     policy: InteractionPolicy,
     deadline: Deadline,
+    expected: Option<&agent_desktop_core::ProcessIdentity>,
 ) -> Result<(), AdapterError> {
+    if !policy.allow_focus_steal {
+        let expected = expected.ok_or_else(|| {
+            AdapterError::stale_ref_because("Keyboard target has no process identity")
+        })?;
+        let identity = crate::system::process::process_identity::require_core(expected)?;
+        if crate::system::app::app_ops::pid_from_element(element, deadline) != Some(identity.pid())
+        {
+            return Err(AdapterError::stale_ref_because(
+                "Keyboard target belongs to another process",
+            ));
+        }
+        if !focused_element_matches(element, identity.pid(), deadline)? {
+            return Err(AdapterError::new(
+                ErrorCode::ActionFailed,
+                "Keyboard target is not the process's focused element",
+            )
+            .with_disposition(agent_desktop_core::DeliverySemantics::not_delivered()));
+        }
+        crate::system::process::process_identity::require_core(expected)?;
+        return crate::input::keyboard::synthesize_key(combo, Some(identity.pid()), deadline);
+    }
     press_sequence(element, std::slice::from_ref(combo), policy, deadline)
 }
 

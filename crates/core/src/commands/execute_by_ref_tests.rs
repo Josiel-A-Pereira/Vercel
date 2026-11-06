@@ -190,6 +190,12 @@ fn execute_with_timeout_zero_normalizes_to_single_attempt() {
     let _guard = HomeGuard::new();
     let snapshot_id = snapshot_with_ref("textfield", &["Click"]);
     let adapter = StaleThenOkAdapter::new(1);
+    let context = CommandContext::default()
+        .with_agent_id(Some("stale-ref".into()))
+        .unwrap();
+    context
+        .remember_process(Some(crate::ProcessIdentity::new(42, "previous")))
+        .unwrap();
 
     let err = execute_with_timeout(
         ExecuteByRefArgs {
@@ -199,16 +205,17 @@ fn execute_with_timeout_zero_normalizes_to_single_attempt() {
         },
         0,
         &adapter,
-        &CommandContext::default(),
+        &context,
     )
     .unwrap_err();
 
     assert_eq!(err.code(), "STALE_REF");
+    assert_eq!(context.remembered_process().unwrap(), None);
     assert_eq!(adapter.resolve_calls.load(Ordering::SeqCst), 1);
 }
 
 #[test]
-fn explicit_press_key_keeps_its_focus_fallback_policy() {
+fn explicit_press_key_does_not_grant_focus_permission() {
     let _guard = HomeGuard::new();
     let snapshot_id = snapshot_with_ref("textfield", &["PressKey"]);
     let adapter = PolicyCaptureAdapter::new();
@@ -230,7 +237,7 @@ fn explicit_press_key_keeps_its_focus_fallback_policy() {
 
     let captured = adapter.captured.lock().unwrap();
     let policy = captured.as_ref().unwrap().policy;
-    assert!(policy.allow_focus_steal);
+    assert!(!policy.allow_focus_steal);
     assert!(!policy.allow_cursor_move);
 }
 

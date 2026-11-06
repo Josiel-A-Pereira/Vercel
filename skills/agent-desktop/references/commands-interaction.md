@@ -6,7 +6,7 @@ Commands that change UI state. Run `agent-desktop <command> --help` for flags.
 
 `--headed` is global (`agent-desktop --headed click @s8f3k2p9:e5`) and applies to every `batch` entry. A headed action may focus the exact source window first, and a pointer action needs a verified target point.
 
-`press` is always physical keyboard input. `hover`, `drag`, `mouse-move`, `mouse-click` and `mouse-wheel` are physical cursor input and need `--headed`. Raw coordinates carry no window identity, so they never focus an app. `key-down`, `key-up`, `mouse-down` and `mouse-up` are reserved and never deliver input. They return `ACTION_NOT_SUPPORTED`, except that a headless `mouse-down` or `mouse-up` returns `POLICY_DENIED` first. Use `press`, `mouse-click` or `drag`.
+`press` requires an explicit or remembered process target and follows the platform keyboard rules. `hover`, `drag`, `mouse-move`, `mouse-click` and `mouse-wheel` are physical cursor input and need `--headed`. Raw coordinates carry no window identity, so they never focus an app. `key-down`, `key-up`, `mouse-down` and `mouse-up` are reserved and never deliver input. They return `ACTION_NOT_SUPPORTED`, except that a headless `mouse-down` or `mouse-up` returns `POLICY_DENIED` first. Use `press`, `mouse-click` or `drag`.
 
 Which gestures have a headless path:
 
@@ -145,14 +145,14 @@ agent-desktop scroll-to @s8f3k2p9:e8
 ## Keyboard
 
 ```bash
-agent-desktop press return
-agent-desktop press ctrl+shift+z
+agent-desktop --agent-id editor snapshot --app TextEdit
+agent-desktop --agent-id editor press return
 agent-desktop press cmd+s --app "TextEdit" --wait-for "button:Save" --wait-timeout 5000
 ```
 
 - Key names: `return`, `escape`, `tab`, `space`, `delete`, `up`, `down`, `left`, `right`, `f1` to `f12`. Modifiers: `cmd`/`meta`, `ctrl`, `alt`, `shift`, joined with `+`. Modifier names and blocked combos differ by OS. Read the platform skill.
 - A bare uppercase letter adds Shift: `press H` sends `shift+h`.
-- `--app` or `--window-id` targets one app. Use `--window-id` when several instances share a name and `--app` alone is `AMBIGUOUS_TARGET`. Unscoped `press` goes to the foreground app.
+- `--app` or `--window-id` targets one app. Use `--window-id` when several instances share a name and `--app` alone is `AMBIGUOUS_TARGET`. Without either flag, `press` uses the process remembered by a snapshot or ref operation in the same `--session` and `--agent-id` scope. A session or agent ID alone also defines a scope. No target means `POLICY_DENIED`, including with `--headed` or `--force`.
 - `press` reports `delivered_unverified`, because delivery does not prove the shortcut did its job. Wait for the expected effect once with `--wait-for` or `--wait-for-gone`. A timeout keeps the delivered result and is unsafe to retry blindly.
 - To open a window with a shortcut, keep the press and the wait in one `batch`, so the baseline is taken before delivery: `press`, then `wait --event window-opened`. A failed wait does not make the press safe to repeat.
 - Dangerous shortcuts are refused with `POLICY_DENIED` by the adapter. `--force` sends one anyway. Adding a modifier to a blocked shortcut usually gives another blocked one.

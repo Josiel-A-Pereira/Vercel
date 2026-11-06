@@ -128,6 +128,10 @@ impl ActionOps for CapturingAdapter {
 impl InputOps for CapturingAdapter {}
 
 impl SystemOps for CapturingAdapter {
+    fn is_blocked_combo(&self, combo: &KeyCombo) -> bool {
+        combo.key == "q"
+    }
+
     crate::adapter::guarded_interaction_lease!();
     crate::adapter::exact_window_focus!();
 
@@ -171,44 +175,51 @@ fn adapter_blocked_combo_is_refused_when_not_forced() {
 
 #[test]
 fn force_bypasses_the_adapter_block() {
+    let mut request = args("cmd+q", true);
+    request.app = Some("Editor".into());
     execute(
-        args("cmd+q", true),
-        &BlockingAdapter,
+        request,
+        &CapturingAdapter::default(),
         &CommandContext::default(),
     )
-    .expect("--force must let the agent send a blocked combo");
+    .unwrap();
 }
 
 #[test]
 fn core_blocks_nothing_by_default() {
-    execute(
-        args("cmd+q", false),
-        &AllowingAdapter,
-        &CommandContext::default(),
-    )
-    .expect("core must not hardcode any block; the default adapter allows everything");
+    let combo = super::parse_combo_normalized("cmd+q").unwrap();
+    super::ensure_combo_allowed(&combo, "cmd+q", false, &AllowingAdapter).unwrap();
 }
 
 #[test]
-fn global_press_uses_only_caller_authorized_policy() {
+fn unscoped_press_never_falls_back_to_global_input() {
     let adapter = CapturingAdapter::default();
-
-    execute(args("a", false), &adapter, &CommandContext::default()).unwrap();
+    for headed in [false, true] {
+        for force in [false, true] {
+            let error = execute(
+                args("a", force),
+                &adapter,
+                &CommandContext::default().with_headed(headed),
+            )
+            .unwrap_err();
+            assert_eq!(error.code(), "POLICY_DENIED");
+        }
+    }
+    assert!(adapter.global_policy.lock().unwrap().is_none());
+    assert!(adapter.app_policy.lock().unwrap().is_none());
+    let _home = crate::refs::refs_test_support::HomeGuard::new();
+    let context = CommandContext::default()
+        .with_agent_id(Some("editor".into()))
+        .unwrap();
+    let mut request = args("a", false);
+    request.app = Some("Editor".into());
+    execute(request, &adapter, &context).unwrap();
+    execute(args("a", false), &adapter, &context).unwrap();
     assert_eq!(
-        *adapter.global_policy.lock().unwrap(),
-        Some(crate::InteractionPolicy::focus_fallback())
+        adapter.dispatches.load(std::sync::atomic::Ordering::SeqCst),
+        2
     );
-
-    execute(
-        args("a", false),
-        &adapter,
-        &CommandContext::default().with_headed(true),
-    )
-    .unwrap();
-    assert_eq!(
-        *adapter.global_policy.lock().unwrap(),
-        Some(crate::InteractionPolicy::headed())
-    );
+    assert!(adapter.global_policy.lock().unwrap().is_none());
 }
 
 #[test]

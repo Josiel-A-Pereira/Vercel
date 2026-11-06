@@ -159,7 +159,7 @@ pub(crate) struct PressArgs {
     pub combo: String,
     #[arg(
         long,
-        help = "Target application name; keys go to its process without focusing it (--headed focuses its window first)"
+        help = "Target application; otherwise use the remembered process in the same --session/--agent-id scope, or return POLICY_DENIED"
     )]
     pub app: Option<String>,
     #[arg(

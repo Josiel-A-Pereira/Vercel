@@ -42,10 +42,13 @@ pub(crate) fn resolve_ref_with_context(
     adapter: &dyn PlatformAdapter,
     context: &CommandContext,
 ) -> Result<(RefEntry, crate::adapter::NativeHandle), AppError> {
-    resolve_ref_within_deadline(ref_id, crate::Deadline::standard()?, adapter, context)
+    context.invalidate_target()?;
+    let resolved =
+        resolve_ref_within_deadline(ref_id, crate::Deadline::standard()?, adapter, context)?;
+    context.remember_process(resolved.0.process.identity())?;
+    Ok(resolved)
 }
 
-/// Resolves a saved ref under the caller deadline and records resolution traces.
 fn resolve_ref_within_deadline(
     ref_id: &str,
     deadline: crate::Deadline,
@@ -117,6 +120,7 @@ pub(crate) fn execute_ref_action_dispatching(
     if request.policy.is_headed() && request.action.headed_requirement().requires_cursor() {
         super::point_resolve::require_pointer_capability(adapter)?;
     }
+    context.invalidate_target()?;
     let entry = load_ref_entry(&args.ref_id, context)?;
     let action_result = crate::ref_action::ref_action_wait::execute_with_auto_wait_and_lease(
         RefActionWaitContext {

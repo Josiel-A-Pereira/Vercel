@@ -70,7 +70,7 @@ Action results carry `data.disposition` and errors carry `error.disposition`, ea
 
 ## Headless and headed
 
-Ref actions are headless by default. They use semantic accessibility calls and do not take focus, move the cursor, synthesize keys or use the clipboard. If no semantic path exists, the action fails closed. Use the global `--headed` flag only when the user explicitly permits physical input, such as double-click, hover, drag, or focus. Never switch to headed mode to recover from a headless failure. Raw coordinates (`--xy`) never imply focus. Which actions need `--headed` differs by OS: read the platform skill.
+Ref actions are headless by default. They use semantic accessibility calls without taking focus, moving the cursor, or using the clipboard. Explicit key actions follow the platform rules for targeted keyboard delivery. If no semantic path exists, the action fails closed. Use the global `--headed` flag only when the user explicitly permits physical input, such as double-click, hover, drag, or focus. Never switch to headed mode to recover from a headless failure. Raw coordinates (`--xy`) never imply focus. Which actions need `--headed` differs by OS: read the platform skill.
 
 ## References
 

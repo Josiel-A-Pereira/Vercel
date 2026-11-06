@@ -146,7 +146,7 @@ pub(super) fn action_supported(
     if request.action.requires_cursor_policy() {
         return pass("supported_action");
     }
-    if matches!(request.action, Action::ScrollTo) {
+    if matches!(request.action, Action::ScrollTo | Action::PressKey(_)) {
         return pass("supported_action");
     }
     if matches!(request.action, Action::Click | Action::RightClick) {

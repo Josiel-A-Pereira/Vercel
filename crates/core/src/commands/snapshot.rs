@@ -89,6 +89,8 @@ pub fn execute(
     }
 
     if let Some(wait) = context.wait_selector() {
+        super::helpers::validate_post_action_wait(context)?;
+        context.invalidate_target()?;
         return wait_selector::execute(
             WaitSelectorInput {
                 query_raw: wait.query_raw.clone(),
