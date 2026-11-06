@@ -52,6 +52,31 @@ fn native_termination_rejection_does_not_blame_the_target_application() {
 }
 
 #[test]
+fn dialog_titles_collects_alerts_and_sheets_in_surface_order() {
+    use agent_desktop_core::SurfaceInfo;
+
+    let surface = |id: &str, kind: &str, title: Option<&str>| SurfaceInfo {
+        id: id.into(),
+        kind: kind.into(),
+        title: title.map(str::to_string),
+        item_count: None,
+        unclassified: Vec::new(),
+    };
+    let surfaces = vec![
+        surface("focused-window", "alert", Some("Review changes?")),
+        surface("focused-window/children/0", "sheet", None),
+        surface("focused-window/children/1", "popover", Some("Not a prompt")),
+        surface("menubar", "menu", Some("File")),
+    ];
+
+    assert_eq!(
+        dialog_titles(&surfaces),
+        vec!["Review changes?".to_string(), String::new()]
+    );
+    assert!(dialog_titles(&surfaces[2..]).is_empty());
+}
+
+#[test]
 fn adapter_close_without_a_process_instance_keeps_the_invalid_args_contract() {
     use agent_desktop_core::{InteractionLease, SystemOps};
 

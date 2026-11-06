@@ -62,7 +62,7 @@ agent-desktop close-app "TextEdit"
 agent-desktop close-app "TextEdit" --force
 ```
 
-Success is reported only after the process is seen gone: `{ "method": "graceful" | "force", "disposition": { "delivery": "delivered_unverified" | "delivered_verified" | "not_delivered" }, "target": { "kind": "app", ... } }`. `not_delivered` means the app had already exited. Read `disposition`, not `ok`, to learn what was proved. If a save dialog appears, snapshot it and answer it. `--force` ends the process. Protected system processes return `INVALID_ARGS` with `not_delivered`, not `PERM_DENIED`.
+Success is reported only after the process is seen gone: `{ "method": "graceful" | "force", "disposition": { "delivery": "delivered_unverified" | "delivered_verified" | "not_delivered" }, "target": { "kind": "app", ... } }`. `not_delivered` means the app had already exited. Read `disposition`, not `ok`, to learn what was proved. If a save dialog appears, snapshot it and answer it. When a prompt the quit request opened is still waiting at the deadline, close-app returns `ACTION_FAILED` with `details.cause` `dialog_pending` and the prompt titles in `details.dialog_titles`, `delivered_unverified` with retry `unsafe`. Answer the prompt in the app and close again, or use `--force`, which discards unsaved work. `--force` ends the process. Protected system processes return `INVALID_ARGS` with `not_delivered`, not `PERM_DENIED`.
 
 ## list-apps
 
