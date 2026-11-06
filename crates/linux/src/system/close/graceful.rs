@@ -56,6 +56,7 @@ fn fan_out(
                 delivery = DeliverySemantics::delivered_unverified();
             }
             Err(ControlError::BadWindow) => {}
+            Err(ControlError::StaleWindow) if sent > 0 => break,
             Err(error @ ControlError::StaleWindow) => {
                 return Err(failure_of(world, request, error).with_disposition(delivery));
             }
@@ -79,6 +80,16 @@ fn fan_out(
     unless_gone(world, failure)
 }
 
+/// Why a process with no window to close is refused: a Wayland session with
+/// no foreign route cannot list windows at all, anything else is windowless.
+fn windowless_answer(world: &impl World, request: &Request<'_>) -> AdapterError {
+    if world.on_wayland() && !world.has_foreign_route() {
+        refusal::wayland_session(request)
+    } else {
+        refusal::windowless(request)
+    }
+}
+
 fn request_close(world: &impl World, request: &Request<'_>) -> Result<bool, AdapterError> {
     let windows = match world.toplevels() {
         ControlRead::Ready(windows) => windows,
@@ -89,10 +100,17 @@ fn request_close(world: &impl World, request: &Request<'_>) -> Result<bool, Adap
             return unless_gone(world, refusal::no_route(request));
         }
         ControlRead::Unavailable if world.remaining().is_zero() => {
-            return Err(not_delivered(world.timeout_error()));
+            let error = world.frames_unanswered().err();
+            return Err(not_delivered(
+                error.unwrap_or_else(|| world.timeout_error()),
+            ));
         }
         ControlRead::Unavailable => {
-            return unless_gone(world, refusal::unavailable(request));
+            let error = world.frames_unanswered().err();
+            return unless_gone(
+                world,
+                error.unwrap_or_else(|| refusal::unavailable(request)),
+            );
         }
     };
     match world.liveness() {
@@ -100,17 +118,23 @@ fn request_close(world: &impl World, request: &Request<'_>) -> Result<bool, Adap
         Liveness::Stopped => return Err(AdapterError::app_unresponsive(request.name)),
         Liveness::Alive => {}
     }
-    if windows.is_empty() {
-        let refused = if world.on_wayland() {
-            refusal::wayland_session(request)
-        } else {
-            refusal::windowless(request)
-        };
-        return unless_gone(world, refused);
+    if windows.is_empty() && !world.has_foreign_route() {
+        return unless_gone(world, windowless_answer(world, request));
     }
     let standing = Standing::of(world, windows);
     if standing.has_dialog() {
         return Err(refusal::dialog_pending(request, &standing, false));
+    }
+    let contested = world.contested_windows();
+    if contested > 0 {
+        return Err(refusal::ambiguous_close(request, contested));
+    }
+    let unproven = world.foreign_unproven();
+    if !unproven.is_empty() {
+        return Err(refusal::identity_unproven(request, &unproven));
+    }
+    if standing.windows.is_empty() {
+        return unless_gone(world, windowless_answer(world, request));
     }
     let ids: Vec<u32> = standing.windows.iter().map(|window| window.id).collect();
     fan_out(world, request, &ids)
@@ -213,3 +237,11 @@ pub(super) fn close(world: &impl World, request: &Request<'_>) -> Result<bool, A
 #[cfg(test)]
 #[path = "graceful_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "graceful_foreign_tests.rs"]
+mod foreign_tests;
+
+#[cfg(test)]
+#[path = "graceful_foreign_route_tests.rs"]
+mod foreign_route_tests;

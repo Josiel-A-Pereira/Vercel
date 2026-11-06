@@ -8,7 +8,11 @@ use super::kept_session;
 use super::key_session::KeySession;
 use super::layout::refuse_unreachable;
 use super::remote_desktop::{RemoteDesktop, semantic_action_refusal};
+use super::virtual_keyboard::vk_link::VkLink;
+use super::virtual_keyboard::vk_port::VkPort;
+use super::virtual_keyboard::vk_send;
 use crate::input::delivery::{Delivery, Gate};
+use crate::input::delivery_channel::DeliveryChannel;
 use crate::input::keyboard::key_names::KEYSYM_SHIFT_L;
 use crate::input::keyboard::keysym_step::KeysymStep;
 
@@ -97,8 +101,10 @@ fn send_each(
                 })
         });
         if let Err(error) = outcome {
+            let unsent = session.discard_unsent();
             recover(session, &held);
-            return Err(with_progress(error, already_delivered + delivered));
+            let confirmed = (already_delivered + delivered).saturating_sub(unsent);
+            return Err(with_progress(error, confirmed));
         }
         delivered += 1;
         if key.down {
@@ -107,6 +113,30 @@ fn send_each(
             held.remove(at);
         }
     }
+    Ok(delivered)
+}
+
+fn send_lead(
+    session: &mut dyn KeySession,
+    gate: Gate<'_>,
+    deadline: Deadline,
+) -> Result<u32, AdapterError> {
+    let shift = [
+        KeysymStep {
+            keysym: KEYSYM_SHIFT_L,
+            down: true,
+        },
+        KeysymStep {
+            keysym: KEYSYM_SHIFT_L,
+            down: false,
+        },
+    ];
+    let delivered = send_each(session, &shift, 0, gate, deadline)?;
+    sleep(
+        deadline
+            .remaining_slice(SHIFT_SETTLE)
+            .map_err(|error| with_progress(error, delivered))?,
+    );
     Ok(delivered)
 }
 
@@ -125,27 +155,18 @@ fn drive(
             .start(deadline)
             .map_err(|error| with_progress(error, 0))?;
         gate().map_err(|error| with_progress(error, 0))?;
-        let shift = [
-            KeysymStep {
-                keysym: KEYSYM_SHIFT_L,
-                down: true,
-            },
-            KeysymStep {
-                keysym: KEYSYM_SHIFT_L,
-                down: false,
-            },
-        ];
-        lead_delivered = send_each(session, &shift, 0, gate, deadline)?;
-        sleep(
-            deadline
-                .remaining_slice(SHIFT_SETTLE)
-                .map_err(|error| with_progress(error, lead_delivered))?,
-        );
+        if session.needs_lead() {
+            lead_delivered = send_lead(session, gate, deadline)?;
+        }
     }
     let mut delivered = 0_u32;
     for chunk in chunks {
-        gate().map_err(|error| with_progress(error, lead_delivered + delivered))?;
-        delivered += send_each(session, chunk, lead_delivered + delivered, gate, deadline)?;
+        let so_far = lead_delivered + delivered;
+        gate().map_err(|error| with_progress(error, so_far))?;
+        session
+            .prepare(chunk, deadline)
+            .map_err(|error| with_progress(error, so_far))?;
+        delivered += send_each(session, chunk, so_far, gate, deadline)?;
     }
     Ok(delivered)
 }
@@ -167,9 +188,15 @@ pub(crate) fn run_chunks(
     }
     let kept = outcome.is_ok() && session.retain();
     if !kept && let Ok(recovery) = Deadline::detached_after(RECOVERY_BUDGET_MS) {
+        if outcome.is_err() {
+            session.drain(recovery);
+        }
         let _ = session.stop(recovery);
     }
-    outcome.map(|delivered_events| Delivery { delivered_events })
+    outcome.map(|delivered_events| Delivery {
+        delivered_events,
+        channel: DeliveryChannel::RemoteDesktop,
+    })
 }
 
 pub(crate) fn send_chunks(
@@ -177,29 +204,63 @@ pub(crate) fn send_chunks(
     gate: Gate<'_>,
     deadline: Deadline,
 ) -> Result<Delivery, AdapterError> {
-    for chunk in chunks {
-        refuse_unreachable(chunk)?;
-    }
-    let chunks: Vec<&[KeysymStep]> = chunks
+    send_via(chunks, gate, deadline, VkLink::open)
+}
+
+/// Chooses the key route. A kept session can only be Mutter's, so it skips
+/// the probe; otherwise a compositor that offers a virtual keyboard takes the
+/// text, and one that does not takes the Mutter path. The open sends no key.
+pub(super) fn send_via<P: VkPort>(
+    chunks: &[Vec<KeysymStep>],
+    gate: Gate<'_>,
+    deadline: Deadline,
+    open: impl FnOnce(Deadline) -> Result<Option<P>, AdapterError>,
+) -> Result<Delivery, AdapterError> {
+    let live: Vec<&[KeysymStep]> = chunks
         .iter()
         .map(Vec::as_slice)
         .filter(|chunk| !chunk.is_empty())
         .collect();
-    if chunks.is_empty() {
+    if live.is_empty() {
         return Ok(Delivery {
             delivered_events: 0,
+            channel: DeliveryChannel::RemoteDesktop,
         });
     }
     let kept = kept_session::take();
+    if kept.is_none()
+        && let Some(port) = open(deadline).map_err(|error| with_progress(error, 0))?
+    {
+        return vk_send::send_on(port, chunks, &live, gate, deadline);
+    }
+    send_mutter(chunks, &live, kept, gate, deadline)
+}
+
+fn send_mutter(
+    chunks: &[Vec<KeysymStep>],
+    live: &[&[KeysymStep]],
+    kept: Option<RemoteDesktop>,
+    gate: Gate<'_>,
+    deadline: Deadline,
+) -> Result<Delivery, AdapterError> {
+    if let Err(refusal) = chunks
+        .iter()
+        .try_for_each(|chunk| refuse_unreachable(chunk))
+    {
+        if let Some(session) = kept {
+            kept_session::keep(session);
+        }
+        return Err(refusal);
+    }
     let reused = kept.is_some();
     let mut session = match kept {
         Some(session) => session,
         None => RemoteDesktop::open(deadline).map_err(|error| with_progress(error, 0))?,
     };
-    let mut outcome = run_chunks(&mut session, &chunks, gate, deadline);
+    let mut outcome = run_chunks(&mut session, live, gate, deadline);
     if reused && outcome.as_ref().is_err_and(sent_nothing) {
         session = RemoteDesktop::open(deadline).map_err(|error| with_progress(error, 0))?;
-        outcome = run_chunks(&mut session, &chunks, gate, deadline);
+        outcome = run_chunks(&mut session, live, gate, deadline);
     }
     if outcome.is_ok() && session.resumed() {
         kept_session::keep(session);
@@ -224,3 +285,7 @@ pub(crate) fn pointer_refusal(what: &'static str) -> AdapterError {
 #[cfg(test)]
 #[path = "keysym_send_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "keysym_send_buffered_tests.rs"]
+mod buffered_tests;

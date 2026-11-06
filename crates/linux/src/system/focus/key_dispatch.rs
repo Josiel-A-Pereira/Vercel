@@ -27,6 +27,14 @@ trait KeyWorld {
         deadline: Deadline,
     ) -> Result<Option<WindowInfo>, AdapterError>;
     fn active_client_pid(&self, deadline: Deadline) -> Option<u32>;
+
+    /// The compositor's own verdict on a window the accessibility tree calls
+    /// focused, or `None` when the session has no compositor window list.
+    fn compositor_active(
+        &self,
+        window: &WindowInfo,
+        deadline: Deadline,
+    ) -> Option<Result<bool, AdapterError>>;
 }
 
 struct LiveKeys<'a> {
@@ -64,6 +72,19 @@ impl KeyWorld for LiveKeys<'_> {
             .iter()
             .find(|client| client.id == active)
             .and_then(|client| client.pid)
+    }
+
+    fn compositor_active(
+        &self,
+        window: &WindowInfo,
+        deadline: Deadline,
+    ) -> Option<Result<bool, AdapterError>> {
+        crate::system::window::compositor_active(
+            window.pid.get(),
+            &window.app,
+            || Ok(window.title.clone()),
+            deadline,
+        )
     }
 }
 
@@ -124,20 +145,53 @@ fn require_active(
     }
     let focused = world.focused_window(pid, deadline);
     if let Some(window) = window {
-        return if focused.ok().flatten().is_some_and(|focused| {
+        let proven = focused.ok().flatten().filter(|focused| {
             focused.id == window.id
                 && focused.pid == process.pid
                 && focused.process_instance.as_deref() == Some(process.instance.as_str())
-        }) {
-            Ok(())
-        } else {
-            Err(window_not_active(window))
+        });
+        let Some(proven) = proven else {
+            return Err(window_not_active(window));
         };
+        return compositor_agrees(
+            world,
+            backend,
+            &proven,
+            || window_not_active(window),
+            deadline,
+        );
     }
     match focused? {
-        Some(focused) if focused.pid.get() == pid => Ok(()),
+        Some(focused) if focused.pid.get() == pid => compositor_agrees(
+            world,
+            backend,
+            &focused,
+            || not_active(process, "compositor_not_activated"),
+            deadline,
+        ),
         Some(_) => Err(not_active(process, "other_application")),
         None => Err(not_active(process, "frame_not_active")),
+    }
+}
+
+/// On a Wayland session whose compositor lists its windows, the focused
+/// window must also be the one the compositor calls activated. A compositor
+/// that lists none leaves the accessibility proof as the whole gate; a list
+/// that cannot be read refuses.
+fn compositor_agrees(
+    world: &impl KeyWorld,
+    backend: &Backend,
+    focused: &WindowInfo,
+    refusal: impl FnOnce() -> AdapterError,
+    deadline: Deadline,
+) -> Result<(), AdapterError> {
+    if !matches!(backend, Backend::Wayland) {
+        return Ok(());
+    }
+    match world.compositor_active(focused, deadline) {
+        None | Some(Ok(true)) => Ok(()),
+        Some(Ok(false)) => Err(refusal()),
+        Some(Err(error)) => Err(error),
     }
 }
 

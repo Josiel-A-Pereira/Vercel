@@ -25,6 +25,9 @@ mod settle;
 #[path = "window_op_wayland_tests.rs"]
 mod wayland;
 
+#[path = "window_op_foreign_tests.rs"]
+mod foreign;
+
 #[path = "window_op_twin_tests.rs"]
 mod twin;
 
@@ -51,6 +54,9 @@ pub(super) struct World {
     pub(super) remember_calls: RefCell<Vec<Option<Extents>>>,
     pub(super) twins: Option<Twins>,
     pub(super) active: Option<u32>,
+    pub(super) foreign: Option<Result<(), AdapterError>>,
+    pub(super) foreign_sent: bool,
+    pub(super) foreign_ops: RefCell<Vec<WindowOp>>,
 }
 
 pub(super) fn process(instance: &str) -> Lookup {
@@ -109,6 +115,9 @@ impl World {
             remember_calls: RefCell::new(Vec::new()),
             twins: None,
             active: None,
+            foreign: None,
+            foreign_sent: true,
+            foreign_ops: RefCell::new(Vec::new()),
         }
     }
 
@@ -197,6 +206,13 @@ impl OpWorld for World {
 
     fn on_wayland(&self) -> bool {
         self.wayland
+    }
+
+    fn foreign_op(&self, _win: &WindowInfo, op: &WindowOp) -> Option<Result<bool, AdapterError>> {
+        self.foreign_ops.borrow_mut().push(op.clone());
+        self.foreign
+            .clone()
+            .map(|outcome| outcome.map(|()| self.foreign_sent))
     }
 
     fn displays(&self) -> Vec<Rect> {

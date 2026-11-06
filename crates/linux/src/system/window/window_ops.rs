@@ -115,13 +115,15 @@ pub(crate) fn list_windows(
         .collect())
 }
 
-/// The windows of one process, placed as `list_windows` places them. Only
-/// that process is read, so an unrelated stopped application costs nothing.
-pub(crate) fn windows_of_process(
+/// The windows of one process as the registry lists them, placed as
+/// `list_windows` places them, with what each shows about being a prompt,
+/// and whether every frame answered. Only that process is read, so an
+/// unrelated stopped application costs nothing.
+pub(crate) fn listed_of_process(
     bus: &SharedBus,
     pid: u32,
     deadline: Deadline,
-) -> Result<(Vec<WindowInfo>, RootRead), AdapterError> {
+) -> Result<(Vec<ListedWindow>, RootRead), AdapterError> {
     let pending = x11::start(|| DisplayReader.read());
     let desktops = x11::start(desktops::read);
     let registry = read_registry_for(bus, Some(pid), deadline)?;
@@ -139,11 +141,25 @@ pub(crate) fn windows_of_process(
     ))
 }
 
+/// The windows of one process, placed as `list_windows` places them.
+pub(crate) fn windows_of_process(
+    bus: &SharedBus,
+    pid: u32,
+    deadline: Deadline,
+) -> Result<(Vec<WindowInfo>, RootRead), AdapterError> {
+    listed_of_process(bus, pid, deadline).map(|(windows, read)| {
+        (
+            windows.into_iter().map(|window| window.info).collect(),
+            read,
+        )
+    })
+}
+
 fn finish_process_listing(
     mut pass: Pass,
     state: &X11State,
     desktops: Option<&Desktops>,
-) -> (Vec<WindowInfo>, RootRead) {
+) -> (Vec<ListedWindow>, RootRead) {
     let read = if pass
         .outcomes
         .iter()
@@ -154,10 +170,7 @@ fn finish_process_listing(
         RootRead::Read
     };
     finish_listing(&mut pass, state, desktops);
-    (
-        pass.windows.into_iter().map(|window| window.info).collect(),
-        read,
-    )
+    (pass.windows, read)
 }
 
 /// The focused window, or none when the available sources do not agree.

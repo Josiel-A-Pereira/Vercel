@@ -1,4 +1,9 @@
+pub(crate) mod active_watch;
 mod embedded_group;
+pub(in crate::system) mod foreign;
+pub(crate) use foreign::foreign_active::{compositor_active, offers_window_control, watch_active};
+#[cfg(test)]
+pub(crate) use foreign::foreign_live_rig;
 pub(crate) mod frame_identity;
 pub(super) mod ghost_window;
 pub(crate) mod listed_twins;

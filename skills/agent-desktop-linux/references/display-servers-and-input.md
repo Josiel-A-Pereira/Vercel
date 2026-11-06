@@ -22,9 +22,37 @@ A stale `WAYLAND_DISPLAY` from another session falls through to a working
 | Window ops | EWMH on the X11 display | Xwayland clients only; native windows and un-minimize refused |
 | `focus-window`, headed scoped `press` | EWMH activation, then keys for `press` | Refused with `ACTION_NOT_SUPPORTED`, cause `wayland_session`, Xwayland clients included |
 | Headless scoped `press` | Live display and frame focus guards, no activation | Live frame focus guard, no activation |
+| `list-displays` | Works | Mutter `DisplayConfig` first; if it does not answer, `wl_output` plus xdg-output (measured on Hyprland) |
 | `screenshot` | Window or display; primary display by default | Portal consent; primary display by default, `--screen` picks a monitor |
 | Clipboard | Native selection owner | `wl-clipboard` |
 | GNOME Shell ref click, popup opener | `--headed`, receiver proof from the shell's own tree | Ref click refused with `wayland_session`, popup opener refused as unproven; see shell reference |
+
+The Wayland column is GNOME. A compositor that offers
+`zwlr_foreign_toplevel_manager_v1` (measured on Hyprland) serves `focus-window`,
+window control and graceful `close-app` through that protocol; see
+`references/windows-and-lifecycle.md`. A compositor that advertises
+`zwp_virtual_keyboard_manager_v1` (measured on Hyprland 0.56.2) delivers
+`press` and headed `type` through that protocol instead of Mutter; see
+"Wayland keys".
+
+On Wayland, `list-displays` and `screenshot --screen N` read the same list. GNOME
+answers through `org.gnome.Mutter.DisplayConfig`. When that interface does not
+answer, the CLI reads the core `wl_output` protocol (version 4, for the output
+name) and `zxdg_output_manager_v1` (xdg-output, for logical position and size).
+Only the display listing uses the second source. Keyboard input and window
+control have their own routes on a non-GNOME compositor, in the paragraph above.
+
+- `scale` is the current mode's pixels divided by the logical width on the same
+  axis, so a fractional scale is reported. A 90 or 270 degree transform uses the
+  mode height.
+- `id` is the xdg-output name, else the `wl_output` name, else
+  `wl-output-<global id>`.
+- Wayland has no primary output. The output at logical (0,0) is marked primary;
+  without one, the left-most output, then the top-most, is.
+- An output without a logical position or size, or with an empty size (switched
+  off), is not listed.
+- If neither Mutter nor xdg-output answers, the command fails with
+  `PLATFORM_NOT_SUPPORTED`.
 
 X11 needs no tool beyond the binary and its clipboard helper. `xdotool`,
 `ydotool`, `xclip` and `wmctrl` are not used. `wl-clipboard` is the one outside
@@ -51,7 +79,8 @@ synthetic pointer path moves the user's real cursor.
   `wayland_session` and `physical_delivery_started: false` (`click`, `hover`,
   `double-click`, `mouse-wheel`, `mouse-down` and `select` included). A
   headed `type` sends keys through `RemoteDesktop.type_text` once the Mutter
-  capability probe succeeds.
+  capability probe succeeds, or through `VirtualKeyboard.type_text` on a
+  compositor with the virtual keyboard protocol.
 - Windows works the other way round (semantic first); do not carry that
   assumption across platforms.
 
@@ -121,9 +150,10 @@ agent-desktop press return --app gnome-text-editor
   printable ASCII, function and modifier keysyms without reading the layout. A
   character the layout cannot produce (`é`, `你`) is refused and not delivered
   (`INVALID_ARGS` on X11, `ACTION_NOT_SUPPORTED` with `character_outside_layout`
-  on Wayland). On X11, `--headed type` sends such a character through spare
-  keycodes; on Wayland it refuses it, so use headless `type` or `set-value` for
-  accents and non-Latin text.
+  on Mutter Wayland). On X11, `--headed type` sends such a character through
+  spare keycodes, and through the virtual keyboard it sends it from the agent's
+  own keymap (see "Wayland keys"). On Mutter it refuses it, so use headless
+  `type` or `set-value` for accents and non-Latin text.
 
 ### Blocked combos
 
@@ -153,7 +183,8 @@ empty insertion is dispatched.
   `--timeout-ms`, `type` waits 5000 ms plus 30 ms per character; an explicit
   `--timeout-ms` replaces that.
 - Under `--headed` it sends physical keys first (step `XTEST.type_text` on X11,
-  `RemoteDesktop.type_text` on Wayland, `physical_synthetic`; the result still
+  `RemoteDesktop.type_text` on Mutter Wayland, `VirtualKeyboard.type_text` on a
+  compositor with the virtual keyboard protocol, `physical_synthetic`; the result still
   reads the field back when it can) and falls back to `EditableText` only where
   keys cannot be sent. It proves focus on the field or its proven internal
   editor; focus elsewhere in the window does not authorize ref typing. Verify
@@ -179,20 +210,22 @@ empty insertion is dispatched.
 
 ## Wayland keys
 
-Wayland keys use one detected backend, `org.gnome.Mutter.RemoteDesktop` on the
-session bus. Before creating a session or emitting an event, the adapter probes
-the interface's typed `Version` property. A missing service or capability is
+Wayland keys use one detected backend. A compositor that advertises
+`zwp_virtual_keyboard_manager_v1` gets the virtual keyboard (below). Otherwise
+the backend is `org.gnome.Mutter.RemoteDesktop` on the session bus. On that path,
+before creating a session or emitting an event, the adapter probes the
+interface's typed `Version` property. A missing service or capability is
 `PLATFORM_NOT_SUPPORTED`, `not_delivered`, `physical_delivery_started: false`;
 another compositor never falls back to X11. A probe timeout is `TIMEOUT`. Calls
 send keysyms and wait 150 ms for the compositor to drain them. A long-lived host
 can retain the keyboard session for later deliveries; a new CLI process opens
 its own. Ending a session releases its held keys.
 
-- **Lead Shift.** A new session sends a lone Shift tap and waits 100 ms before
+- **Lead Shift (Mutter).** A new session sends a lone Shift tap and waits 100 ms before
   the real keys so the compositor can attach its keyboard. It inserts no text,
   but a handler that watches bare Shift can observe it. Reusing a still-live
   session skips the lead tap.
-- **Characters.** Only printable ASCII, function, modifier and vendor keysyms;
+- **Characters (Mutter).** Only printable ASCII, function, modifier and vendor keysyms;
   anything else is `ACTION_NOT_SUPPORTED`, cause `character_outside_layout`.
   Set the value directly with `set-value` instead. On a non-US layout, a
   character your keymap holds can still be refused. A refusal is safe: nothing
@@ -203,6 +236,59 @@ its own. Ending a session releases its held keys.
   `references/shell-tray-and-notifications.md`.
 - **No active window.** On a Wayland session with no seat keyboard no window
   carries `ACTIVE`, so `focus-changed` waits time out.
+
+### Virtual keyboard
+
+`press` and headed `type` report the steps `VirtualKeyboard.press_key` and
+`VirtualKeyboard.type_text`. No library beyond the binary is needed. Measured on
+Hyprland 0.56.2 only; the backend is chosen by the advertised global, so
+another compositor that offers it takes the same path unmeasured.
+
+- **Keymap.** Each delivery uploads the agent's own keymap: a US base at real
+  keycodes plus one key per other character, so text outside the session's
+  layout (Thai, emoji) types. The compositor's layout setting is not changed.
+  Control characters other than newline and tab are refused with
+  `ACTION_NOT_SUPPORTED`, cause `character_outside_layout`, and nothing is sent.
+- **Compositor focus.** Keys are sent only when the compositor itself reports
+  the target toplevel `activated` (through `zwlr_foreign_toplevel_manager_v1`) in
+  addition to the accessibility proof. Otherwise the press or text is refused,
+  `not_delivered`, with nothing sent; a scoped `press --app` names the cause
+  `compositor_not_activated`. Two same-titled windows of one app cannot be told
+  apart and are refused the same way. The focus check and the key write are not
+  atomic. If focus moves during a long text, delivery stops with
+  `compositor_not_activated` and an uncertain disposition, but a few
+  milliseconds of keys can still reach the newly focused window. In the measured
+  run (600 characters, focus moved mid-text) the second window received at most
+  one balanced press and release. Inspect both windows before you retry.
+- **First key on an empty seat.** On a seat with no other keyboard, the first
+  key sent right after the keymap upload was lost (0 of 10 delivered in the
+  probe). A delivery now waits for the seat to offer a keyboard and pauses 100 ms
+  after the keymap sync, which delivered the first key in the live runs; the
+  100 ms is not tuned. A session with a physical keyboard, which approximates a
+  seat that already has one, was not measured.
+- **Interrupted delivery.** The press and release of each key are written
+  together, so a killed process leaves no stuck key or modifier.
+- **Stopping mid-text.** A SIGTERM, SIGINT or SIGHUP while the agent types now
+  drains and destroys the virtual keyboard before the process ends, the same
+  path as a `--timeout-ms` stop. On Hyprland 0.56.2, SIGTERM stops made 0.2 s
+  into a 2000 letter text crashed a GTK3 target app in 0 of 32 runs, against 22
+  of 32 before this handling; a `--timeout-ms` stop crashed it in 0 of 32. Only
+  SIGTERM was measured among the three signals. SIGKILL cannot be handled and
+  can still crash a GTK3 target app with SIGSEGV: 20 of 32 kill stops did
+  before the handler and 1 of 8 after. The cause in GTK3 is not found. A text
+  that completes normally, or a focus move away from the target, did not crash
+  it in the runs measured.
+- **Modifier state.** Each group starts with a `modifiers(0)` request, and ends
+  with one after any chord. In the probe that request cleared a Shift left by
+  an earlier virtual keyboard. Whether it also clears a physical keyboard's Caps
+  Lock was not measured.
+- **Compositor bindings.** The compositor sees these keys as it sees a physical
+  keyboard. A bound chord such as a Super combination is consumed by the
+  compositor and the app receives nothing; the blocked-combo list is separate
+  and does not cover every binding.
+- **Not measured.** Non-GTK clients, input methods, a layer-shell surface that
+  holds the keyboard while a toplevel stays `activated`, and compositor
+  permission enforcement.
 
 ## Wheel and scroll
 

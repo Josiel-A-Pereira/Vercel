@@ -22,6 +22,7 @@ struct Keys<'a> {
     reads: RefCell<Vec<&'static str>>,
     lookups: Cell<u32>,
     stopped: bool,
+    compositor: Option<Result<bool, AdapterError>>,
 }
 
 fn facts(instance: &str) -> ProcessFacts {
@@ -44,6 +45,7 @@ impl<'a> Keys<'a> {
             reads: RefCell::new(Vec::new()),
             lookups: Cell::new(0),
             stopped: false,
+            compositor: None,
         }
     }
 
@@ -90,6 +92,15 @@ impl KeyWorld for Keys<'_> {
     fn active_client_pid(&self, _deadline: Deadline) -> Option<u32> {
         self.reads.borrow_mut().push("active");
         self.active
+    }
+
+    fn compositor_active(
+        &self,
+        _window: &WindowInfo,
+        _deadline: Deadline,
+    ) -> Option<Result<bool, AdapterError>> {
+        self.reads.borrow_mut().push("compositor");
+        self.compositor.clone()
     }
 }
 
@@ -369,3 +380,6 @@ fn window_scoped_press_refuses_unknown_or_mismatched_focus_without_synthesis() {
         assert!(physical.sent_nothing());
     }
 }
+
+#[path = "key_dispatch_compositor_tests.rs"]
+mod compositor;

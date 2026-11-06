@@ -8,6 +8,8 @@ use agent_desktop_core::{
 
 use crate::system::SharedBus;
 
+const WINDOW_CONTROL_PROBE_MS: u64 = 500;
+
 pub struct LinuxAdapter {
     bus: SharedBus,
 }
@@ -328,10 +330,14 @@ impl InputOps for LinuxAdapter {
     }
 
     fn keyboard_needs_window_activation(&self) -> bool {
-        !matches!(
+        if !matches!(
             crate::input::backend::backend(),
             Ok(crate::input::backend::Backend::Wayland)
-        )
+        ) {
+            return true;
+        }
+        Deadline::detached_after(WINDOW_CONTROL_PROBE_MS)
+            .is_ok_and(crate::system::window::offers_window_control)
     }
 
     fn mouse_event(

@@ -11,6 +11,7 @@ use super::sink::X11Sink;
 use super::sink_error::SinkError;
 use super::verify;
 use crate::input::delivery::Delivery;
+use crate::input::delivery_channel::DeliveryChannel;
 use crate::input::plan::Plan;
 use crate::input::release_guard::ReleaseGuard;
 use crate::input::release_state::ReleaseState;
@@ -83,6 +84,7 @@ fn execute(
     })?;
     Ok(Delivery {
         delivered_events: guard.delivered(),
+        channel: DeliveryChannel::Xtest,
     })
 }
 

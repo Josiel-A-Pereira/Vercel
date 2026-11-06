@@ -334,3 +334,6 @@ fn a_process_press_runs_the_gate_before_the_plan_is_read_or_sent() {
     assert_eq!(world.count("keymap"), 0);
     assert!(world.sent_nothing());
 }
+
+#[path = "target_keyboard_channel_tests.rs"]
+mod channel;
