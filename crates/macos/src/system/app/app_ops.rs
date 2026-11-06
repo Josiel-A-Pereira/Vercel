@@ -142,20 +142,72 @@ fn wait_for_exit(
             return Ok(CloseOutcome::Exited);
         }
         if deadline.is_expired() {
-            return Err(deadline
-                .timeout_error()
-                .with_details(serde_json::json!({
-                    "app": id,
-                    "pid": identity.pid(),
-                    "force": force,
-                }))
-                .with_disposition(agent_desktop_core::DeliverySemantics::delivered_unverified()));
+            return timeout_after_termination(id, identity, force, deadline);
         }
         let pause = deadline
             .remaining_slice(std::time::Duration::from_millis(25))
             .map_err(after_termination_request)?;
         std::thread::sleep(pause.min(std::time::Duration::from_millis(25)));
     }
+}
+
+#[cfg(target_os = "macos")]
+fn timeout_after_termination(
+    id: &str,
+    identity: crate::system::process::process_identity::ProcessIdentity,
+    force: bool,
+    deadline: Deadline,
+) -> Result<CloseOutcome, AdapterError> {
+    if let Some(titles) = pending_dialog_titles(&identity) {
+        return Err(AdapterError::dialog_pending(
+            id,
+            identity.pid(),
+            force,
+            &titles,
+        ));
+    }
+    if !identity
+        .still_matches()
+        .map_err(after_termination_request)?
+    {
+        return Ok(CloseOutcome::Exited);
+    }
+    Err(deadline
+        .timeout_error()
+        .with_details(serde_json::json!({
+            "app": id,
+            "pid": identity.pid(),
+            "force": force,
+        }))
+        .with_disposition(agent_desktop_core::DeliverySemantics::delivered_unverified()))
+}
+
+/// Titles of the app's modal prompts, if any are standing when the exit wait
+/// times out. A short bounded probe: a prompt the quit request opened is
+/// already listed by `list-surfaces`, and a probe failure says nothing about
+/// the app, so it falls back to the plain timeout below.
+#[cfg(target_os = "macos")]
+fn pending_dialog_titles(
+    identity: &crate::system::process::process_identity::ProcessIdentity,
+) -> Option<Vec<String>> {
+    let probe_deadline = std::time::Instant::now() + std::time::Duration::from_millis(500);
+    let surfaces =
+        crate::tree::surface_inventory::list_surfaces_for_process(*identity, probe_deadline)
+            .ok()?;
+    let titles = dialog_titles(&surfaces);
+    (!titles.is_empty()).then_some(titles)
+}
+
+/// Titles of the modal prompts (alerts and sheets) among the app's surfaces,
+/// in surface order; an untitled prompt contributes an empty string so the
+/// count still reports it. Popovers and menus are not prompts and never block
+/// a quit.
+fn dialog_titles(surfaces: &[agent_desktop_core::SurfaceInfo]) -> Vec<String> {
+    surfaces
+        .iter()
+        .filter(|surface| matches!(surface.kind.as_str(), "alert" | "sheet"))
+        .map(|surface| surface.title.clone().unwrap_or_default())
+        .collect()
 }
 
 #[cfg(target_os = "macos")]
